@@ -12,3 +12,9 @@ logs/
 
 # Third-party plugin assets (binary files, not part of core project)
 plugins/
+
+# Dev logs and runtime artifacts
+*.log
+server*.log
+startup*.log
+*_err*.log
