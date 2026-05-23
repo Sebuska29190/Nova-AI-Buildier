@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "created_at": "2026-05-23T12:53:20.891Z",
+  "video": {
+    "filename": "video_mpickvkq_le_secret_de_maman.mp4",
+    "title": "**Le secret de maman**",
+    "is_short": false,
+    "quality": "medium",
+    "size_mb": 19.84
+  },
+  "content": {
+    "topic": "A comedic, satirical short film parody featuring a group of stylish but exaggeratedly expressive French women in a chic Parisian café, humorously gossiping and making playful, dramatic jokes about President Emmanuel Macron, cinematic lighting, vibrant atmosphere, lively hand gestures, high-quality production, in the style of a modern French comedy sketch",
+    "word_count": 282,
+    "story": "Je ne voulais pas y aller. Mais maman m’a regardée avec ses yeux fatigués, et j’ai su que je devais.\nLe café était bondé ce jour-là. Des rires, des tasses qui claquent, des parfums de croissants chauds. Mais à notre table, le silence était assourdissant.\n« Tu sais pourquoi je t’ai amenée ici ? » Sa voix tremblait.\nJ’ai secoué la tête, enroulant mes doigts autour de la serviette en papier.\n« Parce que c’est ici que tout a commencé, » a-t-elle murmuré. « Et que tout doit finir. »\nElle a sorti une "
+  },
+  "production": {
+    "model": "deepseek/deepseek-chat",
+    "tts_engine": "edge",
+    "image_engine": "dalle3",
+    "image_count": 8,
+    "subtitles": true
+  }
+}

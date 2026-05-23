@@ -1,0 +1,78 @@
+const BASE = import.meta.env.VITE_NOVA_API_URL || "http://localhost:4123";
+
+async function get(path: string) {
+  const res = await fetch(BASE + path);
+  if (!res.ok) throw new Error(`GET ${path} ${res.status}`);
+  return res.json();
+}
+
+async function post(path: string, body?: unknown) {
+  const res = await fetch(BASE + path, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`POST ${path} ${res.status}: ${await res.text().catch(() => "")}`);
+  return res.json();
+}
+
+export const api = {
+  health: () => get("/healthz"),
+  models: () => get("/v1/models").then((r) => r.data || []),
+  sessions: () => get("/api/sessions").then((r) => r.sessions || []),
+  sessionDetail: (id: string) => get(`/api/sessions/${id}`),
+  tools: () => get("/api/tools").then((r) => r.tools || []),
+  agents: () => get("/api/agents").then((r) => r.agents || []),
+  channels: () => get("/api/channels").then((r) => r.channels || []),
+  memories: () => get("/api/memory").then((r) => r.memories || []),
+  skills: () => get("/api/skills").then((r) => r.skills || []),
+  agentSend: (message: string, model?: string, agentId?: string) =>
+    post("/api/agent/send", { message, model, agentId }),
+
+  // SSE streaming agent with session persistence
+  chatSend: (message: string, model: string, sessionKey?: string, onChunk?: (text: string) => void) => {
+    return new Promise<{ text: string; sessionKey: string }>(async (resolve, reject) => {
+      try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (sessionKey) headers["x-nova-session-key"] = sessionKey;
+
+        const res = await fetch(BASE + "/v1/chat/completions", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: message }],
+            stream: true,
+          }),
+        });
+        if (!res.ok) { reject(new Error(`API ${res.status}`)); return; }
+
+        const newSessionKey = res.headers.get("x-nova-session-id") || sessionKey || "";
+        const reader = res.body?.getReader();
+        if (!reader) { reject(new Error("No body")); return; }
+
+        const decoder = new TextDecoder();
+        let buf = "", fullText = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() || "";
+          for (const line of lines) {
+            const t = line.trim();
+            if (t.startsWith("data: ") && t !== "data: [DONE]") {
+              try {
+                const j = JSON.parse(t.slice(6));
+                if (j.choices?.[0]?.delta?.content) {
+                  fullText += j.choices[0].delta.content;
+                  onChunk?.(fullText);
+                }
+              } catch {}
+            }
+          }
+        }
+        resolve({ text: fullText, sessionKey: newSessionKey });
+      } catch (e) { reject(e); }
+    });
+  },
+};

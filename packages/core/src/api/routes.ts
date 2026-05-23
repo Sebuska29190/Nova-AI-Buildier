@@ -1,0 +1,1142 @@
+﻿import { Hono } from "hono";
+import { getCookie } from "hono/cookie";
+import { safeMessage } from "../errors.ts";
+import { cors } from "hono/cors";
+import { join, dirname } from "node:path";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { registry } from "../plugin/registry.ts";
+import { sessionManager } from "../session/manager.ts";
+import { agentStore } from "../agent/store.ts";
+import { runAgent } from "../agent/runner.ts";
+import { listTools } from "../plugin/tools.ts";
+import { channelManager } from "../channel/manager.ts";
+import { memoryStore } from "../memory/store.ts";
+import { onEvent } from "../event-bus/index.ts";
+import type { VideoParams } from "../video/types.ts";
+import { getVideoJobs, getVideoJob, startVideoGeneration, cancelVideoJob, deleteVideoJob } from "../video/pipeline.ts";
+import { getWorkJobs, getWorkJob, createWorkJob, cancelWorkJob, deleteWorkJob, subscribeSSE } from "../worker/manager.ts";
+import { createTask, listTasks, updateTask, deleteTask } from "../task/store.ts";
+import { loadSkills } from "../skill/loader.ts";
+import { spawnSubAgent } from "../multi-agent/subagent.ts";
+import { makeSnapshot, listSnapshots, rewindFiles } from "../checkpoint/store.ts";
+import { uploadSession, listSessions as listGistSessions } from "../cloud-save/gist.ts";
+import { research, listSources } from "../research/engine.ts";
+import { subscribe as monSubscribe, listSubscriptions, unsubscribe as monUnsubscribe } from "../monitor/scheduler.ts";
+import { analyzeSymbol, getHistoricalData, getWatchlist, addToWatchlist, removeFromWatchlist } from "../trading/analyzer.ts";
+import { brainstorm } from "../brainstorm/engine.ts";
+import { verifyToken, registerUser, loginUser } from "../auth/jwt.ts";
+import { runTerminal } from "../gateway/routes-terminal.ts";
+import { knowledgeBase } from "../knowledge/store.ts";
+import { runAutoBugFixer } from "../agent/auto-bug-fixer.ts";
+import { workspaceManager } from "../workspace/manager.ts";
+import { kernel, agentFS, ledger } from "../kernel/index.ts";
+import { tmuxAvailable, listSessions as tmuxListSessions, createSession as tmuxCreateSession, killSession as tmuxKillSession, sendKeys as tmuxSendKeys, capturePane as tmuxCapturePane, getStatus as tmuxGetStatus } from "../tmux/tools.ts";
+import { listCommunityPlugins, getCommunityPlugin, installPlugin, uninstallPlugin } from "../plugin/community-plugins.ts";
+import { agentScheduler } from "../agent/scheduler.ts";
+import { getAllProviderConfigs, saveProviderConfig, deleteProviderConfig, testProviderConnection } from "../config/provider-config.ts";
+
+// Auth middleware — bypass for /health, /api/auth, /v1, and /api/sessions
+const PUBLIC_PATHS = ["/health", "/api/auth", "/", "/assets"];
+
+function authMiddleware(c: any, next: any) {
+  const path = c.req.path;
+  if (PUBLIC_PATHS.some((p) => path === p || path.startsWith(p))) return next();
+  const auth = c.req.header("Authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : getCookie(c, "nova_token") || "";
+  if (token) {
+    const user = verifyToken(token);
+    if (user) {
+      c.set("user", user);
+      return next();
+    }
+  }
+  // Allow public GET requests only for known safe endpoints
+  const PUBLIC_GET_PATHS = ["/api/sessions", "/api/tools", "/api/agents", "/v1/models", "/health"];
+  if (c.req.method === "GET" && PUBLIC_GET_PATHS.some(p => path === p || path.startsWith(p + "/"))) return next();
+  return c.json({ error: "Unauthorized" }, 401);
+}
+
+export function createRouter(): Hono {
+  const app = new Hono();
+  app.use("*", cors());
+  app.use("*", authMiddleware);
+
+  // Auth
+  app.post("/api/auth/register", async (c) => {
+    const body = await c.req.json<{ username: string; password: string }>();
+    if (!body.username || !body.password) return c.json({ error: "username and password required" }, 400);
+    const token = registerUser(body.username, body.password);
+    if (!token) return c.json({ error: "User already exists" }, 409);
+    return c.json({ token, username: body.username });
+  });
+  app.post("/api/auth/login", async (c) => {
+    const body = await c.req.json<{ username: string; password: string }>();
+    const token = loginUser(body.username, body.password);
+    if (!token) return c.json({ error: "Invalid credentials" }, 401);
+    return c.json({ token, username: body.username });
+  });
+  app.get("/api/auth/me", (c) => {
+    const user = (c as any).get("user");
+    if (!user) return c.json({ error: "Not authenticated" }, 401);
+    return c.json({ user });
+  });
+
+  // Health
+  app.get("/health", (c) => c.json({ status: "ok", version: "0.3.0" }));
+
+  // Models
+  app.get("/v1/models", (c) => c.json({ object: "list", data: registry.listModels().map((m) => ({ id: m.ref, object: "model", owned_by: m.providerId })) }));
+
+  // Chat completions (OpenAI-compat)
+  app.post("/v1/chat/completions", async (c) => {
+    const body = await c.req.json<{ model: string; messages: Array<{ role: string; content: string }>; stream?: boolean; tools?: unknown[]; }>();
+
+    const resolved = registry.resolveModel(body.model);
+    if (!resolved) return c.json({ error: { message: `Model ${body.model} not found` } }, 400);
+
+    const sessionKey = c.req.header("x-nova-session-key");
+    let session = sessionKey ? sessionManager.getSession(sessionKey) : undefined;
+    if (!session) session = sessionManager.createSession(body.model);
+    const lastMsg = body.messages.filter((m) => m.role === "user").pop();
+    if (lastMsg) sessionManager.append(session.id, "user", lastMsg.content);
+
+    if (body.stream !== false) {
+      const headers = { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "x-nova-session-id": session.id };
+      const s = new ReadableStream({
+        async start(ctrl) {
+          const enc = new TextEncoder();
+          const sendSSE = (d: string) => ctrl.enqueue(enc.encode(`data: ${d}\n\n`));
+          const runId = `run_${Date.now()}`;
+
+          // Subscribe to streaming text events only
+          // Do NOT subscribe to "done" events — tool loops may fire multiple "done" events
+          // (one per iteration), which would cause premature stream closure. Instead,
+          // we send the final [DONE] after runAgent completes.
+          const unsubAssistant = onEvent("event", (e: any) => {
+            if (e.kind === "assistant" && e.runId === runId && e.data?.text) {
+              sendSSE(JSON.stringify({
+                id: `chatcmpl-${session.id}`,
+                object: "chat.completion.chunk",
+                created: Math.floor(Date.now() / 1000),
+                model: body.model,
+                choices: [{ index: 0, delta: { content: e.data.text }, finish_reason: null }],
+              }));
+            }
+          });
+
+          try {
+            const result = await runAgent({ sessionId: session.id, message: lastMsg?.content ?? "", modelRef: body.model, tools: true, runId });
+            // Send final result and close stream
+            sendSSE(JSON.stringify({
+              id: `chatcmpl-${session.id}`,
+              object: "chat.completion.chunk",
+              created: Math.floor(Date.now() / 1000),
+              model: body.model,
+              choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+            }));
+            sendSSE("[DONE]");
+          } catch (e: unknown) {
+            sendSSE(JSON.stringify({ error: { message: safeMessage(e) } }));
+          } finally {
+            unsubAssistant();
+            ctrl.close();
+          }
+        },
+      });
+      return new Response(s, { headers });
+    }
+
+    const result = await runAgent({ sessionId: session.id, message: lastMsg?.content ?? "", modelRef: body.model, tools: true });
+    c.header("x-nova-session-id", session.id);
+    return c.json({ id: `chatcmpl-${session.id}`, model: body.model, choices: [{ index: 0, message: { role: "assistant", content: result.text }, finish_reason: "stop" }] });
+  });
+
+  // Agent API — supports agentId to use agent's model+prompt
+  app.post("/api/agent/send", async (c) => {
+    const body = await c.req.json<{ message: string; model?: string; sessionId?: string; thinkingLevel?: string; systemPrompt?: string; agentId?: string; workspace?: string; }>();
+    let sessionId = body.sessionId;
+    let modelRef = body.model;
+    let sysPrompt = body.systemPrompt;
+
+    // If agentId is provided, resolve agent's model and system prompt
+    if (body.agentId) {
+      const agent = agentStore.get(body.agentId);
+      if (!agent) return c.json({ error: `Agent '${body.agentId}' not found` }, 404);
+      modelRef = agent.modelRef;
+      sysPrompt = agent.systemPrompt;
+      // Mark agent as active
+      agentStore.update(body.agentId, { status: "active" as any });
+    }
+
+    if (!sessionId) {
+      const s = sessionManager.createSession(modelRef ?? "deepseek/deepseek-chat", { systemPrompt: sysPrompt });
+      sessionId = s.id;
+    }
+    // Set workspace if provided
+    if (body.workspace) {
+      const { workspaceManager } = await import("../workspace/manager.ts");
+      workspaceManager.setRoot(body.workspace);
+    }
+    const result = await runAgent({ sessionId, message: body.message, modelRef: modelRef ?? "deepseek/deepseek-chat", thinkingLevel: body.thinkingLevel, systemPrompt: sysPrompt, tools: true });
+
+    // Reset agent status after response
+    if (body.agentId) agentStore.update(body.agentId, { status: "ready" as any });
+
+    return c.json(result);
+  });
+
+  // Sessions
+  app.get("/api/sessions", (c) => c.json({ sessions: sessionManager.listSessions(50) }));
+  app.get("/api/sessions/search", (c) => {
+    const q = c.req.query("q") || "";
+    const limit = parseInt(c.req.query("limit") || "10", 10);
+    if (!q.trim()) return c.json({ results: [], query: q });
+    const results = sessionManager.searchTranscripts(q, limit);
+    return c.json({ results, query: q, count: results.length });
+  });
+  app.get("/api/sessions/:id", (c) => {
+    const s = sessionManager.getSession(c.req.param("id"));
+    if (!s) return c.json({ error: "Not found" }, 404);
+    return c.json({ session: s, messages: sessionManager.getTranscript(s.id) });
+  });
+
+  // Tools
+  app.get("/api/tools", (c) => c.json({ tools: listTools().map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) }));
+
+  // Agents
+  app.get("/api/agents", (c) => c.json({ agents: agentStore.list() }));
+  // Static routes before parameterized ones to avoid :id catching "jobs"
+  app.get("/api/agents/jobs", (c) => c.json({ jobs: agentScheduler.listJobs() }));
+  app.get("/api/agents/:id", (c) => {
+    const agent = agentStore.get(c.req.param("id"));
+    if (!agent) return c.json({ error: "Agent not found" }, 404);
+    return c.json({ agent });
+  });
+  app.post("/api/agents", async (c) => {
+    const body = await c.req.json<{ name: string; description?: string; modelRef?: string; systemPrompt?: string; emoji?: string; skills?: string[] }>();
+    try {
+      const agent = agentStore.create(body);
+      return c.json({ agent }, 201);
+    } catch (e: unknown) {
+      return c.json({ error: safeMessage(e) }, 400);
+    }
+  });
+
+  // AI-assisted agent creation
+  app.post("/api/agents/ai-create", async (c) => {
+    try {
+      const body: any = await c.req.json();
+      const userDesc = body.description || "";
+      if (!userDesc.trim()) return c.json({ error: "description is required" }, 400);
+
+      const systemPrompt = "You are an AI agent designer. Return ONLY valid JSON.";
+      const userPrompt = `Based on this user description, generate a JSON object for a new AI agent.
+
+User description: "${userDesc}"
+
+Return valid JSON only (no markdown, no code fences):
+{
+  "name": "Short catchy name (max 30 chars)",
+  "emoji": "A single emoji representing the agent",
+  "description": "One-line description of what this agent does (max 80 chars)",
+  "systemPrompt": "Detailed system prompt/instructions for the agent (2-4 paragraphs)",
+  "modelRef": "deepseek/deepseek-chat",
+  "skills": ["web_search", "get_current_time", "calculate"]
+}`;
+
+      // Use piHarness for a quick one-shot completion via the session manager
+      const sessionId = c.get("sessionId") || "ai-create-" + Date.now();
+      const resolved = registry.resolveModel("deepseek/deepseek-chat");
+      if (!resolved) return c.json({ error: "No provider available" }, 500);
+
+      const messages = [
+        { role: "system" as const, content: systemPrompt },
+        { role: "user" as const, content: userPrompt },
+      ];
+
+      let text = "";
+      const provider = resolved.provider;
+      const modelId = resolved.model.id;
+      await provider.stream({
+        model: modelId,
+        messages,
+        stream: false,
+        onToken: (token: string) => { text += token; },
+        onFinish: () => {},
+      });
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return c.json({ error: "Failed to parse AI response: " + text.slice(0, 200) }, 500);
+
+      const agentData = JSON.parse(jsonMatch[0]);
+      const agent = agentStore.create({
+        name: agentData.name || "AI Agent",
+        description: agentData.description || "AI-generated agent",
+        modelRef: agentData.modelRef || "deepseek/deepseek-chat",
+        systemPrompt: agentData.systemPrompt || "",
+        emoji: agentData.emoji || "🤖",
+        skills: agentData.skills || [],
+      });
+      return c.json({ agent, generated: agentData }, 201);
+    } catch (e: unknown) {
+      return c.json({ error: safeMessage(e) }, 500);
+    }
+  });
+  app.put("/api/agents/:id", async (c) => {
+    const body = await c.req.json<{ name?: string; description?: string; modelRef?: string; systemPrompt?: string; thinkingLevel?: string; emoji?: string; skills?: string[] }>();
+    const agent = agentStore.update(c.req.param("id"), body);
+    if (!agent) return c.json({ error: "Agent not found" }, 404);
+    return c.json({ agent });
+  });
+  // Agent workspace
+  app.put("/api/agents/:id/workspace", async (c) => {
+    try {
+      const body = await c.req.json<{ path: string }>();
+      const agent = agentStore.get(c.req.param("id"));
+      if (!agent) return c.json({ error: "Agent not found" }, 404);
+      agentStore.update(c.req.param("id"), { workspace: body.path } as any);
+      const { workspaceManager } = await import("../workspace/manager.ts");
+      workspaceManager.setRoot(body.path);
+      return c.json({ status: "ok", workspace: body.path });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+  app.delete("/api/agents/:id", (c) => {
+    const ok = agentStore.delete(c.req.param("id"));
+    if (!ok) return c.json({ error: "Agent not found" }, 404);
+    return c.json({ status: "deleted" });
+  });
+
+  // Agent background jobs
+  app.post("/api/agents/:id/start", async (c) => {
+    try {
+      const body: any = await c.req.json().catch(() => ({}));
+      const result = await agentScheduler.startAgent(c.req.param("id"), { task: body?.task, workspace: body?.workspace });
+      return c.json({ status: "started", ...result });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.post("/api/agents/:id/stop", async (c) => {
+    try {
+      await agentScheduler.stopAgent(c.req.param("id"));
+      return c.json({ status: "stopped" });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // Agent files
+  app.get("/api/agents/:id/files", (c) => {
+    const agent = agentStore.get(c.req.param("id"));
+    if (!agent) return c.json({ error: "Agent not found" }, 404);
+    return c.json({ files: agentStore.listFiles(c.req.param("id")) });
+  });
+  app.get("/api/agents/:id/files/:fileName", (c) => {
+    const file = agentStore.getFile(c.req.param("id"), c.req.param("fileName"));
+    if (!file || (file as any).missing) return c.json({ error: "File not found" }, 404);
+    return c.json({ file });
+  });
+  app.put("/api/agents/:id/files/:fileName", async (c) => {
+    const body = await c.req.json<{ content: string }>();
+    const agent = agentStore.get(c.req.param("id"));
+    if (!agent) return c.json({ error: "Agent not found" }, 404);
+    agentStore.setFile(c.req.param("id"), c.req.param("fileName"), body.content);
+    return c.json({ status: "saved" });
+  });
+
+  // Agent task endpoint — wysyła zadanie do konkretnego agenta
+  app.post("/api/agents/:id/task", async (c) => {
+    try {
+      const agentId = c.req.param("id");
+      const body = await c.req.json<{ task: string; model?: string }>();
+      const agent = agentStore.get(agentId);
+      if (!agent) return c.json({ error: "Agent not found" }, 404);
+      const result = await runAgent(body.task, { agentId, model: body.model || agent.modelRef });
+      return c.json({ result });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  // Channels
+  app.get("/api/channels", (c) => c.json({ channels: channelManager.getChannels() }));
+  app.post("/api/channels/:id/start", async (c) => {
+    const body = await c.req.json<{ token?: string; chatId?: string; channelId?: string }>();
+    try {
+      await channelManager.start(c.req.param("id"), body as Record<string, string>);
+      return c.json({ status: "started" });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.post("/api/channels/:id/stop", async (c) => {
+    await channelManager.stop(c.req.param("id"));
+    return c.json({ status: "stopped" });
+  });
+  app.post("/api/channels/:id/test", async (c) => {
+    try {
+      const result = await channelManager.test(c.req.param("id"));
+      return c.json(result);
+    } catch (e: unknown) {
+      return c.json({ ok: false, message: safeMessage(e) }, 500);
+    }
+  });
+  app.post("/api/channels/report", async (c) => {
+    try {
+      const channels = channelManager.getChannels();
+      const now = new Date().toISOString();
+      let report = `Channel Report — ${now}\n${"=".repeat(50)}\n\n`;
+      report += `Total channels configured: ${channels.length}\n\n`;
+      for (const ch of channels) {
+        const configKeys = Object.keys(ch.config || {}).join(", ");
+        report += `[${ch.connected ? "ONLINE" : "OFFLINE"}] ${ch.name || ch.id}\n`;
+        report += `  ID:        ${ch.id}\n`;
+        report += `  Status:    ${ch.connected ? "Connected" : "Disconnected"}\n`;
+        report += `  Config:    ${configKeys || "(none)"}\n`;
+        report += "\n";
+      }
+      report += `${"=".repeat(50)}\n`;
+      report += `Report generated at: ${now}\n`;
+      return c.json({ report });
+    } catch (e: unknown) {
+      return c.json({ error: safeMessage(e) }, 500);
+    }
+  });
+
+  // Memory
+  app.get("/api/memory", (c) => c.json({ memories: memoryStore.getAll(c.req.query("scope") as any) }));
+  app.get("/api/memory/search", (c) => c.json({ results: memoryStore.search(c.req.query("q") || "") }));
+  app.post("/api/memory", async (c) => {
+    const body = await c.req.json<{ name: string; content: string; tags?: string[]; scope?: "user" | "project"; importance?: string }>();
+    if (!body.name || !body.content) return c.json({ error: "name and content required" }, 400);
+    const entry = memoryStore.save(body.name, body.content, body.tags, body.scope, body.importance as any);
+    return c.json({ memory: entry }, 201);
+  });
+  app.delete("/api/memory/:id", (c) => {
+    if (!memoryStore.delete(c.req.param("id"))) return c.json({ error: "Not found" }, 404);
+    return c.json({ status: "deleted" });
+  });
+
+  // Video
+  app.get("/api/video/jobs", (c) => c.json({ jobs: getVideoJobs() }));
+  app.get("/api/video/jobs/:id", (c) => {
+    const job = getVideoJob(c.req.param("id"));
+    if (!job) return c.json({ error: "Job not found" }, 404);
+    return c.json({ job });
+  });
+  app.post("/api/video/generate", async (c) => {
+    const body = await c.req.json<VideoParams>();
+    if (!body.topic) return c.json({ error: "topic is required" }, 400);
+    const job = await startVideoGeneration(body);
+    return c.json({ job }, 201);
+  });
+  app.post("/api/video/jobs/:id/cancel", (c) => {
+    const ok = cancelVideoJob(c.req.param("id"));
+    if (!ok) return c.json({ error: "Job not found or not running" }, 404);
+    return c.json({ status: "cancelled" });
+  });
+  app.delete("/api/video/jobs/:id", (c) => {
+    const ok = deleteVideoJob(c.req.param("id"));
+    if (!ok) return c.json({ error: "Job not found" }, 404);
+    return c.json({ status: "deleted" });
+  });
+  app.get("/api/video/jobs/:id/download", (c) => {
+    const job = getVideoJob(c.req.param("id"));
+    if (!job || !job.outputPath) return c.json({ error: "No output file" }, 404);
+    if (!existsSync(job.outputPath)) return c.json({ error: "File not found on disk" }, 404);
+    const filename = job.outputPath.split(/[/\\]/).pop() || "video.mp4";
+    const file = readFileSync(job.outputPath);
+    return c.newResponse(file, {
+      status: 200,
+      headers: {
+        "Content-Type": "video/mp4",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": String(file.length),
+      },
+    });
+  });
+
+  // Worker
+  app.get("/api/worker/jobs", (c) => c.json({ jobs: getWorkJobs() }));
+  app.get("/api/worker/jobs/:id", (c) => {
+    const job = getWorkJob(c.req.param("id"));
+    if (!job) return c.json({ error: "Job not found" }, 404);
+    return c.json({ job });
+  });
+  app.post("/api/worker/jobs", async (c) => {
+    const body = await c.req.json<{ title: string; tasks: string[]; modelRef?: string }>();
+    if (!body.title || !body.tasks?.length) return c.json({ error: "title and tasks required" }, 400);
+    const job = createWorkJob(body.title, body.tasks, body.modelRef);
+    return c.json({ job }, 201);
+  });
+  app.post("/api/worker/jobs/:id/cancel", (c) => {
+    const ok = cancelWorkJob(c.req.param("id"));
+    if (!ok) return c.json({ error: "Job not found or not running" }, 404);
+    return c.json({ status: "cancelled" });
+  });
+  app.delete("/api/worker/jobs/:id", (c) => {
+    const ok = deleteWorkJob(c.req.param("id"));
+    if (!ok) return c.json({ error: "Job not found" }, 404);
+    return c.json({ status: "deleted" });
+  });
+  app.get("/api/worker/events", (c) => {
+    // SSE endpoint for live worker updates
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const encoder = new TextEncoder();
+    const send = (event: string, data: any) => {
+      try {
+        writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      } catch {}
+    };
+    const unsub = subscribeSSE(send);
+    c.req.raw.signal.addEventListener("abort", () => { unsub(); writer.close().catch(() => {}); });
+    return c.newResponse(readable, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+    });
+  });
+
+  // Tasks
+  app.get("/api/tasks", (c) => c.json({ tasks: listTasks() }));
+  app.post("/api/tasks", async (c) => {
+    const body = await c.req.json<{ title: string; description?: string; priority?: string; tags?: string[] }>();
+    if (!body.title) return c.json({ error: "title required" }, 400);
+    return c.json({ task: createTask(body.title, body.description, body.priority as any, body.tags) }, 201);
+  });
+  app.patch("/api/tasks/:id", async (c) => {
+    const body = await c.req.json<{ status?: string }>();
+    const task = updateTask(c.req.param("id"), body as any);
+    if (!task) return c.json({ error: "Not found" }, 404);
+    return c.json({ task });
+  });
+  app.delete("/api/tasks/:id", (c) => { if (!deleteTask(c.req.param("id"))) return c.json({ error: "Not found" }, 404); return c.json({ status: "deleted" }); });
+
+  // Skills
+  app.get("/api/skills", (c) => c.json({ skills: loadSkills() }));
+
+  // Sub-agents
+  app.post("/api/subagent", async (c) => {
+    const body = await c.req.json<{ id: string; name: string; modelRef: string; systemPrompt: string; message: string }>();
+    const result = await spawnSubAgent({ id: body.id, name: body.name, modelRef: body.modelRef, systemPrompt: body.systemPrompt }, body.message);
+    return c.json({ result });
+  });
+
+  // Checkpoints
+  app.get("/api/checkpoints", (c) => c.json({ snapshots: listSnapshots() }));
+  app.post("/api/checkpoints", async (c) => {
+    const body = await c.req.json<{ description: string; files: string[] }>();
+    return c.json({ snapshot: makeSnapshot(body.description, body.files) }, 201);
+  });
+  app.post("/api/checkpoints/:id/rewind", (c) => {
+    if (!rewindFiles(c.req.param("id"))) return c.json({ error: "Not found" }, 404);
+    return c.json({ status: "rewound" });
+  });
+
+  // Cloud save
+  app.post("/api/cloud/upload", async (c) => {
+    const body = await c.req.json<{ token: string; title: string; content: string }>();
+    const id = await uploadSession(body.token, body.title, body.content);
+    return c.json({ gistId: id });
+  });
+  app.post("/api/cloud/list", async (c) => {
+    const body = await c.req.json<{ token: string }>();
+    const sessions = await listGistSessions(body.token);
+    return c.json({ sessions });
+  });
+
+  // Research
+  app.post("/api/research", async (c) => {
+    const body = await c.req.json<{ query: string }>();
+    const results = await research(body.query);
+    return c.json({ results });
+  });
+
+  // Monitor
+  app.get("/api/monitor", (c) => c.json({ subscriptions: listSubscriptions() }));
+  app.post("/api/monitor", async (c) => {
+    const body = await c.req.json<{ topic: string; sources: string[]; interval: number }>();
+    return c.json({ subscription: monSubscribe(body.topic, body.sources, body.interval) }, 201);
+  });
+  app.delete("/api/monitor/:id", (c) => {
+    if (!monUnsubscribe(c.req.param("id"))) return c.json({ error: "Not found" }, 404);
+    return c.json({ status: "deleted" });
+  });
+
+  // Trading
+  app.get("/api/trading/:symbol", async (c) => {
+    const result = await analyzeSymbol(c.req.param("symbol"));
+    return c.json({ analysis: result });
+  });
+  app.get("/api/trading/:symbol/history", async (c) => {
+    const range = c.req.query("range") as any || "1mo";
+    const data = await getHistoricalData(c.req.param("symbol"), range);
+    return c.json({ symbol: c.req.param("symbol"), data });
+  });
+  app.get("/api/trading/watchlist", (c) => {
+    return c.json({ watchlist: getWatchlist() });
+  });
+  app.post("/api/trading/watchlist", async (c) => {
+    const body = await c.req.json<{ symbol: string; note?: string }>();
+    if (!body.symbol) return c.json({ error: "symbol required" }, 400);
+    const entry = addToWatchlist(body.symbol, body.note);
+    return c.json({ entry }, 201);
+  });
+  app.delete("/api/trading/watchlist/:symbol", (c) => {
+    const ok = removeFromWatchlist(c.req.param("symbol"));
+    if (!ok) return c.json({ error: "Symbol not in watchlist" }, 404);
+    return c.json({ status: "removed" });
+  });
+
+  // Brainstorm
+  app.post("/api/brainstorm", async (c) => {
+    const body = await c.req.json<{ topic: string }>();
+    const ideas = await brainstorm(body.topic);
+    return c.json({ ideas });
+  });
+
+  // Terminal runner
+  app.post("/api/terminal", async (c) => {
+    const body = await c.req.json<{ command: string }>();
+    if (!body.command) return c.json({ error: "command required" }, 400);
+    const output = await runTerminal(body.command);
+    return c.json({ output });
+  });
+
+  // Knowledge Base
+  app.get("/api/knowledge/stats", (c) => c.json({ stats: knowledgeBase.getStats() }));
+  app.get("/api/knowledge/:category", (c) => {
+    const entries = knowledgeBase.listByCategory(c.req.param("category"));
+    return c.json({ entries });
+  });
+  app.get("/api/knowledge/search/:query", (c) => {
+    const results = knowledgeBase.search(c.req.param("query"), c.req.query("category"));
+    return c.json({ results });
+  });
+  app.post("/api/knowledge", async (c) => {
+    const body = await c.req.json<{ title: string; content: string; category?: string; tags?: string[]; source?: string }>();
+    if (!body.title || !body.content) return c.json({ error: "title and content required" }, 400);
+    const entry = knowledgeBase.save(body);
+    return c.json({ entry }, 201);
+  });
+
+  // Auto Bug Fixer
+  app.post("/api/agent/auto-bug-fixer", async (c) => {
+    const body = await c.req.json<{ repoDir?: string; testCmd?: string }>();
+    const result = await runAutoBugFixer(body.repoDir || ".", body.testCmd || "bun test");
+    return c.json({ result });
+  });
+
+  // ─── Workspace ──────────────────────────────────────────────────────────
+  app.get("/api/workspace", (c) => {
+    const state = workspaceManager.getState();
+    if (!state) return c.json({ active: false });
+    return c.json({ active: true, workspace: state });
+  });
+  app.post("/api/workspace/set", async (c) => {
+    const body = await c.req.json<{ dir: string }>();
+    if (!body.dir) return c.json({ error: "dir required" }, 400);
+    const ok = workspaceManager.setRoot(body.dir);
+    if (!ok) return c.json({ error: "Failed to set workspace" }, 400);
+    return c.json({ status: "ok", workspace: workspaceManager.getState() });
+  });
+  app.get("/api/workspace/files", (c) => {
+    if (!workspaceManager.isActive()) return c.json({ error: "No workspace set" }, 400);
+    const files = workspaceManager.listFiles(c.req.query("dir") || "", {
+      ext: c.req.query("ext") || undefined,
+      maxDepth: parseInt(c.req.query("depth") || "3"),
+    });
+    return c.json({ files });
+  });
+  app.get("/api/workspace/read", (c) => {
+    const path = c.req.query("path");
+    if (!path) return c.json({ error: "path required" }, 400);
+    const content = workspaceManager.readFile(path);
+    if (content === null) return c.json({ error: "File not found or too large" }, 404);
+    return c.json({ content });
+  });
+  app.post("/api/workspace/write", async (c) => {
+    const body = await c.req.json<{ path: string; content: string }>();
+    if (!body.path || body.content === undefined) return c.json({ error: "path and content required" }, 400);
+    const ok = workspaceManager.writeFile(body.path, body.content);
+    if (!ok) return c.json({ error: "Failed to write file" }, 400);
+    return c.json({ status: "ok" });
+  });
+  app.get("/api/workspace/tree", (c) => {
+    if (!workspaceManager.isActive()) return c.json({ error: "No workspace set" }, 400);
+    const tree = workspaceManager.getTree(c.req.query("dir") || "", parseInt(c.req.query("depth") || "2"));
+    return c.json({ tree });
+  });
+  app.post("/api/workspace/clear", (c) => {
+    workspaceManager.clear();
+    return c.json({ status: "cleared" });
+  });
+
+  // ─── Kernel ─────────────────────────────────────────────────────────────
+  app.get("/api/kernel/status", (c) => c.json({ initialized: kernel.isInitialized() }));
+  app.get("/api/kernel/agentfs/:agentId", (c) => {
+    const files = agentFS.listAgentFiles(c.req.param("agentId"));
+    return c.json({ files });
+  });
+  app.get("/api/kernel/agentfs/:agentId/:fileName", (c) => {
+    const content = agentFS.readAgentFile(c.req.param("agentId"), c.req.param("fileName"));
+    if (content === null) return c.json({ error: "File not found" }, 404);
+    return c.json({ content });
+  });
+  app.put("/api/kernel/agentfs/:agentId/:fileName", async (c) => {
+    const body = await c.req.json<{ content: string }>();
+    const ok = agentFS.writeAgentFile(c.req.param("agentId"), c.req.param("fileName"), body.content);
+    if (!ok) return c.json({ error: "Failed to write" }, 400);
+    return c.json({ status: "ok" });
+  });
+  app.get("/api/kernel/global", (c) => {
+    const files = agentFS.listGlobalFiles();
+    return c.json({ files });
+  });
+  app.get("/api/kernel/ledger", (c) => {
+    const entries = ledger.query({
+      agentId: c.req.query("agentId") || undefined,
+      action: c.req.query("action") || undefined,
+      limit: parseInt(c.req.query("limit") || "50"),
+    });
+    return c.json({ entries });
+  });
+  app.get("/api/kernel/ledger/stats", (c) => c.json({ stats: ledger.getStats() }));
+
+  // ─── Research Sources ───────────────────────────────────────────────────
+  app.get("/api/research/sources", (c) => c.json({ sources: listSources() }));
+
+  // ─── Tmux ───────────────────────────────────────────────────────────────
+  app.get("/api/tmux/status", (c) => c.json({ available: tmuxAvailable(), status: tmuxGetStatus() }));
+  app.get("/api/tmux/sessions", (c) => c.json({ sessions: tmuxListSessions() }));
+  app.post("/api/tmux/sessions", async (c) => {
+    const body = await c.req.json<{ name: string; dir?: string }>();
+    if (!body.name) return c.json({ error: "name required" }, 400);
+    const ok = tmuxCreateSession(body.name, body.dir);
+    if (!ok) return c.json({ error: "Failed to create session" }, 400);
+    return c.json({ status: "created" });
+  });
+  app.delete("/api/tmux/sessions/:name", (c) => {
+    const ok = tmuxKillSession(c.req.param("name"));
+    if (!ok) return c.json({ error: "Session not found" }, 404);
+    return c.json({ status: "killed" });
+  });
+  app.post("/api/tmux/send", async (c) => {
+    const body = await c.req.json<{ session: string; command: string; window?: number; pane?: number }>();
+    if (!body.session || !body.command) return c.json({ error: "session and command required" }, 400);
+    const ok = tmuxSendKeys(body.session, body.command, body.window, body.pane);
+    if (!ok) return c.json({ error: "Failed to send keys" }, 400);
+    return c.json({ status: "sent" });
+  });
+  app.get("/api/tmux/capture", (c) => {
+    const session = c.req.query("session");
+    if (!session) return c.json({ error: "session required" }, 400);
+    const output = tmuxCapturePane(session, parseInt(c.req.query("window") || "0"), parseInt(c.req.query("pane") || "0"));
+    return c.json({ output });
+  });
+
+  // ─── Plugins ──────────────────────────────────────────────────────────────
+  app.get("/api/plugins", (c) => c.json({ plugins: listCommunityPlugins() }));
+  app.get("/api/plugins/:id", (c) => {
+    const plugin = getCommunityPlugin(c.req.param("id"));
+    if (!plugin) return c.json({ error: "Plugin not found" }, 404);
+    return c.json({ plugin });
+  });
+  app.post("/api/plugins/:id/install", async (c) => {
+    const result = await installPlugin(c.req.param("id"));
+    if (!result.success) return c.json({ error: result.error, log: result.log }, 400);
+    return c.json({ status: "installed", path: result.path, log: result.log });
+  });
+  app.post("/api/plugins/:id/uninstall", async (c) => {
+    const result = await uninstallPlugin(c.req.param("id"));
+    if (!result.success) return c.json({ error: result.error }, 400);
+    return c.json({ status: "uninstalled" });
+  });
+
+  // ─── Config / Provider API Keys ────────────────────────────────────────────
+  app.get("/api/config/providers", (c) => {
+    const providers = getAllProviderConfigs();
+    return c.json({ providers });
+  });
+
+  app.post("/api/config/providers/:id", async (c) => {
+    try {
+      const providerId = c.req.param("id");
+      const body = await c.req.json<{ apiKey?: string; baseUrl?: string; maxTokens?: number; thinkingLevel?: string; enabled?: boolean }>();
+      const entry = saveProviderConfig(providerId, body);
+      // Never send apiKey back to client
+      const { apiKey, ...safe } = entry;
+      return c.json({ status: "saved", provider: safe });
+    } catch (e: unknown) {
+      return c.json({ error: safeMessage(e) }, 400);
+    }
+  });
+
+  app.delete("/api/config/providers/:id", (c) => {
+    const providerId = c.req.param("id");
+    const ok = deleteProviderConfig(providerId);
+    if (!ok) return c.json({ error: "Provider not found" }, 404);
+    return c.json({ status: "unbound" });
+  });
+
+  app.post("/api/config/providers/:id/test", async (c) => {
+    try {
+      const providerId = c.req.param("id");
+      const body: any = await c.req.json().catch(() => ({}));
+      const result = await testProviderConnection(providerId, body?.apiKey);
+      return c.json(result);
+    } catch (e: unknown) {
+      return c.json({ ok: false, error: safeMessage(e) }, 400);
+    }
+  });
+
+  app.post("/api/config/providers/refresh-models", (c) => {
+    // Re-register providers with updated env vars by re-importing
+    // The env vars are already set by saveProviderConfig, so providers
+    // will pick them up on next stream call automatically.
+    const models = registry.listModels();
+    return c.json({ status: "ok", count: models.length, models });
+  });
+
+  // ─── Workspace API ────────────────────────────────────────────────────────
+  app.get("/api/workspace", (c) => {
+    const state = workspaceManager.getState();
+    if (!state) return c.json({ active: false });
+    return c.json({ active: true, ...state });
+  });
+
+  app.post("/api/workspace/set", async (c) => {
+    try {
+      const body = await c.req.json<{ path: string }>();
+      if (!body.path) return c.json({ error: "path is required" }, 400);
+      const ok = workspaceManager.setRoot(body.path);
+      if (!ok) return c.json({ error: "Failed to set workspace root" }, 400);
+      return c.json({ status: "ok", root: workspaceManager.getRoot() });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/workspace/add-folder", async (c) => {
+    try {
+      const body = await c.req.json<{ path: string }>();
+      const ok = workspaceManager.addFolder(body.path);
+      return c.json({ ok });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/workspace/remove-folder", async (c) => {
+    try {
+      const body = await c.req.json<{ path: string }>();
+      const ok = workspaceManager.removeFolder(body.path);
+      return c.json({ ok });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.get("/api/workspace/folders", (c) => {
+    const folders = workspaceManager.getFolders();
+    return c.json({ folders });
+  });
+
+  // Native folder picker — opens Windows folder dialog via PowerShell
+  app.post("/api/workspace/browse", async (c) => {
+    try {
+      const { execSync } = await import("node:child_process");
+      // PowerShell script that opens native FolderBrowserDialog
+      // Use semicolons between statements so newline→space replacement doesn't break it
+      const psScript = [
+        'Add-Type -AssemblyName System.Windows.Forms',
+        '$folder = New-Object System.Windows.Forms.FolderBrowserDialog',
+        '$folder.Description = "Select workspace folder for Nova AI"',
+        '$folder.ShowNewFolderButton = $true',
+        '$result = $folder.ShowDialog()',
+        'if ($result -eq [System.Windows.Forms.DialogResult]::OK) {',
+        '  Write-Output $folder.SelectedPath',
+        '} else {',
+        '  Write-Output "__CANCELLED__"',
+        '}',
+      ].join("; ");
+      const result = execSync(
+        `powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`,
+        { encoding: "utf-8", timeout: 30000, shell: true },
+      ).trim();
+      if (result === "__CANCELLED__" || !result) {
+        return c.json({ cancelled: true });
+      }
+      return c.json({ path: result });
+    } catch (e: unknown) {
+      return c.json({ error: safeMessage(e) }, 500);
+    }
+  });
+
+  // ─── Config / Global Rules ─────────────────────────────────────────────────
+  const RULES_PATH = join(process.cwd(), "config", "rules.txt");
+
+  app.get("/api/config/rules", (c) => {
+    try {
+      if (existsSync(RULES_PATH)) {
+        const rules = readFileSync(RULES_PATH, "utf-8");
+        return c.json({ rules });
+      }
+      return c.json({ rules: "" });
+    } catch (e: unknown) {
+      return c.json({ rules: "", error: safeMessage(e) });
+    }
+  });
+
+  app.post("/api/config/rules", async (c) => {
+    try {
+      const body = await c.req.json<{ rules: string }>();
+      const dir = dirname(RULES_PATH);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(RULES_PATH, body.rules ?? "", "utf-8");
+      return c.json({ status: "saved" });
+    } catch (e: unknown) {
+      return c.json({ error: safeMessage(e) }, 500);
+    }
+  });
+
+  // Save generation defaults
+  app.post("/api/config/settings", async (c) => {
+    try {
+      const body = await c.req.json<{ ttsEngine?: string; imageEngine?: string; videoQuality?: string }>();
+      const SETTINGS_PATH = join(process.cwd(), "data", "defaults.json");
+      const dir = dirname(SETTINGS_PATH);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      const existing = existsSync(SETTINGS_PATH) ? JSON.parse(readFileSync(SETTINGS_PATH, "utf-8")) : {};
+      const merged = { ...existing, ...body };
+      writeFileSync(SETTINGS_PATH, JSON.stringify(merged, null, 2), "utf-8");
+      // Also set env vars for runtime
+      if (body.ttsEngine) process.env.NOVA_DEFAULT_TTS = body.ttsEngine;
+      if (body.imageEngine) process.env.NOVA_DEFAULT_IMAGE = body.imageEngine;
+      if (body.videoQuality) process.env.NOVA_DEFAULT_QUALITY = body.videoQuality;
+      return c.json({ status: "saved", settings: merged });
+    } catch (e: unknown) {
+      return c.json({ error: safeMessage(e) }, 500);
+    }
+  });
+
+  // ─── Crypto News Agent ────────────────────────────────────────────────────────
+  app.post("/api/crypto/start", async (c) => {
+    try {
+      const { startScheduler, getStatus } = await import("../crypto/scheduler.ts");
+      startScheduler();
+      return c.json({ status: "running", interval: 45 });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.post("/api/crypto/stop", async (c) => {
+    try {
+      const { stopScheduler } = await import("../crypto/scheduler.ts");
+      stopScheduler();
+      return c.json({ status: "stopped" });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.post("/api/crypto/now", async (c) => {
+    try {
+      const { runCryptoDigest } = await import("../crypto/scheduler.ts");
+      const result = await runCryptoDigest();
+      return c.json({ ok: true, published: result.published, skipped: result.skipped });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.get("/api/crypto/history", async (c) => {
+    try {
+      const { getHistory } = await import("../crypto/scheduler.ts");
+      return c.json({ publications: getHistory() });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.get("/api/crypto/status", async (c) => {
+    try {
+      const { getStatus, getHistory } = await import("../crypto/scheduler.ts");
+      return c.json({ ...getStatus(), history: getHistory() });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.get("/api/crypto/config", async (c) => {
+    return c.json({ interval: 45, sources: ["CoinDesk", "CoinTelegraph", "The Block", "Decrypt", "CryptoSlate", "CoinGecko"], maxNews: 5 });
+  });
+
+  app.get("/api/crypto/portfolio", async (c) => {
+    try {
+      const { loadPositions, calculatePortfolio } = await import("../crypto/portfolio.ts");
+      return c.json({ positions: loadPositions(), snapshot: await calculatePortfolio() });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.post("/api/crypto/portfolio", async (c) => {
+    try {
+      const body = await c.req.json<{ positions: Record<string, number> }>();
+      const { savePositions } = await import("../crypto/portfolio.ts");
+      const positions = Object.entries(body.positions || {}).map(([symbol, amount]) => ({ symbol, amount, entryPrice: undefined }));
+      savePositions(positions);
+      return c.json({ ok: true, positions });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  // ─── Crypto — Base Ecosystem ──────────────────────────────────────────
+  app.get("/api/crypto/base/status", async (c) => {
+    try {
+      const { fetchBaseEcosystem, fetchBaseOnchainStats } = await import("../crypto/base-tracker.ts");
+      const [ecosystem, onchain] = await Promise.all([fetchBaseEcosystem(), fetchBaseOnchainStats()]);
+      return c.json({ ecosystem, onchain });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  // ─── Crypto — Wallet Scanner ─────────────────────────────────────────
+  app.post("/api/crypto/wallet/check", async (c) => {
+    try {
+      const body = await c.req.json<{ addresses: string[] }>();
+      if (!body.addresses?.length) return c.json({ error: "addresses array required" }, 400);
+      const { scanWallets } = await import("../crypto/wallet-scanner.ts");
+      const results = await scanWallets(body.addresses);
+      return c.json({ results });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  // ─── Crypto — Token Analyzer ─────────────────────────────────────────
+  app.post("/api/crypto/analyze", async (c) => {
+    try {
+      const body = await c.req.json<{ symbol: string }>();
+      if (!body.symbol) return c.json({ error: "symbol required" }, 400);
+      const { analyzeToken } = await import("../crypto/token-analyzer.ts");
+      const result = await analyzeToken(body.symbol);
+      return c.json({ analysis: result });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  // ─── Kimu Video Editor Bridge ────────────────────────────────────────────────
+  app.get("/api/video-editor/status", async (c) => {
+    try {
+      const { getServices } = await import("../launcher.ts");
+      const services = getServices();
+      const kimu = services.find((s) => s.name === "kimu") || { running: false, label: "🎬 Video Editor", url: "http://localhost:3457" };
+      return c.json(kimu);
+    } catch { return c.json({ running: false, error: "Launcher not available" }); }
+  });
+
+  app.post("/api/video-editor/start", async (c) => {
+    try {
+      const { execSync } = await import("node:child_process");
+      execSync('docker compose -f "' + import.meta.resolve("../../infra/kimu.yml") + '" up -d', { stdio: "pipe", timeout: 60000 });
+      return c.json({ status: "starting", message: "Kimu is starting..." });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.post("/api/video-editor/ai", async (c) => {
+    try {
+      const body = await c.req.json();
+      const res = await fetch("http://localhost:3456/api/ai", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) return c.json({ error: "Kimu AI error" }, 502);
+      return c.json(await res.json());
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 502); }
+  });
+
+  app.get("/api/video-editor/projects", async (c) => {
+    try {
+      const res = await fetch("http://localhost:3456/api/projects", { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return c.json({ error: "Kimu unavailable" }, 502);
+      return c.json(await res.json());
+    } catch { return c.json({ error: "Kimu unavailable" }, 502); }
+  });
+
+  app.post("/api/video-editor/import", async (c) => {
+    try {
+      const body = await c.req.json<{ filePath: string }>();
+      const { existsSync, readFileSync } = await import("node:fs");
+      if (!existsSync(body.filePath)) return c.json({ error: "File not found" }, 404);
+      const fileBuffer = readFileSync(body.filePath);
+      const form = new FormData();
+      form.append("file", new Blob([fileBuffer]), body.filePath.split(/[\\/]/).pop() || "asset.mp4");
+      const res = await fetch("http://localhost:3456/api/assets", {
+        method: "POST", body: form, signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) return c.json({ error: "Kimu import failed" }, 502);
+      return c.json(await res.json());
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 502); }
+  });
+
+  app.post("/api/video-editor/export", async (c) => {
+    try {
+      const body = await c.req.json<{ projectId: string; format?: string }>();
+      const res = await fetch("http://localhost:3456/api/exports", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: body.projectId, format: body.format || "mp4" }),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!res.ok) return c.json({ error: "Kimu export failed" }, 502);
+      return c.json(await res.json());
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 502); }
+  });
+
+  // ─── Shopping Agent ──────────────────────────────────────────────────────────
+  app.get("/api/shopping/products", async (c) => {
+    try {
+      const query = c.req.query("q");
+      const minPrice = c.req.query("minPrice") ? parseFloat(c.req.query("minPrice")!) : undefined;
+      const maxPrice = c.req.query("maxPrice") ? parseFloat(c.req.query("maxPrice")!) : undefined;
+      const site = c.req.query("site") || "all";
+      const limit = c.req.query("limit") ? parseInt(c.req.query("limit")!) : 20;
+      const sort = c.req.query("sort") || "relevance";
+      const offset = c.req.query("offset") ? parseInt(c.req.query("offset")!) : 0;
+
+      if (!query) return c.json({ error: "Query required (q parameter)" }, 400);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 25000);
+      const { searchProducts } = await import("../shopping/scraper.ts");
+      const result = await searchProducts({ query, minPrice, maxPrice, site, limit: limit + offset });
+      clearTimeout(timeout);
+      const products = result.products.slice(offset, offset + limit);
+
+      // Sort on client-request
+      if (sort === "price_asc") products.sort((a: any, b: any) => (a.price ?? Infinity) - (b.price ?? Infinity));
+      else if (sort === "price_desc") products.sort((a: any, b: any) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
+      else if (sort === "newest") products.sort((a: any, b: any) => (b.title || "").localeCompare(a.title || ""));
+
+      return c.json({ products, total: result.products.length });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.get("/api/shopping/sites", async (c) => {
+    return c.json({
+      sites: [
+        "amazon.fr", "fnac.com", "darty.com", "cdiscount.com", "boulanger.com",
+        "zalando.fr", "adidas.fr", "nike.com/fr", "decathlon.fr", "intersport.fr",
+        "leroymerlin.fr", "manomano.fr", "auchan.fr", "carrefour.fr",
+        "sephora.fr", "galerieslafayette.com", "showroomprive.com", "veepee.fr",
+        "la-redoute.fr", "but.fr", "electrodepot.fr",
+        "celio.com", "petit-bateau.fr", "go-sport.com",
+      ],
+    });
+  });
+
+  // ─── Analytics ───────────────────────────────────────────────────
+  app.get("/api/analytics/stats", async (c) => {
+    try {
+      const allAgents = agentStore.list();
+      const allSessions = sessionManager.list();
+      const allSkills = loadSkills();
+      const allChannels = channelManager.getChannels();
+      const activeAgents = allAgents.filter((a: any) => a.status === "running").length;
+      return c.json({
+        totalSessions: allSessions.length,
+        totalAgents: allAgents.length,
+        totalSkills: allSkills.length,
+        totalChannels: allChannels.length,
+        activeAgents,
+        uptime: process.uptime(),
+        lastUpdated: new Date().toISOString(),
+      });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
+  app.onError((err, c) => {
+    console.error("Error:", err);
+    return c.json({ error: err instanceof Error ? err.message : "Internal error" }, 500);
+  });
+
+  return app;
+}

@@ -1,0 +1,8 @@
+selects found: 7
+select 0 label: no label options: deepseek-chat (v4-flash),deepseek-coder-v2,Nova AI Builder
+select 1 label: Language options: English,French,Spanish,German,Italian,Japanese,Chinese,Portuguese,Russian,Arabic
+select 2 label: Voice Engine options: Microsoft Edge TTS,Google TTS,ElevenLabs,OpenAI TTS
+select 3 label: Image Engine options: DALL-E 3,Stable Diffusion,Midjourney,Flux
+select 4 label: Quality options: Draft,Standard,Premium
+select 5 label: Image Style options: Photorealistic,Cinematic,Anime,Oil Painting,Watercolor,Sketch,3D Render,Pixel Art
+select 6 label: Subtitles options: Off,Burned In,SRT File,Burned + SRT

@@ -1,0 +1,55 @@
+services:
+  kimu-postgres:
+    image: postgres:16-alpine
+    container_name: nova-kimu-db
+    environment:
+      POSTGRES_DB: kimu
+      POSTGRES_USER: kimu
+      POSTGRES_PASSWORD: kimu_pass
+    volumes:
+      - kimu_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kimu"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - nova-net
+
+  kimu-backend:
+    image: trykimu/videoeditor:latest
+    container_name: nova-kimu-api
+    ports:
+      - "3456:8080"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://kimu:kimu_pass@kimu-postgres:5432/kimu
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - CORS_ORIGINS=http://localhost:3457,http://localhost:5173
+    depends_on:
+      kimu-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - nova-net
+
+  kimu-frontend:
+    image: trykimu/videoeditor-frontend:latest
+    container_name: nova-kimu-ui
+    ports:
+      - "3457:3000"
+    environment:
+      - VITE_API_URL=http://localhost:3456
+    depends_on:
+      - kimu-backend
+    restart: unless-stopped
+    networks:
+      - nova-net
+
+networks:
+  nova-net:
+    driver: bridge
+
+volumes:
+  kimu_pgdata:

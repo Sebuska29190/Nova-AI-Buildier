@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOVA AI Builder - Next-Gen Autonomous Workspace</title>
+    <!-- Tailwind CSS dla sprawnego, wydajnego i responsywnego stylowania -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Czcionki premium o świetnej geometrii i czytelności w ciemnych motywach -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Lucide Icons do renderowania nowoczesnych, wektorowych ikon technicznych -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-abyss: #020408;       /* Najciemniejsza głębia tła OLED */
+            --bg-panel: #070a12;       /* Stonowane tło dla bocznego panelu i nagłówka */
+            --bg-card: rgba(14, 20, 34, 0.65); /* Szklana karta z głębią */
+            --bg-card-hover: rgba(22, 32, 54, 0.85);
+            --color-nova: #00f2fe;     /* Główny neonowy akcent Novy */
+            --color-purple: #7c3aed;   /* Dopełniający kosmiczny fiolet */
+            --border-glow: rgba(0, 242, 254, 0.15);
+            --border-subtle: rgba(255, 255, 255, 0.045);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-abyss);
+            color: #f1f5f9;
+            overflow: hidden;
+        }
+
+        /* Stylizacja i dopasowanie scrollbarów do estetyki cyber-dark */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-abyss);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 99px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+
+        /* Efekt kinowej poświaty tła (Cinema Ambient Glow) */
+        .ambient-glow {
+            position: absolute;
+            top: 40%;
+            left: 55%;
+            transform: translate(-50%, -50%);
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(0, 242, 254, 0.06) 0%, rgba(124, 58, 237, 0.03) 40%, transparent 70%);
+            filter: blur(60px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float-glow 12s infinite ease-in-out alternate;
+        }
+
+        /* Trójwymiarowy wektorowy znak wodny logotypu w tle */
+        .bg-watermark {
+            position: absolute;
+            top: 50%;
+            left: 55%;
+            transform: translate(-50%, -50%);
+            width: 320px;
+            height: 320px;
+            opacity: 0.07;
+            pointer-events: none;
+            z-index: 1;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Uniesienie i szklany szlif kart interfejsu */
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(0, 242, 254, 0.2);
+            box-shadow: 0 10px 40px rgba(0, 242, 254, 0.03);
+        }
+
+        /* Przyciski premium z rozproszonym neonowym światłem */
+        .btn-premium {
+            background: linear-gradient(135deg, #00f2fe 0%, #6366f1 100%);
+            color: #020408;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
+        }
+
+        .btn-premium:hover {
+            transform: translateY(-1.5px);
+            box-shadow: 0 0 25px rgba(0, 242, 254, 0.45);
+            filter: brightness(1.1);
+        }
+
+        /* Subtelny element dekoracyjny aktywnego stanu */
+        .active-dot {
+            box-shadow: 0 0 10px #00f2fe, 0 0 20px #00f2fe;
+        }
+
+        @keyframes float-glow {
+            0% { transform: translate(-50%, -48%) scale(0.95); opacity: 0.7; }
+            100% { transform: translate(-48%, -52%) scale(1.05); opacity: 1.1; }
+        }
+
+        /* Monospace stylizowany pod terminale i badge techniczne */
+        .tech-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col antialiased">
+
+    <!-- AMBIENTOWE TŁO KINOWE -->
+    <div class="ambient-glow"></div>
+    <svg class="bg-watermark" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="50,2 98,28 98,78 50,98 2,78 2,28" stroke="url(#novaGlow)" stroke-width="0.8" fill="none"/>
+        <polygon points="50,15 85,35 85,68 50,83 15,68 15,35" stroke="url(#novaGlow)" stroke-width="0.4" fill="none" opacity="0.4"/>
+        <circle cx="50" cy="50" r="8" stroke="url(#novaGlow)" stroke-width="0.5" fill="none" opacity="0.6"/>
+        <defs>
+            <linearGradient id="novaGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00f2fe"/>
+                <stop offset="100%" stop-color="#7c3aed"/>
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <!-- GŁÓWNY KONTENER OPERACYJNY -->
+    <div class="flex flex-1 overflow-hidden relative z-10">
+        
+        <!-- ================= SIDEBAR (Nowoczesna Struktura 2026) ================= -->
+        <aside class="w-64 bg-[#05080f]/90 border-r border-[rgba(255,255,255,0.03)] flex flex-col justify-between z-20 backdrop-blur-md">
+            
+            <!-- Górna Sekcja: Logo i Szybkie wyszukiwanie -->
+            <div class="overflow-y-auto flex-1">
+                <!-- Branding o podwyższonym standardzie wizualnym -->
+                <div class="p-5 border-b border-[rgba(255,255,255,0.03)] flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#00f2fe] to-[#6366f1] flex items-center justify-center shadow-[0_0_15px_rgba(0,242,254,0.35)]">
+                        <i data-lucide="orbit" class="w-4.5 h-4.5 text-black font-extrabold"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-sm tracking-wide text-white font-mono">NOVA AI</h1>
+                        <span class="text-[9px] text-[#00f2fe] tracking-widest uppercase font-mono font-semibold">BUILDER SUITE</span>
+                    </div>
+                </div>
+
+                <!-- Wyszukiwarka panelu bocznego -->
+                <div class="px-4 py-3">
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500"></i>
+                        <input type="text" placeholder="Quick Search..." class="w-full bg-[#020408]/60 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-[11px] focus:outline-none focus:border-[#00f2fe] transition-all text-slate-300">
+                    </div>
+                </div>
+
+                <!-- Grupowane Nawigacje (Odwzorowanie pełnej konfiguracji) -->
+                <nav class="px-3 space-y-4 pb-6">
+                    
+                    <!-- MAIN CATEGORY -->
+                    <div>
+                        <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1">Main</div>
+                        <div class="space-y-0.5">
+                            <a href="#" onclick="switchTab('chat')" id="tab-link-chat" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all bg-[rgba(0,242,254,0.06)] border-l-2 border-[#00f2fe] text-white">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="message-square" class="w-4 h-4 text-[#00f2fe]"></i>
+                                    <span>Chat Assistant</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('agents')" id="tab-link-agents" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="users-2" class="w-4 h-4"></i>
+                                    <span>Agents</span>
+                                </div>
+                                <span class="text-[10px] bg-indigo-950/50 text-indigo-300 px-1.5 py-0.2 rounded font-mono font-bold">16</span>
+                            </a>
+                            <a href="#" onclick="switchTab('skills')" id="tab-link-skills" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="zap" class="w-4 h-4"></i>
+                                    <span>Skills</span>
+                                </div>
+                                <span class="text-[10px] bg-slate-900 text-slate-400 px-1.5 py-0.2 rounded font-mono">46</span>
+                            </a>
+                            <a href="#" onclick="switchTab('plugins')" id="tab-link-plugins" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                    <span>Add Tools / Plugins</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- DATA CATEGORY -->
+                    <div>
+                        <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1">Data</div>
+                        <div class="space-y-0.5">
+                            <a href="#" onclick="switchTab('sessions')" id="tab-link-sessions" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="history" class="w-4 h-4"></i>
+                                    <span>Sessions</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('channels')" id="tab-link-channels" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="radio" class="w-4 h-4"></i>
+                                    <span>Channels</span>
+                                </div>
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 active-dot"></span>
+                            </a>
+                            <a href="#" onclick="switchTab('memory')" id="tab-link-memory" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="brain" class="w-4 h-4"></i>
+                                    <span>Memory DB</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- TOOLS CATEGORY -->
+                    <div>
+                        <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1">Tools</div>
+                        <div class="space-y-0.5">
+                            <a href="#" onclick="switchTab('workspace')" id="tab-link-workspace" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="folder-git2" class="w-4 h-4"></i>
+                                    <span>Workspace</span>
+                                </div>
+                                <span id="workspace-badge" class="text-[9px] bg-slate-900 text-slate-500 px-1.5 rounded font-mono">None</span>
+                            </a>
+                            <a href="#" onclick="switchTab('video')" id="tab-link-video" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="video" class="w-4 h-4"></i>
+                                    <span>Video Gen</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('editor')" id="tab-link-editor" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="file-code" class="w-4 h-4"></i>
+                                    <span>AI Editor</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('worker')" id="tab-link-worker" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="cpu" class="w-4 h-4"></i>
+                                    <span>Worker Nodes</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('crypto')" id="tab-link-crypto" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="coins" class="w-4 h-4"></i>
+                                    <span>Crypto Hub</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('trading')" id="tab-link-trading" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="trending-up" class="w-4 h-4"></i>
+                                    <span>Trading Hub</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('shopping')" id="tab-link-shopping" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+                                    <span>Smart Shopping</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('terminal')" id="tab-link-terminal" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="terminal" class="w-4 h-4"></i>
+                                    <span>Terminal</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- CONFIGURATION CATEGORY -->
+                    <div>
+                        <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1">Configuration</div>
+                        <div class="space-y-0.5">
+                            <a href="#" onclick="switchTab('settings')" id="tab-link-settings" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="settings" class="w-4 h-4"></i>
+                                    <span>Settings</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('apikeys')" id="tab-link-apikeys" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="key-round" class="w-4 h-4"></i>
+                                    <span>API Keys</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('logs')" id="tab-link-logs" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="scroll-text" class="w-4 h-4"></i>
+                                    <span>System Logs</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('profiles')" id="tab-link-profiles" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="user-cog" class="w-4 h-4"></i>
+                                    <span>User Profiles</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('aimodels')" id="tab-link-aimodels" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="toy-brick" class="w-4 h-4"></i>
+                                    <span>AI Models</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('schedule')" id="tab-link-schedule" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                                    <span>Cron Schedule</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('analytics')" id="tab-link-analytics" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                                    <span>Analytics</span>
+                                </div>
+                            </a>
+                            <a href="#" onclick="switchTab('docs')" id="tab-link-docs" class="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                                    <span>Documentation</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- RECENT INTERACTIONS CATEGORY -->
+                    <div>
+                        <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-1">Recent Sessions</div>
+                        <div class="space-y-0.5 text-[11px] px-3 font-mono text-slate-400 space-y-1">
+                            <div class="flex items-center gap-2 hover:text-white cursor-pointer py-0.5 transition-all">
+                                <span class="w-1.5 h-1.5 rounded-full bg-[#00f2fe]/40"></span>
+                                <span class="truncate">deepseek/deepseek-chat</span>
+                            </div>
+                            <div class="flex items-center gap-2 hover:text-white cursor-pointer py-0.5 transition-all">
+                                <span class="w-1.5 h-1.5 rounded-full bg-[#00f2fe]/40"></span>
+                                <span class="truncate">deepseek/deepseek-chat</span>
+                            </div>
+                            <div class="flex items-center gap-2 hover:text-white cursor-pointer py-0.5 transition-all">
+                                <span class="w-1.5 h-1.5 rounded-full bg-[#00f2fe]/40"></span>
+                                <span class="truncate">deepseek/deepseek-chat</span>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+
+            <!-- Dolna sekcja: Status profilu operatora -->
+            <div class="p-3 border-t border-[rgba(255,255,255,0.03)] bg-[#030509]/90">
+                <div class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-900/60 transition-all cursor-pointer">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-white">
+                            OP
+                        </div>
+                        <div>
+                            <div class="text-[11px] font-semibold text-white">System Operator</div>
+                            <div class="text-[9px] text-slate-500">core@nova.ai</div>
+                        </div>
+                    </div>
+                    <i data-lucide="sliders" class="w-3.5 h-3.5 text-slate-400 hover:text-[#00f2fe] transition-colors"></i>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ================= GŁÓWNY PANEL ROBOCZY ================= -->
+        <main class="flex-1 flex flex-col min-w-0 relative bg-[#020408]">
+            
+            <!-- GÓRNY PASEK STATUSU -->
+            <header class="h-14 border-b border-[rgba(255,255,255,0.03)] flex items-center justify-between px-6 z-10 bg-[rgba(2,4,8,0.7)] backdrop-blur-md">
+                <div class="flex items-center gap-3">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500 active-dot"></div>
+                    <span class="text-xs font-mono text-slate-400">Agent Status: <strong class="text-white">deepseek-v4-flash (active)</strong></span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <!-- Wybór Modelu -->
+                    <select class="bg-[#0b0f19] border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#00f2fe] transition-all">
+                        <option value="deepseek-chat">deepseek-chat (v4-flash)</option>
+                        <option value="deepseek-coder">deepseek-coder-v2</option>
+                        <option value="nova-orchestrator">Nova Orchestrator Suite</option>
+                    </select>
+
+                    <!-- Nowy, systemowy interfejs wyboru folderu -->
+                    <button onclick="triggerSystemDirectoryPicker()" class="flex items-center gap-2 bg-[#0b0f19] hover:bg-[#121926] border border-slate-800 rounded-lg px-3.5 py-1.5 text-xs text-white transition-all">
+                        <i data-lucide="folder" class="w-3.5 h-3.5 text-[#00f2fe]"></i>
+                        <span id="current-workspace-name">No folder selected</span>
+                    </button>
+
+                    <button class="bg-[#0b0f19] hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all">
+                        New Chat
+                    </button>
+                </div>
+            </header>
+
+            <!-- GŁÓWNY KONTENER NA TREŚĆ ZAKŁADEK -->
+            <div class="flex-1 overflow-y-auto relative p-6 z-10" id="main-content">
+                
+                <!-- ================= WIDOK: CZAT (Chat) ================= -->
+                <div id="view-chat" class="h-full flex flex-col justify-between max-w-5xl mx-auto w-full">
+                    
+                    <!-- Ekran powitalny czatu -->
+                    <div class="flex-1 flex flex-col items-center justify-center text-center px-4 my-8">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#00f2fe]/20 to-[#6366f1]/20 border border-[#00f2fe]/30 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(0,242,254,0.12)]">
+                            <i data-lucide="sparkles" class="w-6 h-6 text-[#00f2fe]"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold tracking-tight text-white mb-2">How can we empower your build today?</h2>
+                        <p class="text-xs text-slate-400 max-w-md mx-auto mb-8">
+                            Nova AI Builder seamlessly bridges model code execution, custom system-level local pipelines, and fully decentralized orchestrations.
+                        </p>
+
+                        <!-- Panel Szybkich Poleceń i Wywołań Agenta -->
+                        <div class="w-full max-w-3xl">
+                            <div class="text-[9px] font-bold text-slate-500 uppercase tracking-widest text-left mb-3">Available System Methods & Context Handlers</div>
+                            <div class="flex flex-wrap gap-1.5 justify-start max-h-48 overflow-y-auto p-1 bg-slate-900/10 rounded-lg border border-slate-900/40">
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@workspace_get_state</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@workspace_list_files</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@workspace_read_file</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@workspace_write_file</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@browser_launch</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@browser_navigate</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@coingecko_price</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@fetch_crypto_news</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@search_products</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@whatsapp_send</span>
+                                <span class="custom-badge bg-slate-950 border border-slate-800 text-slate-400 hover:border-[#00f2fe] hover:text-[#00f2fe] cursor-pointer">@email_send</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pasek czatu i input -->
+                    <div class="glass-panel rounded-xl p-4 mb-2">
+                        <div class="flex items-center gap-3">
+                            <input type="text" placeholder="Instruct Nova... (Use @ to tag system tools, / for command shortcuts)" class="flex-1 bg-transparent border-none text-xs text-white focus:outline-none placeholder-slate-600">
+                            <button class="btn-premium px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                                <span>Execute</span>
+                                <i data-lucide="send-horizontal" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOK: WORKSPACE ================= -->
+                <div id="view-workspace" class="hidden max-w-5xl mx-auto w-full">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-lg font-bold text-white">Project Workspace Architecture</h2>
+                            <p class="text-xs text-slate-400">Map local directory trees directly for AI file system orchestration.</p>
+                        </div>
+                        <button onclick="triggerSystemDirectoryPicker()" class="btn-premium px-4 py-2 rounded-lg text-xs flex items-center gap-2">
+                            <i data-lucide="folder-search" class="w-4 h-4"></i>
+                            Map Directory System
+                        </button>
+                    </div>
+
+                    <!-- Stan Pustego Workspace -->
+                    <div id="workspace-status-card" class="glass-panel rounded-xl p-10 mb-6 text-center border-dashed border-slate-800">
+                        <i data-lucide="folder-git2" class="w-10 h-10 text-slate-600 mx-auto mb-4"></i>
+                        <h3 class="text-sm font-bold text-white mb-1">Unmapped Workspace</h3>
+                        <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">Integrate local system pathways, allowing agents to analyze, build, test and refactor codebase systems securely.</p>
+                        <button onclick="triggerSystemDirectoryPicker()" class="bg-[#0c101c] hover:bg-[#121829] text-white border border-slate-800 px-4 py-2 rounded-lg text-xs font-semibold transition-all">
+                            Initialize Native Picker
+                        </button>
+                    </div>
+
+                    <!-- Struktura Drzewa Plików (Uaktywnia się po zmapowaniu) -->
+                    <div id="workspace-files-structure" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="col-span-1 glass-panel rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Project Directory</span>
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-500 hover:text-white cursor-pointer"></i>
+                            </div>
+                            <div class="space-y-2 text-xs font-mono text-slate-400">
+                                <div class="flex items-center gap-2 text-[#00f2fe]"><i data-lucide="folder" class="w-4 h-4"></i>src/</div>
+                                <div class="flex items-center gap-2 pl-4"><i data-lucide="file-code" class="w-4 h-4 text-amber-500"></i>App.jsx</div>
+                                <div class="flex items-center gap-2 pl-4"><i data-lucide="file-code" class="w-4 h-4 text-cyan-500"></i>index.html</div>
+                                <div class="flex items-center gap-2 text-[#00f2fe]"><i data-lucide="folder" class="w-4 h-4"></i>components/</div>
+                                <div class="flex items-center gap-2 pl-4"><i data-lucide="file-code" class="w-4 h-4 text-amber-500"></i>Navbar.jsx</div>
+                                <div class="flex items-center gap-2 pl-4"><i data-lucide="file-code" class="w-4 h-4 text-amber-500"></i>Sidebar.jsx</div>
+                                <div class="flex items-center gap-2"><i data-lucide="file-json" class="w-4 h-4 text-emerald-500"></i>package.json</div>
+                                <div class="flex items-center gap-2"><i data-lucide="file-text" class="w-4 h-4 text-slate-500"></i>README.md</div>
+                            </div>
+                        </div>
+                        <div class="col-span-2 glass-panel rounded-xl p-6 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="file-code" class="w-5 h-5 text-amber-500"></i>
+                                        <span class="text-xs font-bold text-white font-mono">App.jsx</span>
+                                    </div>
+                                    <span class="text-[9px] bg-emerald-950/40 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800/30 font-mono">Sync Complete</span>
+                                </div>
+                                <pre class="bg-[#020408] p-4 rounded-lg font-mono text-xs text-slate-300 overflow-x-auto border border-slate-900">
+import React from 'react';
+import { Sidebar } from './components/Sidebar';
+
+export default function App() {
+  return (
+    &lt;div class="flex h-screen bg-[#05070c]"&gt;
+      &lt;Sidebar /&gt;
+      &lt;main class="flex-1"&gt;
+        {/* Nova Advanced Workspace Panel */}
+      &lt;/main&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+                            </div>
+                            <div class="flex justify-end gap-3 mt-4">
+                                <button class="bg-[#0a0e17] hover:bg-slate-850 text-slate-300 px-3.5 py-1.5 rounded text-xs transition-all border border-slate-800">Refactor Code</button>
+                                <button class="btn-premium px-3.5 py-1.5 rounded text-xs">Commit & Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOK: PLUGINS ================= -->
+                <div id="view-plugins" class="hidden max-w-5xl mx-auto w-full">
+                    <div class="mb-6">
+                        <h2 class="text-lg font-bold text-white">Plugin Integration Hub</h2>
+                        <p class="text-xs text-slate-400">Extend and customize AI abilities with community and corporate modules.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="glass-panel rounded-xl p-5 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="w-9 h-9 rounded-lg bg-indigo-950/50 border border-indigo-500/30 flex items-center justify-center">
+                                        <i data-lucide="layers" class="w-4.5 h-4.5 text-[#00f2fe]"></i>
+                                    </div>
+                                    <span class="text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">Installed</span>
+                                </div>
+                                <h3 class="font-bold text-sm text-white mb-1">MCP Servers Hub</h3>
+                                <p class="text-xs text-slate-400 mb-4 leading-relaxed">System integration for Model Context Protocol. Connect with localized database infrastructures, GitHub API, and file trees.</p>
+                            </div>
+                            <div class="flex items-center justify-between border-t border-slate-800 pt-3 mt-2">
+                                <span class="text-[10px] font-mono text-slate-500">by modelcontextprotocol</span>
+                                <button class="bg-red-950/40 hover:bg-red-900/40 text-red-400 border border-red-900/30 px-2.5 py-1 rounded text-xs transition-all">Remove</button>
+                            </div>
+                        </div>
+
+                        <div class="glass-panel rounded-xl p-5 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="w-9 h-9 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center">
+                                        <i data-lucide="terminal" class="w-4.5 h-4.5 text-amber-500"></i>
+                                    </div>
+                                    <span class="text-[9px] font-bold bg-slate-900 text-slate-500 border border-slate-800 px-2 py-0.5 rounded">Developer Tool</span>
+                                </div>
+                                <h3 class="font-bold text-sm text-white mb-1">Crawl4AI Web Scraper</h3>
+                                <p class="text-xs text-slate-400 mb-4 leading-relaxed">Blazing-fast model-optimized scraper returning clean, context-dense Markdown formatting from complex corporate domains.</p>
+                            </div>
+                            <div class="flex items-center justify-between border-t border-slate-800 pt-3 mt-2">
+                                <span class="text-[10px] font-mono text-slate-500">by unclecode</span>
+                                <button class="btn-premium px-3 py-1 rounded text-xs">Install</button>
+                            </div>
+                        </div>
+
+                        <div class="glass-panel rounded-xl p-5 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="w-9 h-9 rounded-lg bg-indigo-950/50 border border-indigo-500/30 flex items-center justify-center">
+                                        <i data-lucide="globe" class="w-4.5 h-4.5 text-emerald-400"></i>
+                                    </div>
+                                    <span class="text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">Installed</span>
+                                </div>
+                                <h3 class="font-bold text-sm text-white mb-1">Browser Use</h3>
+                                <p class="text-xs text-slate-400 mb-4 leading-relaxed">Direct visual pipeline allowing the agent to launch, click, and navigate actual browser systems for advanced automations.</p>
+                            </div>
+                            <div class="flex items-center justify-between border-t border-slate-800 pt-3 mt-2">
+                                <span class="text-[10px] font-mono text-slate-500">by browser-use</span>
+                                <button class="bg-[#121824] hover:bg-[#192233] text-white border border-slate-800 px-2.5 py-1 rounded text-xs transition-all">Configure</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOK: CHANNELS ================= -->
+                <div id="view-channels" class="hidden max-w-5xl mx-auto w-full">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-lg font-bold text-white">External Communication Pipelines</h2>
+                            <p class="text-xs text-slate-400">Establish pathways between Nova Agent actions and third-party networks.</p>
+                        </div>
+                        <span class="text-xs font-mono bg-[#00f2fe]/10 text-[#00f2fe] border border-[#00f2fe]/20 px-3 py-1 rounded-full flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 active-dot"></span>
+                            All channels operational
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Telegram Integration -->
+                        <div class="glass-panel rounded-xl p-5">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="send" class="w-4.5 h-4.5 text-[#00f2fe]"></i>
+                                    <h3 class="font-bold text-sm text-white">Telegram Gateway</h3>
+                                </div>
+                                <span class="text-[9px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded font-mono font-bold">Connected</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mb-4">Empower your agent to monitor targeted groups, push urgent alerts, and execute queries from secure chats.</p>
+                            <div class="space-y-2 mb-4">
+                                <input type="password" value="************************" disabled class="w-full bg-[#020408]/60 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-500">
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <button class="bg-red-950/40 hover:bg-red-900/40 text-red-400 border border-red-900/30 px-3 py-1 rounded text-xs transition-all">Disconnect</button>
+                            </div>
+                        </div>
+
+                        <!-- Discord Integration -->
+                        <div class="glass-panel rounded-xl p-5">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="message-square" class="w-4.5 h-4.5 text-indigo-400"></i>
+                                    <h3 class="font-bold text-sm text-white">Discord Bridge</h3>
+                                </div>
+                                <span class="text-[9px] bg-slate-900 text-slate-500 px-2 py-0.5 rounded font-mono">Offline</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mb-4">Deploy automated companion bots to channels, bridging centralized user interactions with system servers.</p>
+                            <div class="space-y-2 mb-4">
+                                <input type="text" placeholder="Bot Secret Token" class="w-full bg-[#020408]/60 border border-slate-800 rounded px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div class="flex justify-end">
+                                <button class="btn-premium px-3 py-1 rounded text-xs">Connect</button>
+                            </div>
+                        </div>
+
+                        <!-- Ntfy.sh Integration -->
+                        <div class="glass-panel rounded-xl p-5 border border-[#00f2fe]/20">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="bell-ring" class="w-4.5 h-4.5 text-rose-500"></i>
+                                    <h3 class="font-bold text-sm text-white">Ntfy Push Alerts</h3>
+                                </div>
+                                <span class="text-[9px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded font-mono font-bold">Recommended</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mb-4">Ultra-clean, free, zero-config push notifications. Instantly receive system build statuses directly on your desktop or mobile.</p>
+                            <div class="space-y-2 mb-4">
+                                <div class="flex">
+                                    <span class="bg-[#020408]/60 border border-slate-800 rounded-l px-2.5 py-1.5 text-xs text-slate-500 font-mono">ntfy.sh/</span>
+                                    <input type="text" placeholder="nova_secure_topic" class="flex-1 bg-[#020408]/60 border border-l-0 border-slate-800 rounded-r px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#00f2fe]">
+                                </div>
+                            </div>
+                            <div class="flex justify-end">
+                                <button class="btn-premium px-3 py-1 rounded text-xs">Activate Topic</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOK: CRYPTO ================= -->
+                <div id="view-crypto" class="hidden max-w-5xl mx-auto w-full">
+                    <div class="mb-6 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-lg font-bold text-white">On-Chain Analytics & Protocol Tracker</h2>
+                            <p class="text-xs text-slate-400">Monitor blockchain ecosystems, evaluate security profiles, and execute batched smart contract actions.</p>
+                        </div>
+                        <span class="text-xs font-mono bg-indigo-950 text-indigo-300 border border-indigo-800 px-3 py-1 rounded-lg">Base L2 Mainnet</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                        <div class="glass-panel p-4 rounded-xl">
+                            <span class="text-xs text-slate-500">Active Ecosystem</span>
+                            <div class="text-lg font-bold text-white mt-1">BASE Network</div>
+                            <span class="text-[10px] text-emerald-400 font-mono">Status: Connected</span>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl">
+                            <span class="text-xs text-slate-500">BaseCred Rep Score</span>
+                            <div class="text-lg font-bold text-white mt-1">98.2 / 100</div>
+                            <span class="text-[10px] text-[#00f2fe] font-mono">Excellent Standing</span>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl">
+                            <span class="text-xs text-slate-500">Total Transactions</span>
+                            <div class="text-lg font-bold text-white mt-1">14,208 TX</div>
+                            <span class="text-[10px] text-slate-400 font-mono">All-time secure volume</span>
+                        </div>
+                        <div class="glass-panel p-4 rounded-xl">
+                            <span class="text-xs text-slate-500">Optimized Gas Level</span>
+                            <div class="text-lg font-bold text-emerald-400 mt-1">0.012 Gwei</div>
+                            <span class="text-[10px] text-slate-400 font-mono">Batch optimization ready</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="glass-panel rounded-xl p-5">
+                            <div class="flex items-center gap-2 mb-4 border-b border-slate-800 pb-2">
+                                <i data-lucide="shield-alert" class="w-4.5 h-4.5 text-indigo-400"></i>
+                                <h3 class="font-bold text-sm text-white">Base Smart Contract Scanner</h3>
+                            </div>
+                            <p class="text-xs text-slate-400 mb-4 leading-relaxed">Continuous on-chain auditing engine targeting recently initialized L2 contracts. Runs reentrancy checks, rug-pull vector assessments, and trace analysis.</p>
+                            <div class="bg-slate-950 p-3 rounded border border-slate-900 font-mono text-xs text-slate-300 space-y-1">
+                                <div class="text-slate-500">[Daemon] Scanning block #19481282...</div>
+                                <div class="text-emerald-400">✓ Contract 0x82f... safe from standard exploit vectors</div>
+                                <div class="text-amber-500">⚠ Contract 0x9a1... potential high slippage configuration</div>
+                            </div>
+                        </div>
+
+                        <div class="glass-panel rounded-xl p-5">
+                            <div class="flex items-center gap-2 mb-4 border-b border-slate-800 pb-2">
+                                <i data-lucide="wallet" class="w-4.5 h-4.5 text-emerald-400"></i>
+                                <h3 class="font-bold text-sm text-white">Multi-Destination Batch Transfer</h3>
+                            </div>
+                            <p class="text-xs text-slate-400 mb-4 leading-relaxed">Prepare multi-recipient transfers in a single transaction payload, minimizing gas consumption across the Base ecosystem.</p>
+                            <div class="space-y-3">
+                                <textarea placeholder="0xRecipientAddress, 0.05 ETH" class="w-full bg-[#020408]/60 border border-slate-800 rounded p-2 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500" rows="3"></textarea>
+                                <button class="w-full btn-premium py-2 rounded text-xs font-semibold">Execute Batch Transaction</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOK: SHOPPING ================= -->
+                <div id="view-shopping" class="hidden max-w-5xl mx-auto w-full flex flex-col h-full">
+                    <div class="mb-6">
+                        <h2 class="text-lg font-bold text-white">Smart Shopping - Global Aggregation</h2>
+                        <p class="text-xs text-slate-400">Scrape, analyze, filter, and compare product inventories across global marketplaces in milliseconds.</p>
+                    </div>
+
+                    <!-- Parametry wyszukiwania -->
+                    <div class="glass-panel rounded-xl p-5 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                            <div class="col-span-2">
+                                <label class="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Search Phrase</label>
+                                <div class="relative">
+                                    <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-slate-500"></i>
+                                    <input type="text" value="SAC A MAIN FEMMES" class="w-full bg-[#020408]/60 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-[#00f2fe]">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Price Range (€)</label>
+                                <div class="flex gap-2">
+                                    <input type="number" value="0" class="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                                    <span class="text-slate-500 self-center">-</span>
+                                    <input type="number" value="30" class="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Sort By</label>
+                                <select class="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white">
+                                    <option>Most Relevant</option>
+                                    <option>Price: Low to High</option>
+                                    <option>Price: High to Low</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button class="bg-[#0b0f19] hover:bg-[#121926] text-white px-4 py-2 rounded-lg text-xs font-semibold border border-slate-800 transition-all">Reset Filters</button>
+                            <button class="btn-premium px-5 py-2 rounded-lg text-xs font-semibold">Launch Scrape</button>
+                        </div>
+                    </div>
+
+                    <!-- Naprawione wyniki z własnym kontenerem przewijania -->
+                    <div class="flex-1 flex flex-col min-h-0">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs text-slate-400 font-mono">Found: <strong>10 listings matches</strong></span>
+                            <span class="text-xs text-[#00f2fe] font-mono cursor-pointer hover:underline">Reset Search</span>
+                        </div>
+
+                        <!-- Lista wyników z niezależnym, sztywnym przewijaniem -->
+                        <div class="flex-grow overflow-y-auto pr-2 space-y-4" style="max-height: 480px;">
+                            
+                            <!-- Oferta 1 -->
+                            <div class="glass-panel rounded-xl p-4 flex gap-4 hover:border-[#00f2fe]/40 transition-all">
+                                <div class="w-20 h-20 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="shopping-bag" class="w-7 h-7 text-slate-600"></i>
+                                </div>
+                                <div class="flex-1 flex flex-col justify-between">
+                                    <div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-indigo-400 font-mono">#1 Sacs À Main Femme - Bandoulière</span>
+                                            <span class="text-xs font-bold text-[#00f2fe]">18.90 €</span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-400 mt-1">Sacs à main pour femmes, sac à bandoulière en cuir souple de haute qualité. Parfait pour un usage quotidien avec bandoulière réglable.</p>
+                                    </div>
+                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-slate-800/40">
+                                        <span class="text-[9px] font-mono text-slate-500">Source: galerieslafayette.com</span>
+                                        <button class="btn-premium px-3 py-1 rounded text-[10px]">Go to Store</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Oferta 2 -->
+                            <div class="glass-panel rounded-xl p-4 flex gap-4 hover:border-[#00f2fe]/40 transition-all">
+                                <div class="w-20 h-20 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="shopping-bag" class="w-7 h-7 text-slate-600"></i>
+                                </div>
+                                <div class="flex-1 flex flex-col justify-between">
+                                    <div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-indigo-400 font-mono">#2 Sac Bandoulière Classique</span>
+                                            <span class="text-xs font-bold text-[#00f2fe]">24.50 €</span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-400 mt-1">Design épuré et moderne. Poches de rangement multiples pour vos essentiels, fermeture éclair robuste et finitions métalliques élégantes.</p>
+                                    </div>
+                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-slate-800/40">
+                                        <span class="text-[9px] font-mono text-slate-500">Source: amazon.fr</span>
+                                        <button class="btn-premium px-3 py-1 rounded text-[10px]">Go to Store</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Oferta 3 -->
+                            <div class="glass-panel rounded-xl p-4 flex gap-4 hover:border-[#00f2fe]/40 transition-all">
+                                <div class="w-20 h-20 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="shopping-bag" class="w-7 h-7 text-slate-600"></i>
+                                </div>
+                                <div class="flex-1 flex flex-col justify-between">
+                                    <div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-indigo-400 font-mono">#3 Sac en Toile Bio Artistique</span>
+                                            <span class="text-xs font-bold text-[#00f2fe]">12.00 €</span>
+                                        </div>
+                                        <p class="text-[11px] text-slate-400 mt-1">Sac réutilisable en coton biologique avec imprimés artistiques. Écologique, solide et spacieux pour vos courses quotidiennes.</p>
+                                    </div>
+                                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-slate-800/40">
+                                        <span class="text-[9px] font-mono text-slate-500">Source: etsy.com</span>
+                                        <button class="btn-premium px-3 py-1 rounded text-[10px]">Go to Store</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOK: TERMINAL ================= -->
+                <div id="view-terminal" class="hidden max-w-5xl mx-auto w-full">
+                    <div class="mb-6">
+                        <h2 class="text-lg font-bold text-white">System Terminal</h2>
+                        <p class="text-xs text-slate-400">Direct CLI access for system builds, testing environments, and localized docker structures.</p>
+                    </div>
+
+                    <div class="glass-panel rounded-xl overflow-hidden border border-slate-800">
+                        <div class="bg-slate-950 px-4 py-2 border-b border-slate-850 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
+                                <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
+                                <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+                                <span class="text-[11px] font-mono text-slate-500 ml-2">bash - core@nova-builder</span>
+                            </div>
+                            <i data-lucide="terminal" class="w-4 h-4 text-slate-600"></i>
+                        </div>
+                        <div class="bg-[#020408]/95 p-5 font-mono text-xs text-emerald-400 space-y-2 h-96 overflow-y-auto">
+                            <div><span class="text-indigo-400">core@nova:~$</span> systemctl status nova-agent-builder</div>
+                            <div class="text-slate-400">● nova-agent-builder.service - Autonomous System Core Orchestration Daemon</div>
+                            <div class="text-slate-400">   Loaded: loaded (/etc/systemd/system/nova-agent-builder.service; enabled; vendor preset: enabled)</div>
+                            <div class="text-emerald-500">   Active: active (running) since Tue 2026-05-19 23:05:49 CEST; 1h 50min ago</div>
+                            <div class="text-slate-400">   Main PID: 19482 (node)</div>
+                            <div class="text-slate-400">   Tasks: 45 (limit: 4915)</div>
+                            <div class="text-slate-400">   CGroup: /system.slice/nova-agent-builder.service</div>
+                            <div><span class="text-indigo-400">core@nova:~$</span> <span class="text-white animate-pulse">_</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOK: API KEYS ================= -->
+                <div id="view-apikeys" class="hidden max-w-5xl mx-auto w-full">
+                    <div class="mb-6">
+                        <h2 class="text-lg font-bold text-white">API Keys Management</h2>
+                        <p class="text-xs text-slate-400">Control secure keys, tokens, and verification secrets used by the orchestrator.</p>
+                    </div>
+
+                    <div class="glass-panel rounded-xl p-6 space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-850 pb-4">
+                            <div>
+                                <h3 class="text-xs font-bold text-white">DeepSeek API Secret</h3>
+                                <p class="text-[11px] text-slate-500">Key utilized for standard v4-flash orchestrations.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="password" value="sk-deepseek-****************************" disabled class="bg-[#020408]/60 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-400 font-mono w-64">
+                                <button class="btn-premium px-3 py-1.5 rounded text-xs">Update</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between border-b border-slate-850 pb-4">
+                            <div>
+                                <h3 class="text-xs font-bold text-white">Base L2 Node RPC url</h3>
+                                <p class="text-[11px] text-slate-500">On-chain transaction propagation node.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="text" value="https://mainnet.base.org" disabled class="bg-[#020408]/60 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-400 font-mono w-64">
+                                <button class="bg-[#0b0f19] hover:bg-slate-800 text-white border border-slate-800 px-3 py-1.5 rounded text-xs transition-all">Edit</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOK: ANALYTICS ================= -->
+                <div id="view-analytics" class="hidden max-w-5xl mx-auto w-full">
+                    <div class="mb-6">
+                        <h2 class="text-lg font-bold text-white">Performance Analytics</h2>
+                        <p class="text-xs text-slate-400">Observe model token expenditures, query latencies, and execution success rates.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div class="glass-panel p-5 rounded-xl">
+                            <span class="text-xs text-slate-500">Success Run Rate</span>
+                            <div class="text-2xl font-bold text-emerald-400 mt-1">99.82%</div>
+                            <span class="text-[10px] text-slate-500">Target score: > 98.5%</span>
+                        </div>
+                        <div class="glass-panel p-5 rounded-xl">
+                            <span class="text-xs text-slate-500">Avg Response Latency</span>
+                            <div class="text-2xl font-bold text-white mt-1">142 ms</div>
+                            <span class="text-[10px] text-slate-500 font-mono">Model: deepseek-v4-flash</span>
+                        </div>
+                        <div class="glass-panel p-5 rounded-xl">
+                            <span class="text-xs text-slate-500">Monthly Spend</span>
+                            <div class="text-2xl font-bold text-white mt-1">$42.18</div>
+                            <span class="text-[10px] text-slate-500">Estimated budget remaining: $200.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= WIDOKI POMOCNICZE / PLACEHOLDERY DLA PEŁNEJ NAWIGACJI ================= -->
+                <div id="view-agents" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Active Autonomous Agents (16)</h2>
+                    <p class="text-xs text-slate-400 mt-1">Configure individual personas, system credentials, and specialized logic models.</p>
+                </div>
+                <div id="view-skills" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Agent Skills Library (46)</h2>
+                    <p class="text-xs text-slate-400 mt-1">Manage functional blocks, tool schemas, and executable script capabilities.</p>
+                </div>
+                <div id="view-sessions" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Core Sessions</h2>
+                    <p class="text-xs text-slate-400 mt-1">Track long-term session IDs, multi-agent orchestrations, and conversation histories.</p>
+                </div>
+                <div id="view-memory" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Memory DB Configurations</h2>
+                    <p class="text-xs text-slate-400 mt-1">Observe dynamic contextual long-term memory records and graph associations.</p>
+                </div>
+                <div id="view-video" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Video Generation Engine</h2>
+                    <p class="text-xs text-slate-400 mt-1">Control automated frame synthesis, model-based rendering, and context sequences.</p>
+                </div>
+                <div id="view-editor" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Autonomous AI Editor</h2>
+                    <p class="text-xs text-slate-400 mt-1">Interactive code editor featuring real-time collaborative agent revisions.</p>
+                </div>
+                <div id="view-worker" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Distributed Worker Nodes</h2>
+                    <p class="text-xs text-slate-400 mt-1">Observe processing workloads, CPU usage and status logs across nodes.</p>
+                </div>
+                <div id="view-settings" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">System Settings</h2>
+                    <p class="text-xs text-slate-400 mt-1">Configure layout, interface parameters, telemetry pipelines, and database directories.</p>
+                </div>
+                <div id="view-logs" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Core System Logs</h2>
+                    <p class="text-xs text-slate-400 mt-1">Real-time log tracing from underlying node frameworks and external APIs.</p>
+                </div>
+                <div id="view-profiles" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Operator Profiles</h2>
+                    <p class="text-xs text-slate-400 mt-1">Manage cryptographic access keys, profiles, and localized authentication schemes.</p>
+                </div>
+                <div id="view-aimodels" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Custom AI Fine-tunes</h2>
+                    <p class="text-xs text-slate-400 mt-1">Fine-tune custom model structures, load weights, and set temperature metrics.</p>
+                </div>
+                <div id="view-schedule" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Automated Job Cron Schedule</h2>
+                    <p class="text-xs text-slate-400 mt-1">Schedule automatic scraping, smart updates, on-chain scans, and reports.</p>
+                </div>
+                <div id="view-docs" class="hidden max-w-5xl mx-auto w-full">
+                    <h2 class="text-lg font-bold text-white">Developer Documentation</h2>
+                    <p class="text-xs text-slate-400 mt-1">Reference manuals, schema specifications, and API integration guides.</p>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ================= MODAL FALLBACK SYSTEMU WYBORU FOLDRU ================= -->
+    <div id="system-picker-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-[#0b0f19] border border-slate-800 max-w-md w-full rounded-xl overflow-hidden shadow-2xl">
+            <!-- Header okna systemowego -->
+            <div class="bg-[#05080f] px-4 py-3 border-b border-slate-850 flex items-center justify-between">
+                <div class="flex items-center gap-2 text-white">
+                    <i data-lucide="monitor" class="w-4 h-4 text-[#00f2fe]"></i>
+                    <span class="text-xs font-bold tracking-wide uppercase font-mono">System Directory Picker</span>
+                </div>
+                <button onclick="closeModal()" class="text-slate-500 hover:text-white transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <!-- Zawartość okna -->
+            <div class="p-6">
+                <p class="text-xs text-slate-400 mb-4">Select a secure workspace target path for autonomous agent builds:</p>
+                
+                <div class="bg-[#020408] border border-slate-850 rounded-lg p-3 max-h-48 overflow-y-auto text-xs font-mono space-y-2 mb-4">
+                    <div onclick="selectSystemFolder('Moje Projekty')" class="flex items-center gap-2.5 p-2 hover:bg-[#121824] rounded cursor-pointer transition-all">
+                        <i data-lucide="folder" class="w-4 h-4 text-amber-500"></i>
+                        <span class="text-white">Dysk:/Moje Projekty (MyProjects)</span>
+                    </div>
+                    <div onclick="selectSystemFolder('nova-agent-builder')" class="flex items-center gap-2.5 p-2 hover:bg-[#121824] rounded cursor-pointer transition-all">
+                        <i data-lucide="folder" class="w-4 h-4 text-amber-500"></i>
+                        <span class="text-white">Dysk:/nova-agent-builder</span>
+                    </div>
+                    <div onclick="selectSystemFolder('web-development-site')" class="flex items-center gap-2.5 p-2 hover:bg-[#121824] rounded cursor-pointer transition-all">
+                        <i data-lucide="folder" class="w-4 h-4 text-amber-500"></i>
+                        <span class="text-white">Dysk:/web-development-site</span>
+                    </div>
+                    <div onclick="selectSystemFolder('test-environment')" class="flex items-center gap-2.5 p-2 hover:bg-[#121824] rounded cursor-pointer transition-all">
+                        <i data-lucide="folder" class="w-4 h-4 text-amber-500"></i>
+                        <span class="text-white">Dysk:/test-environment</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button onclick="closeModal()" class="bg-[#020408] hover:bg-slate-900 text-slate-400 border border-slate-850 px-4 py-2 rounded-lg text-xs font-semibold transition-all">Cancel</button>
+                    <button onclick="confirmSelectedFolder()" class="btn-premium px-4 py-2 rounded-lg text-xs font-semibold">Confirm Folder Path</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RENDEROWANIE I LOGIKA OBSŁUGI ZAKŁADEK (JS) -->
+    <script>
+        // Załadowanie wszystkich ikon z zestawu Lucide
+        lucide.createIcons();
+
+        // Lista wszystkich zakładanych widoków
+        const viewsList = [
+            'chat', 'agents', 'skills', 'plugins', 
+            'sessions', 'channels', 'memory', 
+            'workspace', 'video', 'editor', 'worker', 'crypto', 'trading', 'shopping', 'terminal',
+            'settings', 'apikeys', 'logs', 'profiles', 'aimodels', 'schedule', 'analytics', 'docs'
+        ];
+
+        // Funkcja zmiany zakładek (Tabs)
+        function switchTab(tabName) {
+            // Ukrywanie wszystkich widoków w głównej sekcji
+            viewsList.forEach(view => {
+                const el = document.getElementById(`view-${view}`);
+                if (el) el.classList.add('hidden');
+            });
+
+            // Usunięcie aktywnego wyglądu ze wszystkich linków bocznych
+            viewsList.forEach(link => {
+                const el = document.getElementById(`tab-link-${link}`);
+                if (el) {
+                    el.className = "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-[rgba(255,255,255,0.02)] transition-all";
+                    const icon = el.querySelector('i');
+                    if (icon) icon.className = icon.className.replace('text-[#00f2fe]', '');
+                }
+            });
+
+            // Uwidocznienie docelowego widoku
+            const targetView = document.getElementById(`view-${tabName}`);
+            if (targetView) targetView.classList.remove('hidden');
+
+            // Aktywacja stylu linku wybranej zakładki
+            const activeLink = document.getElementById(`tab-link-${tabName}`);
+            if (activeLink) {
+                activeLink.className = "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all bg-[rgba(0,242,254,0.06)] border-l-2 border-[#00f2fe] text-white";
+                const icon = activeLink.querySelector('i');
+                if (icon) icon.className += ' text-[#00f2fe]';
+            }
+        }
+
+        // --- NATYWNY SYSTEMOWY WYBÓR KATALOGU PLIKÓW ---
+        let selectedFolder = "";
+
+        async function triggerSystemDirectoryPicker() {
+            // Sprawdzenie obecności interfejsu API Directory Picker przeglądarki
+            if ('showDirectoryPicker' in window) {
+                try {
+                    const dirHandle = await window.showDirectoryPicker();
+                    setupWorkspaceActiveState(dirHandle.name);
+                } catch (err) {
+                    console.log("Natywny selektor odrzucony. Wywołanie systemowego modalu zastępczego.");
+                    openSystemFallbackModal();
+                }
+            } else {
+                openSystemFallbackModal();
+            }
+        }
+
+        function openSystemFallbackModal() {
+            document.getElementById('system-picker-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('system-picker-modal').classList.add('hidden');
+        }
+
+        function selectSystemFolder(name) {
+            selectedFolder = name;
+            // Opcjonalne: graficzne podświetlenie wybranego folderu w modalu fallback
+        }
+
+        function confirmSelectedFolder() {
+            if (selectedFolder === "") {
+                selectedFolder = "nova-agent-builder";
+            }
+            setupWorkspaceActiveState(selectedFolder);
+            closeModal();
+        }
+
+        function setupWorkspaceActiveState(folderName) {
+            // Dynamiczne przypisanie informacji w panelu górnym i bocznym
+            document.getElementById('current-workspace-name').innerText = folderName;
+            document.getElementById('workspace-badge').innerText = "Active";
+            document.getElementById('workspace-badge').className = "text-[9px] bg-[#00f2fe]/20 text-[#00f2fe] px-1.5 rounded font-mono font-bold";
+            
+            // Konwersja interfejsu ze stanu pustego na drzewo struktury plików
+            document.getElementById('workspace-status-card').classList.add('hidden');
+            document.getElementById('workspace-files-structure').classList.remove('hidden');
+            
+            console.log(`Directory zmapowany pomyślnie: ${folderName}`);
+        }
+    </script>
+</body>
+</html>

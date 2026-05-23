@@ -1,0 +1,13 @@
+Title: Nova AI Builder
+Errors: []
+Nav links: 23
+  Link: 'Chat Assistant'
+  Link: 'Agents 16'
+  Link: 'Skills 46'
+  Link: 'Add Tools / Plugins'
+  Link: 'Sessions'
+  Link: 'Channels'
+  Link: 'Memory DB'
+  Link: 'Workspace'
+After click - errors: []
+After 2nd click - errors: []

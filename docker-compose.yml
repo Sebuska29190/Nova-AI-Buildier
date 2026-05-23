@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  nova:
+    build: .
+    ports:
+      - "4123:4123"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - NOVA_AUTH_TOKEN=${NOVA_AUTH_TOKEN:-}
+    volumes:
+      - nova-data:/app/nova.db
+    restart: unless-stopped
+
+  # Ollama (optional local models)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    profiles:
+      - local
+
+volumes:
+  nova-data:
+  ollama-data:

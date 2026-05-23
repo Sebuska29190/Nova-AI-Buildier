@@ -1,0 +1,1 @@
+{ "name": "provider-lmstudio", "version": "0.4.0", "private": true, "type": "module", "dependencies": { "@nova/sdk": "workspace:*" } }

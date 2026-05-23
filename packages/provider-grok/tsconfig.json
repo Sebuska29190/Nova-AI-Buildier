@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "../..",
+    "types": ["node", "bun-types"],
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": {
+      "@nova/sdk": ["../sdk/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,245 @@
+  ✓ Community plugin registry ready (26 plugins)
+  ✓ Community skills loaded (64 tools)
+
+  ╔═══════════════════════════════════════╗
+  ║       Nova Agent Platform v0.6.1        ║
+  ╚═══════════════════════════════════════╝
+
+  ✓ Knowledge Base initialized at D:\nova\knowledge
+  ✓ AgentFS initialized at D:\nova\kernel\agentfs
+  ✓ Kernel Ledger initialized at D:\nova\kernel\ledger
+  ✓ Kernel initialized at D:\nova\kernel
+  ✓ DeepSeek (4 models)
+  ✓ Anthropic (3 models)
+  ✓ OpenAI (4 models)
+  ✓ Gemini (3 models)
+  ✓ Ollama (5 models)
+  ✓ Qwen (7 models)
+  ✓ Zhipu (5 models)
+  ✓ Kimi (4 models)
+  ✓ MiniMax (3 models)
+  ✓ LM Studio (1 models)
+  ✓ Grok (4 models)
+  ✓ Custom (1 models)
+  12 provider(s), 44 model(s) ready
+  17 agent(s) configured
+
+  ✓ UI dist ready
+  Gateway:      http://0.0.0.0:4123
+  Chat API:     POST /v1/chat/completions
+  Agent API:    POST /api/agent/send
+  Models:       GET  /v1/models
+  Sessions:     GET  /api/sessions
+  Channels:     POST /api/channels/:id/start
+  Tools:        GET  /api/tools
+  UI:           http://localhost:4123/
+
+  Terminal WS:  /terminal (WebSocket attached)
+  WebSocket:    ws://localhost:4123/ws
+  Terminal:     ws://localhost:4123/terminal
+  Health:       GET /healthz, /readyz, /metrics
+[ChannelManager] Restored channel: telegram
+  Channels:     1 restored from config
+[video] Language: fr, storyInstr: "Write the story ENTIRELY in French.", ttsVoice: fr-FR-HenriNeural
+[images] Searching Pexels for: "Close-up weathered hands holding yellowed scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Close-up weathered hands holding yellowed scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Close-up weathered hands holding yellowed scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Searching Flickr for: "Close-up weathered hands holding yellowed scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Close-up weathered hands holding yellowed scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497284839, query="Close-up weathered hands holding yellowed scene photo **Lappât parfait** J’ai visage dans scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmq5n3\story\images\img_01.png
+[images] Searching Pexels for: "Medium shot man typing laptop scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Medium shot man typing laptop scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Medium shot man typing laptop scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Searching Flickr for: "Medium shot man typing laptop scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Medium shot man typing laptop scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497285780, query="Medium shot man typing laptop scene photo **Lappât parfait** J’ai visage dans scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmq5n3\story\images\img_02.png
+[images] Searching Pexels for: "Wide shot man sitting alone scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Wide shot man sitting alone scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Wide shot man sitting alone scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Searching Flickr for: "Wide shot man sitting alone scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Wide shot man sitting alone scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497286255, query="Wide shot man sitting alone scene photo **Lappât parfait** J’ai visage dans scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmq5n3\story\images\img_03.png
+[images] Searching Pexels for: "Over-the-shoulder shot first man placing scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Over-the-shoulder shot first man placing scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Over-the-shoulder shot first man placing scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Searching Flickr for: "Over-the-shoulder shot first man placing scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Over-the-shoulder shot first man placing scene photo **Lappât parfait** J’ai visage dans scene photo"
+[images] MET Museum: found image
+[images] Downloaded from Paintings API: D:\nova\video_output\job_mphmq5n3\story\images\img_04.png
+[images] Searching Pexels for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Searching Flickr for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497287770, query="Scene establishing shot **Lappât parfait** J’ai visage dans scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmq5n3\story\images\img_05.png
+[images] Searching Pexels for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Searching Flickr for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot **Lappât parfait** J’ai visage dans scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497288291, query="Scene establishing shot **Lappât parfait** J’ai visage dans scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmq5n3\story\images\img_06.png
+[video] Language: fr, storyInstr: "Write the story ENTIRELY in French.", ttsVoice: fr-FR-HenriNeural
+[images] Searching Pexels for: "Aerial drone shot dense, moonless scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Aerial drone shot dense, moonless scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Aerial drone shot dense, moonless scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Searching Flickr for: "Aerial drone shot dense, moonless scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Aerial drone shot dense, moonless scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497343927, query="Aerial drone shot dense, moonless scene photo **Le pacte rio** suis arrivé scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmrcxw\story\images\img_01.png
+[images] Searching Pexels for: "Close-up man's hand reaching toward scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Close-up man's hand reaching toward scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Close-up man's hand reaching toward scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Searching Flickr for: "Close-up man's hand reaching toward scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Close-up man's hand reaching toward scene photo **Le pacte rio** suis arrivé scene photo"
+[images] MET Museum: found image
+[images] Downloaded from Paintings API: D:\nova\video_output\job_mphmrcxw\story\images\img_02.png
+[images] Searching Pexels for: "Wide shot woman's silhouette river scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Wide shot woman's silhouette river scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Wide shot woman's silhouette river scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Searching Flickr for: "Wide shot woman's silhouette river scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Wide shot woman's silhouette river scene photo **Le pacte rio** suis arrivé scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497345198, query="Wide shot woman's silhouette river scene photo **Le pacte rio** suis arrivé scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmrcxw\story\images\img_03.png
+[images] Searching Pexels for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Searching Flickr for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497345723, query="Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmrcxw\story\images\img_04.png
+[images] Searching Pexels for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Searching Flickr for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497346157, query="Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmrcxw\story\images\img_05.png
+[images] Searching Pexels for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Searching Flickr for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497346628, query="Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmrcxw\story\images\img_06.png
+[images] Searching Pexels for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Searching Flickr for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497347230, query="Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmrcxw\story\images\img_07.png
+[images] Searching Pexels for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Searching Flickr for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497347784, query="Scene establishing shot, photorealistic **Le pacte rio** suis arrivé scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmrcxw\story\images\img_08.png
+[video] Language: fr, storyInstr: "Write the story ENTIRELY in French.", ttsVoice: fr-FR-HenriNeural
+[images] Searching Pexels for: "Close-up woman's confident smile dimly scene photo mois silence L'homme détruit réputation scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Close-up woman's confident smile dimly scene photo mois silence L'homme détruit réputation scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Close-up woman's confident smile dimly scene photo mois silence L'homme détruit réputation scene photo"
+[images] Searching Flickr for: "Close-up woman's confident smile dimly scene photo mois silence L'homme détruit réputation scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Close-up woman's confident smile dimly scene photo mois silence L'homme détruit réputation scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497518144, query="Close-up woman's confident smile dimly scene photo mois silence L'homme détruit réputation scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmv7z0\story\images\img_01.png
+[images] Searching Pexels for: "Medium shot Marc Delacroix tight scene photo mois silence L'homme détruit réputation scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Medium shot Marc Delacroix tight scene photo mois silence L'homme détruit réputation scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Medium shot Marc Delacroix tight scene photo mois silence L'homme détruit réputation scene photo"
+[images] Searching Flickr for: "Medium shot Marc Delacroix tight scene photo mois silence L'homme détruit réputation scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Medium shot Marc Delacroix tight scene photo mois silence L'homme détruit réputation scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497518965, query="Medium shot Marc Delacroix tight scene photo mois silence L'homme détruit réputation scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmv7z0\story\images\img_02.png
+[images] Searching Pexels for: "Woman's hand holding smartphone, screen scene photo mois silence L'homme détruit réputation scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Woman's hand holding smartphone, screen scene photo mois silence L'homme détruit réputation scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Woman's hand holding smartphone, screen scene photo mois silence L'homme détruit réputation scene photo"
+[images] Searching Flickr for: "Woman's hand holding smartphone, screen scene photo mois silence L'homme détruit réputation scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Woman's hand holding smartphone, screen scene photo mois silence L'homme détruit réputation scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497519613, query="Woman's hand holding smartphone, screen scene photo mois silence L'homme détruit réputation scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmv7z0\story\images\img_03.png
+[images] Searching Pexels for: "Wide shot conference room, projector scene photo mois silence L'homme détruit réputation scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Wide shot conference room, projector scene photo mois silence L'homme détruit réputation scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Wide shot conference room, projector scene photo mois silence L'homme détruit réputation scene photo"
+[images] Searching Flickr for: "Wide shot conference room, projector scene photo mois silence L'homme détruit réputation scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Wide shot conference room, projector scene photo mois silence L'homme détruit réputation scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497520284, query="Wide shot conference room, projector scene photo mois silence L'homme détruit réputation scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmv7z0\story\images\img_04.png
+[images] Searching Pexels for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Searching Flickr for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497520929, query="Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmv7z0\story\images\img_05.png
+[images] Searching Pexels for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Searching Flickr for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779497521613, query="Scene establishing shot, photorealistic mois silence L'homme détruit réputation scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphmv7z0\story\images\img_06.png

@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "created_at": "2026-05-23T12:46:15.122Z",
+  "video": {
+    "filename": "video_mpicd27f_elle_mattendait_dehors.mp4",
+    "title": "**Elle mattendait dehors**",
+    "is_short": true,
+    "quality": "low",
+    "size_mb": 5.87
+  },
+  "content": {
+    "topic": "test",
+    "word_count": 63,
+    "story": "Chaque nuit, je vérifiais que la porte était fermée. Ce soir, elle est ouverte. Je la referme, tremblant. Puis, un grattement. À la fenêtre. Je n’ose pas regarder. Le grattement s’intensifie. Je me cache sous la couette. Le silence revient. Soulagé, j’ouvre les yeux. Mon visage est collé à la vitre. La mienne. Je crie. Mais dehors, il y a moi, qui sourit."
+  },
+  "production": {
+    "model": "deepseek/deepseek-chat",
+    "tts_engine": "auto",
+    "image_engine": "auto",
+    "image_count": 6,
+    "subtitles": true
+  }
+}

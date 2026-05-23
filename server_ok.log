@@ -1,0 +1,152 @@
+  ✓ Community plugin registry ready (26 plugins)
+  ✓ Community skills loaded (64 tools)
+
+  ╔═══════════════════════════════════════╗
+  ║       Nova Agent Platform v0.6.1        ║
+  ╚═══════════════════════════════════════╝
+
+  ✓ Knowledge Base initialized at D:\nova\knowledge
+  ✓ AgentFS initialized at D:\nova\kernel\agentfs
+  ✓ Kernel Ledger initialized at D:\nova\kernel\ledger
+  ✓ Kernel initialized at D:\nova\kernel
+  ✓ DeepSeek (4 models)
+  ✓ Anthropic (3 models)
+  ✓ OpenAI (4 models)
+  ✓ Gemini (3 models)
+  ✓ Ollama (5 models)
+  ✓ Qwen (7 models)
+  ✓ Zhipu (5 models)
+  ✓ Kimi (4 models)
+  ✓ MiniMax (3 models)
+  ✓ LM Studio (1 models)
+  ✓ Grok (4 models)
+  ✓ Custom (1 models)
+  12 provider(s), 44 model(s) ready
+  17 agent(s) configured
+
+  ✓ UI dist ready
+  Gateway:      http://0.0.0.0:4123
+  Chat API:     POST /v1/chat/completions
+  Agent API:    POST /api/agent/send
+  Models:       GET  /v1/models
+  Sessions:     GET  /api/sessions
+  Channels:     POST /api/channels/:id/start
+  Tools:        GET  /api/tools
+  UI:           http://localhost:4123/
+
+  Terminal WS:  /terminal (WebSocket attached)
+  WebSocket:    ws://localhost:4123/ws
+  Terminal:     ws://localhost:4123/terminal
+  Health:       GET /healthz, /readyz, /metrics
+[ChannelManager] Restored channel: telegram
+  Channels:     1 restored from config
+[images] Searching Pexels for: "Close-up hands nervously packing cardboard scene photo Promotion watched Sarah pack desk scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Close-up hands nervously packing cardboard scene photo Promotion watched Sarah pack desk scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Close-up hands nervously packing cardboard scene photo Promotion watched Sarah pack desk scene photo"
+[images] Searching Flickr for: "Close-up hands nervously packing cardboard scene photo Promotion watched Sarah pack desk scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Close-up hands nervously packing cardboard scene photo Promotion watched Sarah pack desk scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779495877776, query="Close-up hands nervously packing cardboard scene photo Promotion watched Sarah pack desk scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphlw0an\story\images\img_01.png
+[images] Searching Pexels for: "Wide shot corporate office hallway, scene photo Promotion watched Sarah pack desk scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Wide shot corporate office hallway, scene photo Promotion watched Sarah pack desk scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Wide shot corporate office hallway, scene photo Promotion watched Sarah pack desk scene photo"
+[images] Searching Flickr for: "Wide shot corporate office hallway, scene photo Promotion watched Sarah pack desk scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Wide shot corporate office hallway, scene photo Promotion watched Sarah pack desk scene photo"
+[images] MET Museum: found image
+[images] Downloaded from Paintings API: D:\nova\video_output\job_mphlw0an\story\images\img_02.png
+[images] Searching Pexels for: "Medium shot man polished mahogany scene photo Promotion watched Sarah pack desk scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Medium shot man polished mahogany scene photo Promotion watched Sarah pack desk scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Medium shot man polished mahogany scene photo Promotion watched Sarah pack desk scene photo"
+[images] Searching Flickr for: "Medium shot man polished mahogany scene photo Promotion watched Sarah pack desk scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Medium shot man polished mahogany scene photo Promotion watched Sarah pack desk scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779495880279, query="Medium shot man polished mahogany scene photo Promotion watched Sarah pack desk scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphlw0an\story\images\img_03.png
+[images] Searching Pexels for: "Low-angle shot woman standing podium, scene photo Promotion watched Sarah pack desk scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Low-angle shot woman standing podium, scene photo Promotion watched Sarah pack desk scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Low-angle shot woman standing podium, scene photo Promotion watched Sarah pack desk scene photo"
+[images] Searching Flickr for: "Low-angle shot woman standing podium, scene photo Promotion watched Sarah pack desk scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Low-angle shot woman standing podium, scene photo Promotion watched Sarah pack desk scene photo"
+[images] MET Museum: found image
+[images] Downloaded from Paintings API: D:\nova\video_output\job_mphlw0an\story\images\img_04.png
+[images] Searching Pexels for: "Scene establishing shot, photorealistic Promotion watched Sarah pack desk scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot, photorealistic Promotion watched Sarah pack desk scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot, photorealistic Promotion watched Sarah pack desk scene photo"
+[images] Searching Flickr for: "Scene establishing shot, photorealistic Promotion watched Sarah pack desk scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot, photorealistic Promotion watched Sarah pack desk scene photo"
+[images] MET Museum: found image
+[images] Downloaded from Paintings API: D:\nova\video_output\job_mphlw0an\story\images\img_05.png
+[images] Searching Pexels for: "man his 30s holding phone, scene photo mère père appelé après silence. scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "man his 30s holding phone, scene photo mère père appelé après silence. scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "man his 30s holding phone, scene photo mère père appelé après silence. scene photo"
+[images] Searching Flickr for: "man his 30s holding phone, scene photo mère père appelé après silence. scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "man his 30s holding phone, scene photo mère père appelé après silence. scene photo"
+[images] MET Museum: found image
+[images] Downloaded from Paintings API: D:\nova\video_output\job_mphlynki\story\images\img_01.png
+[images] Searching Pexels for: "Close-up worn-out phone receiver, dust scene photo mère père appelé après silence. scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Close-up worn-out phone receiver, dust scene photo mère père appelé après silence. scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Close-up worn-out phone receiver, dust scene photo mère père appelé après silence. scene photo"
+[images] Searching Flickr for: "Close-up worn-out phone receiver, dust scene photo mère père appelé après silence. scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Close-up worn-out phone receiver, dust scene photo mère père appelé après silence. scene photo"
+[images] MET Museum: found image
+[images] Downloaded from Paintings API: D:\nova\video_output\job_mphlynki\story\images\img_02.png
+[images] Searching Pexels for: "old analog clock wall, hands scene photo mère père appelé après silence. scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "old analog clock wall, hands scene photo mère père appelé après silence. scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "old analog clock wall, hands scene photo mère père appelé après silence. scene photo"
+[images] Searching Flickr for: "old analog clock wall, hands scene photo mère père appelé après silence. scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "old analog clock wall, hands scene photo mère père appelé après silence. scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779495993613, query="old analog clock wall, hands scene photo mère père appelé après silence. scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphlynki\story\images\img_03.png
+[images] Searching Pexels for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Searching Flickr for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779495994314, query="Scene establishing shot mère père appelé après silence. scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphlynki\story\images\img_04.png
+[images] Searching Pexels for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Searching Flickr for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779495994984, query="Scene establishing shot mère père appelé après silence. scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphlynki\story\images\img_05.png
+[images] Searching Pexels for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Pexels: no API key set, skipping
+[images] Searching Unsplash for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Unsplash: no API key set, skipping
+[images] Searching Wikimedia Commons for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Searching Flickr for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Flickr: no API key set (FLICKR_API_KEY), skipping
+[images] Searching Paintings APIs for: "Scene establishing shot mère père appelé après silence. scene photo"
+[images] Trying picsum/loremflickr fallback (seed=1779495995547, query="Scene establishing shot mère père appelé après silence. scene photo")
+[images] Downloaded from picsum/loremflickr: D:\nova\video_output\job_mphlynki\story\images\img_06.png

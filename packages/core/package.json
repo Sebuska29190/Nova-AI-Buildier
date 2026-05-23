@@ -1,0 +1,1 @@
+{ "name": "nova-ai-builder-core", "version": "0.7.0", "private": true, "type": "module", "dependencies": { "hono": "^4.7.0", "@hono/node-server": "^1.14.0", "dotenv": "^16.4.0" } }

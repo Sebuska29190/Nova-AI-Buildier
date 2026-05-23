@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "D:\nova\tools\generate_skills.py", line 946, in <module>
+    print(f'  \u2713 {path}')
+    ~~~~~^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\encodings\cp1250.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 2: character maps to <undefined>
