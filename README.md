@@ -207,8 +207,8 @@ nova-ai-builder/
 │   │   ├── terminal/               # WebSocket PTY terminal
 │   │   └── memory/                 # Memory store (markdown files + cache)
 │   │
-│   ├── ui/                         # Svelte 5 frontend
-│   │   └── src/routes/             #   Each page = one .svelte file
+│   ├── ui/                         # React 19 + Vite 6 frontend
+│   │   └── src/routes/             #   Each page = one .tsx component
 │   │
 │   ├── provider-deepseek/          # LLM provider plugins (pluggable)
 │   ├── provider-anthropic/

@@ -38,6 +38,7 @@ import "./plugin/community-skills.ts"; // registers 20 community tools
 import "./plugin/tools_session_search.ts"; // FTS5 session search tool
 import "./skill/self-improve.ts"; // Auto-skill creation tools
 import { cronManager } from "./cron/manager.ts"; // Cron scheduler (registers tools)
+import "./log/capture.ts"; // Log capture system (intercepts console.log/warn/error)
 import "./multi-agent/tools_parallel.ts"; // Parallel sub-agent tool
 import "./skill/hub.ts"; // Skill Hub (agentskills.io integration)
 import "./plugin/community-plugins.ts"; // registers community plugin registry
@@ -202,8 +203,9 @@ import { createServer as netCreateServer } from "node:net";
 async function tryStart(port: number): Promise<import("node:http").Server | null> {
   const free = await new Promise<boolean>((resolve) => {
     const s = netCreateServer();
-    s.once("error", () => resolve(false));
-    s.once("listening", () => { s.close(); resolve(true); });
+    const timer = setTimeout(() => { try { s.close(); } catch {} resolve(false); }, 1000);
+    s.once("error", () => { clearTimeout(timer); resolve(false); });
+    s.once("listening", () => { clearTimeout(timer); s.close(); resolve(true); });
     s.listen(port, "127.0.0.1");
   });
   if (!free) return null;
@@ -218,15 +220,11 @@ async function tryStart(port: number): Promise<import("node:http").Server | null
 (async () => {
   let httpServer = await tryStart(desiredPort);
   if (!httpServer) {
-    console.log(`  ⚠ Port ${desiredPort} in use, trying 4124...`);
-    httpServer = await tryStart(4124);
+    console.log(`  ⚠ Port ${desiredPort} in use, using auto-assigned port...`);
+    httpServer = await tryStart(0);
   }
   if (!httpServer) {
-    console.log(`  ⚠ Port 4124 also in use, trying 4125...`);
-    httpServer = await tryStart(4125);
-  }
-  if (!httpServer) {
-    console.error(`  ✗ Could not find free port (tried 4123-4125). Free a port and restart.`);
+    console.error(`  ✗ Could not start server. Free ports and restart.`);
     process.exit(1);
   }
   const port = (httpServer.address() as import("net").AddressInfo).port;
@@ -249,5 +247,24 @@ async function tryStart(port: number): Promise<import("node:http").Server | null
 
   channelManager.restoreSavedChannels().then(() => {
     console.log(`  Channels:     ${channelManager.getChannels().length} restored from config`);
+  });
+
+  // Initialize MCP servers
+  import("./mcp-client.ts").then(async (mcp) => {
+    await mcp.initMCPServers();
+    const servers = mcp.listServers();
+    if (servers.length > 0) {
+      console.log(`  MCP:          ${servers.length} server(s), ${servers.reduce((s, x) => s + x.toolCount, 0)} tools`);
+      const { registerTool } = await import("./plugin/tools.ts");
+      for (const reg of mcp.getMCPToolRegistrations()) {
+        registerTool({
+          name: reg.name, description: reg.description,
+          parameters: reg.parameters,
+          async execute(args: any) { return reg.execute(args); },
+        });
+      }
+    } else {
+      console.log(`  MCP:          no servers configured (edit config/mcp-servers.json)`);
+    }
   });
 })();

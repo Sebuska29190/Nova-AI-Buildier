@@ -4,8 +4,9 @@ import { join, dirname } from "node:path";
 
 function runFFmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const ff = Bun.which("ffmpeg") || "ffmpeg";
-    const proc = spawn(ff, args);
+    const ff = process.env.FFMPEG_PATH?.replace(/\\/g, "/") || "C:/Windows/system32/ffmpeg.exe";
+    if (!process.env.FFMPEG_PATH) process.env.FFMPEG_PATH = "C:\\Windows\\system32\\ffmpeg.exe";
+    const proc = spawn(ff, args, { windowsHide: true });
     let stderr = "";
     proc.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
     proc.on("close", (code) => code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}: ${stderr.slice(-200)}`)));

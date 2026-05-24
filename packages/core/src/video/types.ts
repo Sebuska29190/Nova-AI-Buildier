@@ -53,6 +53,13 @@ export interface VideoParams {
   animationStyle?: string;   // "ken-burns" | "zoom" | "fade" | "slide" | "none" | "cinematic-zoom" | "parallax" | "whip-pan" | "random" | "blur-zoom"
   imageStyle?: string;       // visual style hint e.g. "cinematic", "anime", "3d render"
   effects?: string;          // comma-separated visual effects: "vignette,glitch,vhs,grain,bloom"
+  audioPath?: string;        // pre-recorded audio file path (skip TTS, use duration from file)
+  useAudioEffects?: boolean; // add music-like effects to uploaded audio (reverb, compression etc.)
+  transcriptionSegments?: Array<{ text: string; start: number; end: number }>; // Whisper timestamps
+  /** Path to input video file for dubbing (MP4) */
+  inputVideoPath?: string;
+  /** Source language of input video (for translation dubbing) */
+  sourceLanguage?: string;
 }
 
 export interface VideoJob {

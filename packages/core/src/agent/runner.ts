@@ -159,6 +159,28 @@ function thisRole(role: string, content: string, toolCallId?: string): AgentMess
 
 async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: AgentMessage[]; signal?: AbortSignal; thinkingLevel?: string; tools: { type: "function"; function: { name: string; description?: string; parameters: Record<string, unknown> } }[] }): Promise<RunResult> {
   const seenTools = new Set<string>();
+  const fileMutations: { action: string; path: string; detail: string }[] = [];
+
+  const FILE_TOOLS = new Set(["workspace_write_file", "workspace_edit_file", "workspace_delete_file", "write_file", "patch", "delete_file"]);
+
+  function trackFileMutation(toolName: string, args: Record<string, unknown>, result: string): void {
+    if (!FILE_TOOLS.has(toolName)) return;
+    const path = (args.path as string) || "";
+    if (toolName === "workspace_write_file" || toolName === "write_file") {
+      const content = (args.content as string) || "";
+      fileMutations.push({ action: "✏️ Written", path, detail: `${content.length} bytes` });
+    } else if (toolName === "workspace_edit_file" || toolName === "patch") {
+      fileMutations.push({ action: "🔧 Edited", path, detail: `find/replace` });
+    } else if (toolName === "workspace_delete_file" || toolName === "delete_file") {
+      fileMutations.push({ action: "🗑️ Deleted", path, detail: `` });
+    }
+  }
+
+  function buildMutationFooter(): string {
+    if (fileMutations.length === 0) return "";
+    const lines = fileMutations.map(m => `  ${m.action} \`${m.path}\`${m.detail ? ` — ${m.detail}` : ""}`);
+    return `\n\n📁 **File changes** (${fileMutations.length}):\n${lines.join("\n")}`;
+  }
 
   for (let iteration = 0; iteration < 25; iteration++) {
     let text = "";
@@ -216,6 +238,24 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
           tool.execute(parsedArgs, { sessionId: params.sessionId, signal: params.signal }),
           new Promise<string>((_, reject) => setTimeout(() => reject(new Error(`Tool ${tc.function.name} timed out after 60s`)), 60000)),
         ]);
+        trackFileMutation(tc.function.name, parsedArgs, resultText);
+
+        // LSP diagnostics after file writes
+        if (FILE_TOOLS.has(tc.function.name) && resultText.includes("✅")) {
+          try {
+            const { runDiagnostics, formatDiagnostics } = await import("../lsp-diagnostics.ts");
+            const filePath = (parsedArgs.path as string) || "";
+            const wsRoot = workspaceManager?.getRoot?.();
+            if (filePath && wsRoot) {
+              const diags = runDiagnostics(filePath, wsRoot);
+              if (diags.length > 0) {
+                const diagMsg = formatDiagnostics(diags);
+                fileMutations.push({ action: "🔍 Lint", path: filePath, detail: diagMsg.replace(/\n/g, "; ") });
+              }
+            }
+          } catch {} // diagnostics are non-blocking
+        }
+
         ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: resultText.slice(0, 10000), name: tc.function.name });
         sessionManager.append(params.sessionId, "tool", resultText.slice(0, 10000), tc.id, tc.function.name);
         emitEvent({ type: "event", kind: "tool_result", sessionId: params.sessionId, data: { toolCallId: tc.id } });
@@ -234,7 +274,7 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
     if (toolNames.length >= 8 && new Set(toolNames).size <= 1) {
       const summary = `[Loop detected — same tool "${toolNames[0]}" called ${toolNames.length} times]`;
       sessionManager.append(params.sessionId, "assistant", summary);
-      return { sessionId: params.sessionId, text: summary, modelRef: params.modelRef, usage: { input: 0, output: 0 } };
+      return { sessionId: params.sessionId, text: summary + buildMutationFooter(), modelRef: params.modelRef, usage: { input: 0, output: 0 } };
     }
   }
 
@@ -244,8 +284,16 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
   const summary = allTools.length > 0
     ? `${lastText || `[Completed after 15 tool iterations]`}\n\n_Tools used: ${allTools.join(", ")}_`
     : lastText || "Max attempts reached";
-  sessionManager.append(params.sessionId, "assistant", summary);
-  return { sessionId: params.sessionId, text: summary, modelRef: params.modelRef, usage: { input: 0, output: 0 } };
+  const fullText = summary + buildMutationFooter();
+  sessionManager.append(params.sessionId, "assistant", fullText);
+
+  // Fire-and-forget: compress long sessions in background
+  try {
+    const { maybeCompressSession } = await import("../trajectory-compression.ts");
+    maybeCompressSession(params.sessionId, params.modelRef).catch(() => {});
+  } catch {}
+
+  return { sessionId: params.sessionId, text: fullText, modelRef: params.modelRef, usage: { input: 0, output: 0 } };
 }
 
 /**

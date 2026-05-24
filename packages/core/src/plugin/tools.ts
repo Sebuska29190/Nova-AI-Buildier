@@ -669,3 +669,119 @@ registerTool({
   },
 });
 
+// ─── Computer Use Tools ─────────────────────────────────────────
+registerTool({
+  name: "computer_screenshot",
+  description: "Take a screenshot of the current screen. Returns image path and dimensions.",
+  parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
+  async execute() { const cu = await import("../computer-use.ts"); const r = cu.takeScreenshot(); return `📸 Screenshot saved: ${r.path} (${r.width}x${r.height})`; },
+});
+
+registerTool({
+  name: "computer_mouse_move",
+  description: "Move mouse cursor to (x, y) coordinates.",
+  parameters: { type: "object", properties: { x: { type: "number" }, y: { type: "number" } }, required: ["x", "y"], additionalProperties: false },
+  async execute(args) { const cu = await import("../computer-use.ts"); return cu.mouseMove((args as any).x, (args as any).y); },
+});
+
+registerTool({
+  name: "computer_mouse_click",
+  description: "Click mouse button (left, right, middle) at current cursor position.",
+  parameters: { type: "object", properties: { button: { type: "string", enum: ["left", "right", "middle"], default: "left" } }, additionalProperties: false },
+  async execute(args) { const cu = await import("../computer-use.ts"); return cu.mouseClick((args as any).button || "left"); },
+});
+
+registerTool({
+  name: "computer_type",
+  description: "Type text at the current cursor position (sends keystrokes to active window).",
+  parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"], additionalProperties: false },
+  async execute(args) { const cu = await import("../computer-use.ts"); return cu.typeText((args as any).text); },
+});
+
+registerTool({
+  name: "computer_key_press",
+  description: "Press a key: enter, tab, escape, backspace, delete, arrows, home, end, ctrl_c/v/x/a/z/s, alt_tab, etc.",
+  parameters: { type: "object", properties: { key: { type: "string" } }, required: ["key"], additionalProperties: false },
+  async execute(args) { const cu = await import("../computer-use.ts"); return cu.keyPress((args as any).key); },
+});
+
+registerTool({
+  name: "computer_screen_size",
+  description: "Get primary screen resolution (width x height).",
+  parameters: { type: "object", properties: {}, additionalProperties: false },
+  async execute() { const cu = await import("../computer-use.ts"); const s = cu.getScreenSize(); return `📺 Screen: ${s.width}x${s.height}`; },
+});
+
+registerTool({
+  name: "computer_cursor_pos",
+  description: "Get current mouse cursor position.",
+  parameters: { type: "object", properties: {}, additionalProperties: false },
+  async execute() { const cu = await import("../computer-use.ts"); const p = cu.getCursorPos(); return `📍 Cursor: (${p.x}, ${p.y})`; },
+});
+
+registerTool({
+  name: "computer_scroll",
+  description: "Scroll mouse wheel. Positive=up, negative=down.",
+  parameters: { type: "object", properties: { amount: { type: "number" } }, required: ["amount"], additionalProperties: false },
+  async execute(args) { const cu = await import("../computer-use.ts"); return cu.scroll((args as any).amount); },
+});
+
+registerTool({
+  name: "computer_drag",
+  description: "Drag mouse from (x1,y1) to (x2,y2) with smooth movement.",
+  parameters: { type: "object", properties: { x1: { type: "number" }, y1: { type: "number" }, x2: { type: "number" }, y2: { type: "number" }, steps: { type: "number", default: 10 } }, required: ["x1", "y1", "x2", "y2"], additionalProperties: false },
+  async execute(args) { const a = args as any; const cu = await import("../computer-use.ts"); return cu.mouseDrag(a.x1, a.y1, a.x2, a.y2, a.steps || 10); },
+});
+
+// ─── Kanban Orchestrator Tool ──────────────────────────────────
+registerTool({
+  name: "orchestrate",
+  description: "Break down a complex task and delegate to specialized agents in parallel. Use when a task has multiple independent parts.",
+  parameters: { type: "object", properties: { task: { type: "string", description: "The complex task to break down and execute" }, modelRef: { type: "string", default: "deepseek/deepseek-chat" } }, required: ["task"], additionalProperties: false },
+  async execute(args: any) {
+    const { orchestrate } = await import("../kanban-orchestrator.ts");
+    const result = await orchestrate(args.task, args.modelRef);
+    return result.summary;
+  },
+});
+
+// ─── Checkpoint Tools ─────────────────────────────────────────
+registerTool({
+  name: "create_checkpoint",
+  description: "Create a file backup snapshot before making changes. Restore with restore_checkpoint. Use before risky file operations.",
+  parameters: { type: "object", properties: { description: { type: "string", default: "auto-checkpoint" }, files: { type: "array", items: { type: "string" }, description: "File paths to backup (optional — defaults to current workspace files)" } }, additionalProperties: false },
+  async execute(args: any) {
+    const { makeSnapshot, listSnapshots } = await import("../checkpoint/store.ts");
+    const desc = args.description || `checkpoint_${Date.now()}`;
+    const files = args.files || [];
+    const snapshot = makeSnapshot(desc, files);
+    return `✅ Checkpoint created: ${snapshot.id}\n${snapshot.description}\n${snapshot.files.length} file(s) backed up`;
+  },
+});
+
+registerTool({
+  name: "restore_checkpoint",
+  description: "Restore files from a previous checkpoint. Use checkpoint ID from list_checkpoints.",
+  parameters: { type: "object", properties: { id: { type: "string", description: "Checkpoint ID to restore from" } }, required: ["id"], additionalProperties: false },
+  async execute(args: any) {
+    const { rewindFiles, listSnapshots } = await import("../checkpoint/store.ts");
+    const snapshots = listSnapshots();
+    const snap = snapshots.find(s => s.id === args.id);
+    if (!snap) return `❌ Checkpoint "${args.id}" not found. Use list_checkpoints to see available IDs.`;
+    const count = rewindFiles(args.id);
+    return `✅ Restored ${count} file(s) from checkpoint ${args.id} (${snap.description})`;
+  },
+});
+
+registerTool({
+  name: "list_checkpoints",
+  description: "List all available file checkpoints/snapshots.",
+  parameters: { type: "object", properties: {}, additionalProperties: false },
+  async execute() {
+    const { listSnapshots } = await import("../checkpoint/store.ts");
+    const snapshots = listSnapshots();
+    if (snapshots.length === 0) return "No checkpoints available.";
+    return snapshots.map(s => `- ${s.id}: ${s.description} (${s.files.length} files, ${new Date(s.createdAt).toLocaleString()})`).join("\n");
+  },
+});
+

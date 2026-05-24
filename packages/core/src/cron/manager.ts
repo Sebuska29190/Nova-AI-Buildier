@@ -38,7 +38,7 @@ interface CronJob {
   createdAt: string;
 }
 
-function parseNaturalSchedule(description: string): { cronExpr: string; intervalMs: number } | null {
+export function parseNaturalSchedule(description: string): { cronExpr: string; intervalMs: number } | null {
   const lower = description.toLowerCase();
 
   // Every X minutes

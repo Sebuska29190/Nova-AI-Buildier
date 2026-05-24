@@ -1,7 +1,10 @@
 node_modules/
+node_modules_bak/
 dist/
 .env
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 
 # Runtime data (may contain cached API keys)
@@ -18,3 +21,27 @@ plugins/
 server*.log
 startup*.log
 *_err*.log
+
+# Temporary test files
+tmp_test_*.ts
+
+# Video output artifacts
+video_output/
+
+# Checkpoint snapshots
+checkpoints/
+
+# Test knowledge entries
+test_knowledge/
+
+# Agent memory files
+memory/
+
+# Binary tools
+bin/
+
+# Config files (local)
+config/
+
+# Hermes workspace config
+.hermes/

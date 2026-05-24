@@ -372,6 +372,43 @@ class ChannelManager {
       inst.stop = async () => { inst.connected = false; };
       this.instances.set(id, inst);
 
+    } else if (id === "googlechat") {
+      const { webhookUrl, spaceId } = config;
+      if (!webhookUrl) throw new Error("Google Chat requires webhookUrl");
+      const inst: ChannelInstance = { id, name: "Google Chat", connected: false, config };
+      inst.sendMessage = async (target: string, text: string) => {
+        try {
+          await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: text.slice(0, 4000) }),
+          });
+        } catch (e) { console.warn(`[GoogleChat] Error:`, e); }
+      };
+      inst.connected = true;
+      inst.stop = async () => { inst.connected = false; };
+      this.instances.set(id, inst);
+
+    } else if (id === "signal") {
+      const { phoneNumber, signalCliPath } = config;
+      if (!phoneNumber) throw new Error("Signal requires phoneNumber");
+      // Set env vars for signal module
+      process.env.SIGNAL_PHONE = phoneNumber;
+      if (signalCliPath) process.env.SIGNAL_CLI_PATH = signalCliPath;
+      const { signalStatus } = await import("./signal.ts");
+      const status = await signalStatus();
+      const inst: ChannelInstance = { id, name: "Signal", connected: false, config };
+      const { signalSend } = await import("./signal.ts");
+      inst.sendMessage = async (target: string, text: string) => {
+        try { await signalSend(target, text); } catch (e) { console.warn(`[Signal] Error:`, e); }
+      };
+      inst.connected = true;
+      inst.stop = async () => { inst.connected = false; };
+      inst.test = async () => {
+        try { await signalStatus(); return { ok: true, message: status }; } catch (e) { return { ok: false, message: String(e) }; }
+      };
+      this.instances.set(id, inst);
+
     } else {
       throw new Error(`Unknown channel: ${id}`);
     }
@@ -380,6 +417,12 @@ class ChannelManager {
     const allConfigs = loadChannelConfigs();
     allConfigs[id] = config;
     saveChannelConfigs(allConfigs);
+
+    // Fire gateway hook
+    try {
+      const { fireEvent } = await import("../gateway-hooks.ts");
+      fireEvent("channel_connected", { channelId: id }).catch(() => {});
+    } catch {}
   }
 
   async stop(id: string): Promise<void> {

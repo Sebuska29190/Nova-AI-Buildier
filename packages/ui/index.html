@@ -7,19 +7,17 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232dd4bf'><circle cx='12' cy='12' r='10'/></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <style>
-      /* FOUC prevention */
-      body { margin: 0; background: #041c1c; color: #f0e6d2; font-family: system-ui, sans-serif; overflow: hidden; }
+      body { margin: 0; background: #020408; color: #f1f5f9; font-family: system-ui, sans-serif; overflow: hidden; }
     </style>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Fallback: if Svelte doesn't mount in 3s, show error
       setTimeout(() => {
-        var app = document.getElementById('app');
-        if (app && app.children.length === 0) {
-          app.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:1rem;color:#6b7a7a;background:#041c1c"><div style="width:40px;height:40px;border:3px solid #1a3a3a;border-top-color:#2dd4bf;border-radius:50%;animation:spin 0.8s linear infinite"></div><h2 style="color:#2dd4bf;font-size:1.1rem">Nova AI Builder loading…</h2><button onclick="location.reload()" style="padding:0.5rem 1rem;border-radius:6px;border:1px solid #2dd4bf;background:rgba(45,212,191,0.1);color:#f0e6d2;cursor:pointer;font-size:0.85rem">Odśwież</button><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          root.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:1rem;color:#475569;background:#020408"><div style="width:40px;height:40px;border:3px solid #1e293b;border-top-color:#00f2fe;border-radius:50%;animation:spin 0.8s linear infinite"></div><h2 style="color:#00f2fe;font-size:1.1rem">Nova AI Builder loading…</h2><button onclick="location.reload()" style="padding:0.5rem 1rem;border-radius:6px;border:1px solid #00f2fe;background:rgba(0,242,254,0.1);color:#f0e6d2;cursor:pointer;font-size:0.85rem">Refresh</button><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
         }
       }, 3000);
     </script>

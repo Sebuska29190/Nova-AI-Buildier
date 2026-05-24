@@ -28,8 +28,8 @@ export const api = {
   agentSend: (message: string, model?: string, agentId?: string) =>
     post("/api/agent/send", { message, model, agentId }),
 
-  // SSE streaming agent with session persistence
-  chatSend: (message: string, model: string, sessionKey?: string, onChunk?: (text: string) => void) => {
+  // SSE streaming chat with session persistence
+  chatSend: (message: string, model: string, sessionKey?: string, onChunk?: (text: string) => void, signal?: AbortSignal) => {
     return new Promise<{ text: string; sessionKey: string }>(async (resolve, reject) => {
       try {
         const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -38,6 +38,7 @@ export const api = {
         const res = await fetch(BASE + "/v1/chat/completions", {
           method: "POST",
           headers,
+          signal,
           body: JSON.stringify({
             model,
             messages: [{ role: "user", content: message }],
@@ -67,7 +68,7 @@ export const api = {
                   fullText += j.choices[0].delta.content;
                   onChunk?.(fullText);
                 }
-              } catch {}
+              } catch { /* skip parse errors */ }
             }
           }
         }

@@ -41,7 +41,22 @@
   --color-error: #ef4444;
   --color-info: #3b82f6;
 
-  /* Fonts — jak w HTML */
+  /* ── Teal Dark Theme (nova design) ── */
+  --bg-deep: #0a0c10;
+  --bg-surface: #0e1117;
+  --bg-card: #161b22;
+  --bg-elevated: #1c2333;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-card: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #14b8a6;
+  --accent-hover: #0d9488;
+  --accent-subtle: rgba(20,184,166,0.1);
+  --accent-border: rgba(20,184,166,0.25);
+
+  /* Fonts */
   --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   --font-display: var(--font-sans);
@@ -68,7 +83,7 @@ html {
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
-  background-color: var(--color-nova-bg);
+  background-color: #0a0c10;
   color: var(--color-nova-foreground);
 }
 
@@ -78,6 +93,12 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 /* Scrollbar — cyber-dark */
@@ -91,7 +112,7 @@ body {
   background: var(--color-nova-border-3);
 }
 
-/* ── Ambient glow (cinema background) ── */
+/* ── Ambient glow ── */
 .ambient-glow {
   position: fixed;
   top: 40%;
@@ -111,30 +132,58 @@ body {
   100% { transform: translate(-48%, -52%) scale(1.05); opacity: 1.1; }
 }
 
-/* ── Glass panel ── */
-.glass-panel {
-  background: var(--color-nova-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-nova-border);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+/* ── Nova card style (teal dark) ── */
+.nova-card {
+  background: #161b22;
+  border: 1px solid #1e293b;
+  border-radius: 1rem;
+  transition: all 0.2s ease;
 }
-.glass-panel:hover {
-  border-color: rgba(0, 242, 254, 0.2);
-  box-shadow: 0 10px 40px rgba(0, 242, 254, 0.03);
+.nova-card:hover {
+  border-color: rgba(20, 184, 166, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* ── Premium button ── */
+/* ── Nova button ── */
+.btn-nova {
+  background: #14b8a6;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+.btn-nova:hover {
+  background: #0d9488;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+}
+
+/* ── Glass panel (updated teal theme) ── */
+.glass-panel {
+  background: #161b22;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  border-radius: 1rem;
+}
+.glass-panel:hover {
+  border-color: rgba(20, 184, 166, 0.25);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Premium button (updated teal theme) ── */
 .btn-premium {
-  background: linear-gradient(135deg, #00f2fe 0%, #6366f1 100%);
-  color: #020408;
+  background: #14b8a6;
+  color: #fff;
   font-weight: 600;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
+  box-shadow: 0 0 15px rgba(20, 184, 166, 0.2);
+  border-radius: 0.75rem;
 }
 .btn-premium:hover {
   transform: translateY(-1.5px);
-  box-shadow: 0 0 25px rgba(0, 242, 254, 0.45);
+  box-shadow: 0 0 25px rgba(20, 184, 166, 0.4);
   filter: brightness(1.1);
 }
 
@@ -157,7 +206,7 @@ body {
 /* ── Typography ── */
 .font-mono { font-family: var(--font-mono); }
 
-/* ── Animations (legacy) ── */
+/* ── Animations ── */
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -193,3 +242,79 @@ body {
   scrollbar-width: none;
 }
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ── Prose / markdown styles (for ChatPage) ── */
+.prose-nova {
+  --tw-prose-body: #cbd5e1;
+  --tw-prose-headings: #f1f5f9;
+  --tw-prose-links: #00f2fe;
+  --tw-prose-bold: #f1f5f9;
+  --tw-prose-code: #00f2fe;
+  --tw-prose-pre-bg: #020408;
+  --tw-prose-quote-borders: #00f2fe;
+}
+
+/* ── Light Theme ──────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-deep: #f0f4f8;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #f8fafc;
+  --border-subtle: rgba(0,0,0,0.06);
+  --border-card: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-subtle: rgba(13,148,136,0.08);
+  --accent-border: rgba(13,148,136,0.2);
+  --color-nova-bg: #f0f4f8;
+  --color-nova-panel: #ffffff;
+  --color-nova-card: rgba(255,255,255,0.8);
+  --color-nova-foreground: #0f172a;
+  --color-nova-midground: #475569;
+  --color-nova-muted: #94a3b8;
+  --color-nova-border: rgba(0,0,0,0.06);
+  --color-nova-border-2: #e2e8f0;
+  --color-nova-border-3: #cbd5e1;
+}
+
+[data-theme="light"] html {
+  background-color: #f0f4f8;
+  color: #0f172a;
+}
+
+[data-theme="light"] .glass-panel {
+  background: rgba(255,255,255,0.85);
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+[data-theme="light"] .glass-panel:hover {
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .btn-premium {
+  color: #fff;
+}
+
+[data-theme="light"] .nova-card {
+  background: rgba(255,255,255,0.85);
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .ambient-glow {
+  opacity: 0.3;
+}
+
+[data-theme="light"] .prose-nova {
+  --tw-prose-body: #475569;
+  --tw-prose-headings: #0f172a;
+  --tw-prose-bold: #0f172a;
+}
+
+[data-theme="light"] aside {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}

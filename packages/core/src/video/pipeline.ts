@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync, existsSync, readFileSync, unlinkSync, renameSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, unlinkSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { emitEvent } from "../event-bus/index.ts";
 import type { VideoParams, VideoJob } from "./types.ts";
@@ -11,6 +11,7 @@ import { textToSrt } from "./subtitles.ts";
 import { generateImages } from "./images.ts";
 import { safeMessage } from "../errors.ts";
 import { createVideo, audioDuration, ffmpegPath } from "./assembly.ts";
+import { mixWithBackgroundMusic } from "../media/music.ts";
 
 const jobs = new Map<string, VideoJob>();
 const abortControllers = new Map<string, AbortController>();
@@ -213,12 +214,84 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
     // ── Step 2: Audio ─────────────────────────────────────────────────────
     updateJob(job, "generating_audio", 30);
     const audioPath = join(workDir, "audio.mp3");
-    const ttsVoice = params.edgeVoice || langEntry?.edgeVoice || "en-US-GuyNeural";
-    const ttsOk = await generateTTS(storyText, audioPath, params.ttsEngine || "auto", ttsVoice);
-    if (!ttsOk) throw new Error("TTS generation failed");
-    let actualDuration = await audioDuration(audioPath);
+    let actualDuration: number;
 
-    // Respect user-requested duration: pad with silence if audio is too short
+    if (params.audioPath && existsSync(params.audioPath)) {
+      // Use uploaded audio file instead of generating TTS
+      const srcSize = statSync(params.audioPath).size;
+      console.log(`[pipeline] copying audio: ${params.audioPath} (${srcSize} bytes) -> ${audioPath}`);
+      writeFileSync(audioPath, readFileSync(params.audioPath));
+      const dstSize = statSync(audioPath).size;
+      console.log(`[pipeline] copied audio: ${dstSize} bytes (match=${srcSize === dstSize})`);
+
+      // Strip ID3 tags and non-audio streams without re-encoding
+      const normalizedPath = join(workDir, "audio_normalized.mp3");
+      const ff = ffmpegPath();
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn(ff, ["-y", "-i", audioPath, "-map", "0:a", "-c:a", "copy", "-vn", "-write_xing", "0", normalizedPath]);
+        proc.on("close", (code) => code === 0 ? resolve() : reject(new Error(`audio normalize exit ${code}`)));
+        proc.on("error", reject);
+      });
+      if (existsSync(normalizedPath) && statSync(normalizedPath).size > 1024) {
+        try { unlinkSync(audioPath); } catch {}
+        renameSync(normalizedPath, audioPath);
+        console.log(`[pipeline] audio normalized OK (${statSync(audioPath).size} bytes)`);
+      } else {
+        console.warn(`[pipeline] audio normalize failed, using original`);
+        try { unlinkSync(normalizedPath); } catch {}
+      }
+
+      actualDuration = await audioDuration(audioPath);
+
+      // Add background music for professional sound
+      const bgMusicPath = join(workDir, "audio_bgmusic.mp3");
+      const mixed = await mixWithBackgroundMusic(audioPath, bgMusicPath, {
+        musicVolume: 0.1,
+        fadeIn: 1.5,
+        fadeOut: 3,
+      });
+      if (mixed && existsSync(bgMusicPath)) {
+        try { unlinkSync(audioPath); } catch {}
+        renameSync(bgMusicPath, audioPath);
+        console.log(`[pipeline] background music mixed OK`);
+      }
+
+      // Apply audio effects if requested (reverb, compression, EQ)
+      if (params.useAudioEffects !== false) {
+        try {
+          const processedPath = join(workDir, "audio_processed.mp3");
+          const ff = ffmpegPath();
+          await new Promise<void>((resolve, reject) => {
+            const proc = spawn(ff, [
+              "-y", "-i", audioPath,
+              "-af", "compand=attacks=0.3:decays=0.8:points=-80/-80|-45/-15|-27/-9|0/-7|20/-7:dela=2:gain=8, aecho=0.8:0.7:40:0.3, chorus=0.7:0.9:55:0.4:0.25:2",
+              "-c:a", "libmp3lame", "-b:a", "192k",
+              processedPath,
+            ]);
+            proc.on("close", (code) => code === 0 ? resolve() : reject(new Error(`audio fx exit ${code}`)));
+            proc.on("error", reject);
+          });
+          if (existsSync(processedPath)) {
+            const origSize = statSync(audioPath).size;
+            const processedSize = statSync(processedPath).size;
+            // Only replace if processed file is at least 50% of original size
+            if (processedSize > origSize * 0.5) {
+              try { unlinkSync(audioPath); } catch {}
+              renameSync(processedPath, audioPath);
+            } else {
+              try { unlinkSync(processedPath); } catch {}
+            }
+          }
+        } catch (e) { console.warn(`[pipeline] audio effects failed: ${e}`); }
+      }
+    } else {
+      const ttsVoice = params.edgeVoice || langEntry?.edgeVoice || "en-US-GuyNeural";
+      const ttsOk = await generateTTS(storyText, audioPath, params.ttsEngine || "auto", ttsVoice);
+      if (!ttsOk) throw new Error("TTS generation failed");
+      actualDuration = await audioDuration(audioPath);
+    }
+
+    // Duration normalization: respect user-requested duration by padding if audio is too short
     const targetDurationSec = params.duration ? params.duration * 60 : 0;
     if (targetDurationSec > 0 && actualDuration < targetDurationSec) {
       const paddedAudio = join(workDir, "audio_padded.mp3");
@@ -254,7 +327,7 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
 
     if (subMode !== "none") {
       const srtPathActual = join(workDir, "subs.srt");
-      await textToSrt(storyText, audioPath, srtPathActual);
+      await textToSrt(storyText, audioPath, srtPathActual, params.transcriptionSegments);
       if (existsSync(srtPathActual)) srtPath = srtPathActual;
       emitEvent({ type: "event", kind: "message", sessionId: jobId, data: { step: "subtitles", text: srtPath ? "Subtitles generated" : "No subtitles" } });
     }

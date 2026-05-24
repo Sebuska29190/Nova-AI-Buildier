@@ -1,3 +1,0 @@
-Found 1 occurrence(s) of old pattern
-After replace, new pattern count: 1
-Done

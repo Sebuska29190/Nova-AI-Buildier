@@ -316,7 +316,7 @@ function buildEffectsFilter(effects: string[], isShort: boolean): string | null 
   for (const fx of effects) {
     switch (fx) {
       case "vignette":
-        filters.push("vignette=PI/4:max_eval=frame");
+        filters.push("vignette=PI/4");
         break;
       case "glitch":
         filters.push("geq=r='if(lt(random(1),0.03),255,r(X,Y))':g='if(lt(random(1),0.03),255,g(X,Y))':b='if(lt(random(1),0.03),255,b(X,Y))'");
