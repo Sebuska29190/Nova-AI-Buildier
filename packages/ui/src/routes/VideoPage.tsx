@@ -1,78 +1,103 @@
 import { useState, useEffect } from "react";
 
+interface StockPhoto {
+  id: number; url: string; photographer: string;
+  src: { medium: string; large: string; original: string }; alt: string;
+}
+interface MusicTrack {
+  id: string; title: string; artist: string; duration: number; genre: string; url: string;
+}
+interface Scene {
+  id: number; imageUrl: string; animationStyle: string; duration: number;
+  effects: string[]; transition: string; overlayText: string; overlayPosition: "top" | "center" | "bottom";
+}
+
 const LANGUAGES = [
   { value: "en", label: "English" }, { value: "fr", label: "French" }, { value: "es", label: "Spanish" },
-  { value: "de", label: "German" }, { value: "it", label: "Italian" }, { value: "ja", label: "Japanese" },
-  { value: "zh", label: "Chinese" }, { value: "pt", label: "Portuguese" }, { value: "ru", label: "Russian" },
-  { value: "ar", label: "Arabic" }, { value: "pl", label: "Polish" },
+  { value: "de", label: "German" }, { value: "it", label: "Italian" }, { value: "pl", label: "Polish" },
+  { value: "ja", label: "Japanese" }, { value: "zh", label: "Chinese" }, { value: "pt", label: "Portuguese" },
 ];
-
-const NICHES = [
-  { name: "Custom", prompt: "" }, { name: "Travel Vlog", prompt: "Create a cinematic travel vlog..." },
-  { name: "Tech Review", prompt: "Create an engaging tech review video..." },
-  { name: "Cooking Tutorial", prompt: "Create a step-by-step cooking tutorial..." },
-  { name: "Fitness Workout", prompt: "Create a high-energy fitness workout video..." },
-  { name: "Gaming Montage", prompt: "Create an epic gaming montage..." },
-  { name: "Educational Explain", prompt: "Create an educational explainer video..." },
-  { name: "Product Showcase", prompt: "Create a professional product showcase..." },
-  { name: "Nature Documentary", prompt: "Create a serene nature documentary..." },
-  { name: "Music Lyric Video", prompt: "Create a dynamic music lyric video..." },
-  { name: "News Summary", prompt: "Create a concise news summary video..." },
-  { name: "Fashion Lookbook", prompt: "Create a stylish fashion lookbook video..." },
+const ANIMATIONS = [
+  { value: "ken-burns", label: "Ken Burns" }, { value: "zoom", label: "Zoom" },
+  { value: "fade", label: "Fade" }, { value: "slide", label: "Slide" },
+  { value: "cinematic-zoom", label: "Cinematic" }, { value: "parallax", label: "Parallax" },
+  { value: "blur-zoom", label: "Blur Zoom" }, { value: "none", label: "Static" },
 ];
-
-const ALL_EFFECTS = ["vignette", "glitch", "vhs", "grain", "bloom", "sepia", "invert", "color_shift", "pixelate"];
-
-const ANIMATION_STYLES = [
-  { value: "cinematic-zoom", label: "Cinematic", icon: "\u{1F3AC}" }, { value: "zoom", label: "Animated", icon: "\u{1F3A8}" },
-  { value: "fade", label: "Modern", icon: "\u2728" }, { value: "vhs", label: "Retro", icon: "\u{1F4FA}" },
-  { value: "none", label: "Minimal", icon: "\u25FB\uFE0F" }, { value: "blur-zoom", label: "Dramatic", icon: "\u{1F525}" },
-  { value: "slide", label: "Corporate", icon: "\u{1F4BC}" }, { value: "ken-burns", label: "Storybook", icon: "\u{1F4D6}" },
+const EFFECTS_LIST = ["vignette", "glitch", "vhs", "grain", "bloom", "sepia", "invert", "color_shift", "pixelate"];
+const EXPORT_PRESETS = [
+  { id: "youtube", label: "YouTube", w: 1920, h: 1080, short: false },
+  { id: "tiktok", label: "TikTok", w: 1080, h: 1920, short: true },
+  { id: "instagram", label: "IG Reels", w: 1080, h: 1920, short: true },
+  { id: "1080p", label: "1080p", w: 1920, h: 1080, short: false },
+  { id: "4k", label: "4K", w: 3840, h: 2160, short: false },
+  { id: "square", label: "Square 1:1", w: 1080, h: 1080, short: false },
 ];
-
-type InputMode = "text" | "audio" | "video";
+const TTS_ENGINES = ["edge", "gtts", "elevenlabs", "openai"];
 
 export function VideoPage() {
+  // ─── State ───────────────────────────────────────────────────
   const [topic, setTopic] = useState("");
-  const [nicheName, setNicheName] = useState("Custom");
+  const [scriptText, setScriptText] = useState("");
   const [langIdx, setLangIdx] = useState(0);
   const [isShort, setIsShort] = useState(false);
   const [durationMin, setDurationMin] = useState(1);
   const [ttsEngine, setTtsEngine] = useState("edge");
-  const [imageEngine, setImageEngine] = useState("auto");
   const [quality, setQuality] = useState("standard");
-  const [subMode, setSubMode] = useState("off");
-  const [scriptText, setScriptText] = useState("");
+  const [subMode, setSubMode] = useState("story");
   const [imageCount, setImageCount] = useState(4);
   const [animationStyle, setAnimationStyle] = useState("cinematic-zoom");
-  const [imageStyle, setImageStyle] = useState("photorealistic");
   const [selectedEffects, setSelectedEffects] = useState<string[]>([]);
+  const [exportPreset, setExportPreset] = useState("youtube");
+
+  // Audio / Video upload
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioFileName, setAudioFileName] = useState("");
-  const [inputMode, setInputMode] = useState<InputMode>("text");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoFileName, setVideoFileName] = useState("");
+  const [inputMode, setInputMode] = useState<"text" | "audio" | "video">("text");
   const [sourceLang, setSourceLang] = useState("auto");
-  const [jobs, setJobs] = useState<Array<{ id: string; status: string; topic: string; progress: number; error?: string; outputPath?: string }>>([]);
+
+  // Music library
+  const [showMusic, setShowMusic] = useState(false);
+  const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
+  const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
+
+  // Stock
+  const [showStock, setShowStock] = useState(false);
+  const [stockQuery, setStockQuery] = useState("");
+  const [stockPhotos, setStockPhotos] = useState<StockPhoto[]>([]);
+  const [stockLoading, setStockLoading] = useState(false);
+
+  // Scenes
+  const [scenes, setScenes] = useState<Scene[]>([]);
+  const [selectedScene, setSelectedScene] = useState(0);
+
+  // Jobs
+  const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { loadJobs(); }, []);
+  useEffect(() => { loadMusic(); }, []);
 
-  function toggleEffect(effect: string) {
-    setSelectedEffects((prev) =>
-      prev.includes(effect) ? prev.filter((e) => e !== effect) : [...prev, effect]
-    );
+  async function loadJobs() {
+    try { const res = await fetch("/api/video/jobs"); if (res.ok) setJobs((await res.json()).jobs || []); } catch {}
+  }
+  async function loadMusic() {
+    try { const res = await fetch("/api/music/library"); if (res.ok) setMusicTracks((await res.json()).tracks || []); } catch {}
+  }
+  async function searchStock() {
+    if (!stockQuery.trim()) return;
+    setStockLoading(true);
+    try { const res = await fetch(`/api/stock/search?q=${encodeURIComponent(stockQuery)}&page=1`); if (res.ok) setStockPhotos((await res.json()).photos || []); } catch {}
+    setStockLoading(false);
   }
 
-  function handleNicheChange(name: string) {
-    setNicheName(name);
-    if (name !== "Custom") {
-      const niche = NICHES.find((n) => n.name === name);
-      if (niche?.prompt) setTopic(niche.prompt);
-    }
+  function toggleEffect(fx: string) {
+    setSelectedEffects(p => p.includes(fx) ? p.filter(e => e !== fx) : [...p, fx]);
   }
 
   async function generateVideo() {
+    // ── Dubbing mode ──
     if (inputMode === "video") {
       if (!videoFile) return;
       setLoading(true);
@@ -95,42 +120,45 @@ export function VideoPage() {
       return;
     }
 
-    if (!topic.trim() && !scriptText.trim() && !audioFile) return;
-    setLoading(true);
-    try {
-      if (inputMode === "audio" && audioFile) {
+    // ── Audio mode ──
+    if (inputMode === "audio" && audioFile) {
+      setLoading(true);
+      try {
         const fd = new FormData();
         fd.append("audio", audioFile);
         fd.append("language", LANGUAGES[langIdx]?.value || "en");
-        fd.append("imageEngine", imageEngine);
+        fd.append("duration", String(durationMin));
         fd.append("quality", quality);
-        fd.append("subtitleMode", "story");
+        fd.append("subtitleMode", subMode === "off" ? "none" : subMode);
         fd.append("imageCount", String(imageCount));
         fd.append("animationStyle", animationStyle);
-        fd.append("imageStyle", imageStyle || "photorealistic");
         if (selectedEffects.length > 0) fd.append("effects", selectedEffects.join(","));
-        if (nicheName !== "Custom") fd.append("nicheName", nicheName);
+        if (selectedMusic) fd.append("backgroundMusic", selectedMusic.url);
         const res = await fetch("/api/video/generate", { method: "POST", body: fd });
         if (!res.ok) throw new Error(`API ${res.status}`);
         await loadJobs();
-        setLoading(false);
-        return;
-      }
+      } catch (e: any) { console.error("Audio gen failed:", e); }
+      setLoading(false);
+      return;
+    }
 
+    // ── Text mode ──
+    if (!topic.trim() && !scriptText.trim()) return;
+    setLoading(true);
+    try {
       const payload = {
         topic: topic.trim() || scriptText.trim().slice(0, 60),
-        nicheName: nicheName === "Custom" ? undefined : nicheName,
         language: LANGUAGES[langIdx]?.value || "en",
-        isShort,
+        isShort: EXPORT_PRESETS.find(p => p.id === exportPreset)?.short || isShort,
         durationMin,
-        ttsEngine: ttsEngine === "auto" ? undefined : ttsEngine,
+        ttsEngine: ttsEngine === "edge" ? undefined : ttsEngine,
         quality,
         subtitleMode: subMode === "off" ? "none" : "story",
         scriptText: scriptText.trim() || undefined,
-        imageCount,
-        animationStyle,
-        imageStyle: imageStyle || undefined,
+        imageCount: scenes.length > 0 ? scenes.length : imageCount,
+        animationStyle: scenes[selectedScene]?.animationStyle || animationStyle,
         effects: selectedEffects.length > 0 ? selectedEffects.join(",") : undefined,
+        backgroundMusic: selectedMusic?.url || undefined,
       };
       const res = await fetch("/api/video/generate", {
         method: "POST",
@@ -143,263 +171,320 @@ export function VideoPage() {
     setLoading(false);
   }
 
-  async function loadJobs() {
-    try {
-      const res = await fetch("/api/video/jobs");
-      if (res.ok) { const data = await res.json(); setJobs(data.jobs || []); }
-    } catch {}
-  }
-
-  function statusColor(s: string) {
-    if (s === "done" || s === "completed") return "text-emerald-400";
-    if (s === "failed" || s === "error") return "text-rose-400";
-    if (s === "queued" || s === "processing" || s === "extracting_audio" || s === "transcribing" || s === "translating") return "text-amber-400";
-    return "text-slate-400";
-  }
-
   return (
-    <div className="max-w-5xl mx-auto w-full">
-      <div className="mb-6">
-        <h2 className="text-lg font-bold text-white">Video Factory</h2>
-        <p className="text-xs text-slate-400 mt-1">Generate AI-powered narrated videos or dub existing MP4 with translation.</p>
+    <div className="max-w-6xl mx-auto w-full">
+      {/* ─── Header ──────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#00f2fe]/20 to-[#4facfe]/20 border border-[#00f2fe]/30 flex items-center justify-center">
+            <svg className="w-4 h-4 text-[#00f2fe]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white">Video Pro Studio</h2>
+            <p className="text-[10px] text-slate-500">Generate AI videos from text, audio, or dub existing MP4</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={exportPreset} onChange={(e) => setExportPreset(e.target.value)}
+            className="bg-slate-900/80 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-slate-300">
+            {EXPORT_PRESETS.map(p => <option key={p.id} value={p.id}>{p.label} ({p.w}x{p.h})</option>)}
+          </select>
+          <button onClick={generateVideo} disabled={loading || (inputMode === "video" ? !videoFile : inputMode === "audio" ? !audioFile : !topic.trim() && !scriptText.trim())}
+            className="btn-premium px-5 py-2 rounded-lg text-xs font-semibold disabled:opacity-40 transition-all hover:scale-[1.02] flex items-center gap-2">
+            {loading ? <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> Processing...</>
+            : <><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> {inputMode === "video" ? "Dub Video" : "Generate"}</>}
+          </button>
+        </div>
       </div>
 
-      <div className="glass-panel rounded-xl p-5 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="space-y-4">
-            {/* Niche */}
-            <div>
-              <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Niche / Template</label>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-                {NICHES.map((niche) => (
-                  <button key={niche.name} onClick={() => handleNicheChange(niche.name)}
-                    className={`text-[10px] px-2 py-1.5 rounded-lg border transition-all truncate ${nicheName === niche.name ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-[#020408]/60 text-slate-400 hover:border-slate-600"}`}>
-                    {niche.name}
-                  </button>
-                ))}
+      {/* ─── Main Grid ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* ─── LEFT: Scenes + Timeline ──────────────────────────── */}
+        <div className="col-span-3 space-y-3">
+          <div className="glass-panel rounded-xl p-3 border border-slate-800/60">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Scenes</span>
+              <div className="flex gap-1">
+                {inputMode !== "video" && (
+                  <button onClick={() => setShowStock(true)}
+                    className="text-[9px] text-[#00f2fe] hover:underline">Stock</button>
+                )}
               </div>
             </div>
-
-            {/* Input Mode */}
-            <div>
-              <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Input Mode</label>
-              <div className="flex gap-1.5 flex-wrap">
-                {(["text", "audio", "video"] as InputMode[]).map((mode) => (
-                  <button key={mode} onClick={() => { setInputMode(mode); if (mode === "video") setSourceLang("auto"); }}
-                    className={`flex-1 text-[10px] px-3 py-1.5 rounded-lg border transition-all ${inputMode === mode ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-[#020408]/60 text-slate-400 hover:border-slate-600"}`}>
-                    {mode === "text" ? "\u270F\uFE0F Text" : mode === "audio" ? "\uD83C\uDFA4 Audio" : "\uD83C\uDFAC Dubbing"}
-                  </button>
+            {inputMode !== "video" && scenes.length > 0 ? (
+              <div className="space-y-1.5">
+                {scenes.map((scene, idx) => (
+                  <div key={scene.id}
+                    onClick={() => setSelectedScene(idx)}
+                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                      selectedScene === idx ? "bg-[#00f2fe]/10 border-[#00f2fe]/40" : "bg-slate-900/40 border-slate-800/40 hover:border-slate-700"
+                    }`}>
+                    <div className="w-10 h-8 rounded bg-slate-800 flex items-center justify-center text-[8px] text-slate-600 overflow-hidden shrink-0">
+                      {scene.imageUrl ? <img src={scene.imageUrl} className="w-full h-full object-cover" /> : <span>🎬</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[9px] text-white truncate">Scene {idx + 1}</p>
+                      <p className="text-[7px] text-slate-500">{scene.duration}s · {scene.animationStyle}</p>
+                    </div>
+                  </div>
                 ))}
               </div>
+            ) : (
+              <p className="text-[9px] text-slate-600 text-center py-3">Scenes auto-generated from topic</p>
+            )}
+          </div>
+
+          {/* Timeline */}
+          {inputMode !== "video" && scenes.length > 0 && (
+            <div className="glass-panel rounded-xl p-2 border border-slate-800/60">
+              <div className="flex justify-between text-[8px] text-slate-500 mb-1"><span>Timeline</span><span>{scenes.reduce((a, s) => a + s.duration, 0).toFixed(0)}s</span></div>
+              <div className="h-5 rounded bg-slate-900/80 flex overflow-hidden">
+                {scenes.map((s, i) => {
+                  const total = scenes.reduce((a, s) => a + s.duration, 0);
+                  const pct = total > 0 ? (s.duration / total) * 100 : 0;
+                  return <div key={s.id} onClick={() => setSelectedScene(i)}
+                    className={`h-full flex items-center justify-center text-[6px] text-white/50 border-r border-slate-800/40 last:border-r-0 cursor-pointer ${
+                      selectedScene === i ? "bg-[#00f2fe]/20" : "bg-slate-800/60 hover:bg-slate-700/60"
+                    }`} style={{ width: `${pct}%` }}>{pct > 8 ? `${Math.round(s.duration)}s` : ''}</div>;
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ─── CENTER: Form ──────────────────────────────────────── */}
+        <div className="col-span-6 space-y-4">
+          {/* Input Mode */}
+          <div className="glass-panel rounded-xl p-4 border border-slate-800/60">
+            <div className="flex gap-2 mb-4">
+              {(["text", "audio", "video"] as const).map(mode => (
+                <button key={mode} onClick={() => { setInputMode(mode); if (mode === "video") setSourceLang("auto"); }}
+                  className={`flex-1 text-[10px] px-3 py-1.5 rounded-lg border transition-all ${
+                    inputMode === mode ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-slate-900/40 text-slate-400 hover:border-slate-600"
+                  }`}>
+                  {mode === "text" ? "✍️ Text" : mode === "audio" ? "🎤 Audio" : "🎬 Dubbing"}
+                </button>
+              ))}
             </div>
 
-            {/* Video / Dubbing mode */}
             {inputMode === "video" ? (
               <div className="space-y-3">
                 <div>
-                  <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Source Video (.mp4)</label>
-                  <label className={`flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${videoFileName ? "border-[#00f2fe]/50 bg-[#00f2fe]/5" : "border-slate-700 bg-[#020408]/40 hover:border-slate-500"}`}>
-                    {videoFileName ? (
-                      <><span className="text-xs text-white">\uD83C\uDFAC {videoFileName}</span><span className="text-[9px] text-slate-400">Click to change file</span></>
-                    ) : (
-                      <><span className="text-xs text-slate-400">\u2B07 Drop MP4 here or click</span><span className="text-[9px] text-slate-500">Transcribe, translate, re-voice, burn subtitles</span></>
-                    )}
-                    <input type="file" accept=".mp4,video/mp4" className="hidden"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) { setVideoFile(f); setVideoFileName(f.name); } }} />
+                  <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Source Video</label>
+                  <label className={`flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${videoFileName ? "border-[#00f2fe]/50 bg-[#00f2fe]/5" : "border-slate-700 bg-slate-900/30 hover:border-slate-500"}`}>
+                    {videoFileName ? <span className="text-xs text-white">🎬 {videoFileName}</span> : <><span className="text-xs text-slate-400">⬇ Drop MP4 here</span><span className="text-[9px] text-slate-600">Transcribe, translate, re-voice</span></>}
+                    <input type="file" accept=".mp4,video/mp4" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setVideoFile(f); setVideoFileName(f.name); } }} />
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Source Language</label>
-                    <select value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}
-                      className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white">
-                      <option value="auto">Auto-detect</option>
-                      {LANGUAGES.map((lang) => <option key={lang.value} value={lang.value}>{lang.label}</option>)}
+                    <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Source Lang</label>
+                    <select value={sourceLang} onChange={(e) => setSourceLang(e.target.value)} className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white">
+                      <option value="auto">Auto</option>
+                      {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Target Language</label>
-                    <select value={langIdx} onChange={(e) => setLangIdx(Number(e.target.value))}
-                      className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white">
-                      {LANGUAGES.map((lang, i) => <option key={i} value={i}>{lang.label}</option>)}
+                    <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Target Lang</label>
+                    <select value={langIdx} onChange={(e) => setLangIdx(Number(e.target.value))} className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white">
+                      {LANGUAGES.map((l, i) => <option key={i} value={i}>{l.label}</option>)}
                     </select>
                   </div>
                 </div>
               </div>
             ) : inputMode === "audio" ? (
-              <div>
-                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Audio File (.mp3)</label>
-                <label className={`flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${audioFileName ? "border-[#00f2fe]/50 bg-[#00f2fe]/5" : "border-slate-700 bg-[#020408]/40 hover:border-slate-500"}`}>
-                  {audioFileName ? (
-                    <><span className="text-xs text-white">\uD83C\uDFB5 {audioFileName}</span><span className="text-[9px] text-slate-400">Click to change</span></>
-                  ) : (
-                    <><span className="text-xs text-slate-400">\u2B07 Drop MP3 here</span></>
-                  )}
-                  <input type="file" accept=".mp3,audio/mpeg" className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { setAudioFile(f); setAudioFileName(f.name); } }} />
-                </label>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Audio File</label>
+                  <label className={`flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${audioFileName ? "border-[#00f2fe]/50 bg-[#00f2fe]/5" : "border-slate-700 bg-slate-900/30 hover:border-slate-500"}`}>
+                    {audioFileName ? <span className="text-xs text-white">🎵 {audioFileName}</span> : <span className="text-xs text-slate-400">⬇ Drop MP3 / WAV here</span>}
+                    <input type="file" accept=".mp3,audio/mpeg,.wav,audio/wav" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setAudioFile(f); setAudioFileName(f.name); } }} />
+                  </label>
+                </div>
+                <p className="text-[9px] text-slate-600">Topic optional — video auto-generated from audio transcription.</p>
               </div>
             ) : (
-              <>
+              <div className="space-y-3">
                 <div>
                   <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Topic / Prompt</label>
                   <textarea value={topic} onChange={(e) => setTopic(e.target.value)}
-                    placeholder="Describe your video concept..." rows={4}
-                    className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00f2fe] resize-none" />
+                    placeholder="Describe your video concept..." rows={3}
+                    className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00f2fe]/40 resize-none" />
                 </div>
                 <div>
-                  <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Narration Script (optional)</label>
+                  <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Script (optional)</label>
                   <textarea value={scriptText} onChange={(e) => setScriptText(e.target.value)}
-                    placeholder="Write custom narration..." rows={3}
-                    className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00f2fe] resize-none" />
+                    placeholder="Write custom narration..." rows={2}
+                    className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00f2fe]/40 resize-none" />
                 </div>
-              </>
+              </div>
             )}
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+          {/* Settings */}
+          <div className="glass-panel rounded-xl p-4 border border-slate-800/60">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Language</label>
-                <select value={inputMode === "video" ? langIdx : langIdx} onChange={(e) => setLangIdx(Number(e.target.value))}
-                  className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white">
-                  {LANGUAGES.map((lang, i) => <option key={i} value={i}>{lang.label}</option>)}
+                <select value={langIdx} onChange={(e) => setLangIdx(Number(e.target.value))} className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white">
+                  {LANGUAGES.map((l, i) => <option key={i} value={i}>{l.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Duration (min)</label>
                 <input type="number" value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value))} min={0.5} max={10} step={0.5}
-                  className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white" disabled={inputMode === "video"} />
+                  className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white" disabled={inputMode === "video"} />
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Voice Engine</label>
-                <select value={ttsEngine} onChange={(e) => setTtsEngine(e.target.value)}
-                  className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white">
-                  <option value="edge">Edge TTS</option>
-                  <option value="gtts">Google TTS</option>
-                  <option value="elevenlabs">ElevenLabs</option>
-                  <option value="openai">OpenAI TTS</option>
+                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Voice</label>
+                <select value={ttsEngine} onChange={(e) => setTtsEngine(e.target.value)} className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white">
+                  {TTS_ENGINES.map(e => <option key={e} value={e}>{e === 'edge' ? 'Edge TTS' : e === 'gtts' ? 'Google TTS' : e === 'elevenlabs' ? 'ElevenLabs' : 'OpenAI TTS'}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Quality</label>
-                <select value={quality} onChange={(e) => setQuality(e.target.value)}
-                  className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white">
-                  <option value="draft">Draft</option>
-                  <option value="standard">Standard</option>
-                  <option value="premium">Premium</option>
+                <select value={quality} onChange={(e) => setQuality(e.target.value)} className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white">
+                  <option value="draft">Draft</option><option value="standard">Standard</option><option value="premium">Premium</option>
                 </select>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
               <div>
                 <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Format</label>
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   <button onClick={() => setIsShort(false)}
-                    className={`flex-1 text-[10px] px-2 py-1.5 rounded-lg border ${!isShort ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-[#020408]/60 text-slate-400"}`}>Standard</button>
+                    className={`flex-1 text-[9px] px-2 py-1.5 rounded-lg border ${!isShort ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-slate-900/60 text-slate-400"}`}>16:9</button>
                   <button onClick={() => setIsShort(true)}
-                    className={`flex-1 text-[10px] px-2 py-1.5 rounded-lg border ${isShort ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-[#020408]/60 text-slate-400"}`}>Short (9:16)</button>
+                    className={`flex-1 text-[9px] px-2 py-1.5 rounded-lg border ${isShort ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-slate-900/60 text-slate-400"}`}>9:16</button>
                 </div>
               </div>
               <div>
                 <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Images</label>
-                <input type="number" value={imageCount} onChange={(e) => setImageCount(Number(e.target.value))} min={1} max={20}
-                  className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white" disabled={inputMode === "video"} />
+                <input type="number" value={imageCount} onChange={(e) => setImageCount(Number(e.target.value))} min={1} max={50}
+                  className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white" disabled={inputMode === "video"} />
+              </div>
+              <div>
+                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Subtitles</label>
+                <select value={subMode} onChange={(e) => setSubMode(e.target.value)} className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white">
+                  <option value="off">Off</option><option value="story">Burned In</option><option value="srt">SRT File</option><option value="both">Burned + SRT</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Animation</label>
+                <select value={animationStyle} onChange={(e) => setAnimationStyle(e.target.value)} className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white">
+                  {ANIMATIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                </select>
               </div>
             </div>
+          </div>
 
-            <div>
-              <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Subtitles</label>
-              <select value={subMode} onChange={(e) => setSubMode(e.target.value)}
-                className="w-full bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white">
-                <option value="off">Off</option>
-                <option value="story">Burned In</option>
-                <option value="srt">SRT File</option>
-                <option value="both">Burned + SRT</option>
-              </select>
-            </div>
-
-            {/* Animation Style */}
-            <div>
-              <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Animation Style</label>
-              <div className="grid grid-cols-4 gap-2">
-                {ANIMATION_STYLES.map((style) => (
-                  <button key={style.value} onClick={() => setAnimationStyle(style.value)}
-                    className={`flex flex-col items-center gap-1 text-[10px] px-2 py-2 rounded-lg border ${animationStyle === style.value ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-[#020408]/60 text-slate-400 hover:border-slate-600"}`}>
-                    <span>{style.icon}</span>
-                    <span>{style.label}</span>
-                  </button>
-                ))}
+          {/* Effects + Music */}
+          <div className="glass-panel rounded-xl p-4 border border-slate-800/60">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-2">Visual Effects</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {EFFECTS_LIST.map(fx => (
+                    <button key={fx} onClick={() => toggleEffect(fx)}
+                      className={`text-[9px] px-1.5 py-0.5 rounded border capitalize ${
+                        selectedEffects.includes(fx) ? "border-[#00f2fe]/50 bg-[#00f2fe]/15 text-[#00f2fe]" : "border-slate-800 bg-slate-900/60 text-slate-500 hover:border-slate-600"
+                      }`}>{fx.replace(/_/g, ' ')}</button>
+                  ))}
+                </div>
               </div>
-            </div>
-
-            {/* Effects */}
-            <div>
-              <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Visual Effects</label>
-              <div className="flex flex-wrap gap-1.5">
-                {ALL_EFFECTS.map((effect) => (
-                  <button key={effect} onClick={() => toggleEffect(effect)}
-                    className={`text-[10px] px-2 py-1 rounded-lg border capitalize ${selectedEffects.includes(effect) ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-[#020408]/60 text-slate-400 hover:border-slate-600"}`}>
-                    {effect.replace(/_/g, " ")}
-                  </button>
-                ))}
+              <div>
+                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-2">Background Music</label>
+                {selectedMusic ? (
+                  <div className="flex items-center gap-2 bg-slate-900/60 rounded-lg p-2">
+                    <span>🎵</span>
+                    <div className="flex-1 min-w-0"><p className="text-[10px] text-white truncate">{selectedMusic.title}</p><p className="text-[8px] text-slate-500">{selectedMusic.artist}</p></div>
+                    <button onClick={() => setSelectedMusic(null)} className="text-slate-500 hover:text-red-400 text-[9px]">✕</button>
+                  </div>
+                ) : (
+                  <div className="text-center"><p className="text-[9px] text-slate-600">No music selected</p></div>
+                )}
+                <button onClick={() => setShowMusic(true)} className="text-[9px] text-[#00f2fe] hover:underline mt-1">Browse library</button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Submit */}
-        <div className="flex justify-end mt-5">
-          <button onClick={generateVideo} disabled={loading || (inputMode === "video" ? !videoFile : !topic.trim() && !scriptText.trim() && !audioFile)}
-            className="btn-premium px-6 py-2.5 rounded-lg text-xs font-semibold disabled:opacity-40">
-            {loading ? "Processing..." : inputMode === "video" ? "Dub Video" : "Generate Video"}
-          </button>
-        </div>
-      </div>
+        {/* ─── RIGHT: Preview + Jobs ──────────────────────────────── */}
+        <div className="col-span-3 space-y-3">
+          <div className="glass-panel rounded-xl overflow-hidden border border-slate-800/60">
+            <div className="aspect-video bg-gradient-to-br from-slate-900 to-slate-950 flex items-center justify-center">
+              <svg className="w-10 h-10 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            </div>
+            <div className="p-2 text-center text-[9px] text-slate-600">Preview generated after job completes</div>
+          </div>
 
-      {/* Job List */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold text-white">Jobs</h3>
-          <button onClick={loadJobs} className="text-[10px] text-[#00f2fe] hover:underline">Refresh</button>
-        </div>
-        {jobs.length === 0 ? (
-          <p className="text-xs text-slate-500 text-center py-8">No jobs yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {jobs.map((job) => (
-              <div key={job.id} className="glass-panel rounded-xl px-4 py-3 flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-white truncate">{job.topic}</p>
-                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">#{job.id.slice(0, 8)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {job.progress > 0 && job.progress < 100 ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 bg-slate-800 rounded-full h-1.5">
-                        <div className="bg-[#00f2fe] h-1.5 rounded-full" style={{ width: `${job.progress}%` }} />
-                      </div>
-                      <span className={`text-[10px] font-mono ${statusColor(job.status)}`}>{job.progress}%</span>
+          <div className="glass-panel rounded-xl p-3 border border-slate-800/60">
+            <h3 className="text-[9px] text-slate-400 uppercase tracking-wider font-medium mb-2">Jobs</h3>
+            <button onClick={loadJobs} className="text-[8px] text-[#00f2fe] hover:underline mb-2 block">Refresh</button>
+            {jobs.length === 0 ? (
+              <p className="text-[9px] text-slate-600 text-center py-4">No jobs yet</p>
+            ) : (
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {jobs.slice(0, 6).map((job) => (
+                  <div key={job.id} className="flex items-center justify-between bg-slate-900/40 rounded-lg p-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] text-white truncate">{job.topic || `#${job.id?.slice(0, 8)}`}</p>
+                      <span className={`text-[8px] font-mono ${
+                        job.status === "done" ? "text-emerald-400" : job.status === "failed" ? "text-red-400" : "text-amber-400"
+                      }`}>{job.status}</span>
                     </div>
-                  ) : (
-                    <span className={`text-[10px] font-mono ${statusColor(job.status)}`}>
-                      {job.status === "done" ? "Done" : job.status === "failed" ? "Failed" : job.status}
-                    </span>
-                  )}
-                  {job.outputPath && (
-                    <a href={`/api/video/download/${job.id}`} target="_blank" className="text-[10px] text-[#00f2fe] hover:underline">View</a>
-                  )}
-                </div>
+                    {job.outputPath && <a href={`/api/video/download/${job.id}`} target="_blank" className="text-[9px] text-[#00f2fe] hover:underline shrink-0">View</a>}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
+        </div>
       </div>
+
+      {/* ─── Stock Modal ──────────────────────────────────────────── */}
+      {showStock && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowStock(false)}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-[600px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-white">Stock Photos</h3>
+              <button onClick={() => setShowStock(false)} className="text-slate-400 hover:text-white text-xs">✕</button>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <input type="text" value={stockQuery} onChange={(e) => setStockQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && searchStock()}
+                placeholder="Search free photos..." className="flex-1 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500" />
+              <button onClick={searchStock} disabled={stockLoading} className="btn-premium px-4 py-2 rounded-lg text-xs disabled:opacity-40">{stockLoading ? "..." : "Search"}</button>
+            </div>
+            <div className="text-center py-4 text-[10px] text-slate-600">Set PEXELS_API_KEY for full stock photo access</div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Music Modal ──────────────────────────────────────────── */}
+      {showMusic && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowMusic(false)}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-[450px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-white">Music Library</h3>
+              <button onClick={() => setShowMusic(false)} className="text-slate-400 hover:text-white text-xs">✕</button>
+            </div>
+            <div className="space-y-1.5">
+              <button onClick={() => { setSelectedMusic(null); setShowMusic(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/40 text-[11px] text-slate-400 transition-all">No music (voice only)</button>
+              {musicTracks.map((track) => (
+                <div key={track.id} onClick={() => { setSelectedMusic(track); setShowMusic(false); }}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all ${
+                    selectedMusic?.id === track.id ? "bg-[#00f2fe]/10 border border-[#00f2fe]/30" : "hover:bg-slate-800/40 border border-transparent"
+                  }`}>
+                  <span className="text-lg">🎵</span>
+                  <div className="flex-1 min-w-0"><p className="text-[11px] text-white font-medium truncate">{track.title}</p><p className="text-[9px] text-slate-500">{track.artist} · {track.genre}</p></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

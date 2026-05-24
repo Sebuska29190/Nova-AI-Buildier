@@ -16,15 +16,22 @@ interface BskySession {
 }
 
 let _session: BskySession | null = null;
+let _loggingIn = false;
 
 // Auto-login from environment variables (BSKY_IDENTIFIER, BSKY_APP_PASSWORD)
 async function ensureSession(): Promise<void> {
   if (_session) return;
-  const id = process.env.BSKY_IDENTIFIER;
-  const pw = process.env.BSKY_APP_PASSWORD;
-  if (!id || !pw) throw new Error("Not logged in. Set BSKY_IDENTIFIER and BSKY_APP_PASSWORD in .env, or call bsky_login.");
-  const data = await bskyFetch("com.atproto.server.createSession", { identifier: id, password: pw });
-  _session = { accessJwt: data.accessJwt, refreshJwt: data.refreshJwt, did: data.did, handle: data.handle };
+  if (_loggingIn) return; // Prevent re-entrant calls
+  _loggingIn = true;
+  try {
+    const id = process.env.BSKY_IDENTIFIER;
+    const pw = process.env.BSKY_APP_PASSWORD;
+    if (!id || !pw) throw new Error("Not logged in. Set BSKY_IDENTIFIER and BSKY_APP_PASSWORD in .env, or call bsky_login.");
+    const data = await bskyFetch("com.atproto.server.createSession", { identifier: id, password: pw });
+    _session = { accessJwt: data.accessJwt, refreshJwt: data.refreshJwt, did: data.did, handle: data.handle };
+  } finally {
+    _loggingIn = false;
+  }
 }
 
 function getAuth(): string {
@@ -34,7 +41,7 @@ function getAuth(): string {
 async function bskyFetch(action: string, body?: unknown): Promise<any> {
   const url = `${BSKY_HOST}/${action}`;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (!_session) await ensureSession();
+  if (!_session && !_loggingIn) await ensureSession();
   if (_session) headers["Authorization"] = `Bearer ${_session.accessJwt}`;
 
   const res = await fetch(url, {
@@ -55,14 +62,16 @@ export const bskyTools = {
     description: "Log in to Bluesky with identifier and app password. Call this first before other Bluesky tools.",
     parameters: {
       type: "object", properties: {
-        identifier: { type: "string", description: "Your Bluesky handle (e.g. user.bsky.social)" },
-        password: { type: "string", description: "App password (Settings → App Passwords)" },
-      }, required: ["identifier", "password"], additionalProperties: false,
+        identifier: { type: "string", description: "Your Bluesky handle (e.g. user.bsky.social). Leave empty to use BSKY_IDENTIFIER from .env" },
+        password: { type: "string", description: "App password. Leave empty to use BSKY_APP_PASSWORD from .env" },
+      }, additionalProperties: false,
     },
-    async execute(args: { identifier: string; password: string }) {
+    async execute(args: { identifier?: string; password?: string }) {
+      const id = args.identifier || process.env.BSKY_IDENTIFIER || "";
+      const pw = args.password || process.env.BSKY_APP_PASSWORD || "";
+      if (!id || !pw) throw new Error("No credentials. Provide identifier+password or set BSKY_IDENTIFIER and BSKY_APP_PASSWORD in .env");
       const data = await bskyFetch("com.atproto.server.createSession", {
-        identifier: args.identifier,
-        password: args.password,
+        identifier: id, password: pw,
       });
       _session = { accessJwt: data.accessJwt, refreshJwt: data.refreshJwt, did: data.did, handle: data.handle };
       return `✅ Logged in as @${data.handle} (DID: ${data.did})`;
@@ -79,7 +88,7 @@ export const bskyTools = {
       }, required: ["text"], additionalProperties: false,
     },
     async execute(args: { text: string; lang?: string }) {
-      if (!_session) throw new Error("Not logged in. Call bsky_login first.");
+      await ensureSession();
       const data = await bskyFetch("com.atproto.repo.createRecord", {
         repo: _session.did,
         collection: "app.bsky.feed.post",
@@ -104,7 +113,7 @@ export const bskyTools = {
       }, required: ["uri", "cid"], additionalProperties: false,
     },
     async execute(args: { uri: string; cid: string }) {
-      if (!_session) throw new Error("Not logged in. Call bsky_login first.");
+      await ensureSession();
       await bskyFetch("com.atproto.repo.createRecord", {
         repo: _session.did,
         collection: "app.bsky.feed.like",
@@ -128,7 +137,7 @@ export const bskyTools = {
       }, required: ["uri", "cid"], additionalProperties: false,
     },
     async execute(args: { uri: string; cid: string }) {
-      if (!_session) throw new Error("Not logged in. Call bsky_login first.");
+      await ensureSession();
       await bskyFetch("com.atproto.repo.createRecord", {
         repo: _session.did,
         collection: "app.bsky.feed.repost",
@@ -151,7 +160,7 @@ export const bskyTools = {
       }, additionalProperties: false,
     },
     async execute(args: { limit?: number }) {
-      if (!_session) throw new Error("Not logged in. Call bsky_login first.");
+      await ensureSession();
       const data = await bskyFetch(`app.bsky.feed.getTimeline?limit=${args.limit || 20}`);
       const posts = (data.feed || []).map((item: any) => {
         const p = item.post;
@@ -194,7 +203,7 @@ export const bskyTools = {
       }, required: ["did"], additionalProperties: false,
     },
     async execute(args: { did: string }) {
-      if (!_session) throw new Error("Not logged in. Call bsky_login first.");
+      await ensureSession();
       await bskyFetch("com.atproto.repo.createRecord", {
         repo: _session.did,
         collection: "app.bsky.graph.follow",
@@ -215,7 +224,7 @@ export const bskyTools = {
       type: "object", properties: {}, additionalProperties: false,
     },
     async execute() {
-      if (!_session) throw new Error("Not logged in. Call bsky_login first.");
+      await ensureSession();
       const data = await bskyFetch(`app.bsky.actor.getProfile?actor=${_session.handle}`);
       return `👤 @${data.handle} (${data.displayName || "no display name"})
 📝 Bio: ${data.description || "(none)"}
@@ -233,7 +242,7 @@ export const bskyTools = {
       }, additionalProperties: false,
     },
     async execute(args: { limit?: number }) {
-      if (!_session) throw new Error("Not logged in. Call bsky_login first.");
+      await ensureSession();
       const data = await bskyFetch(`app.bsky.feed.getAuthorFeed?actor=${_session.handle}&limit=${args.limit || 20}&filter=posts_no_replies`);
       const posts = (data.feed || []).map((item: any, i: number) => {
         const p = item.post;
@@ -256,7 +265,7 @@ export const bskyTools = {
       }, required: ["rkey"], additionalProperties: false,
     },
     async execute(args: { rkey: string }) {
-      if (!_session) throw new Error("Not logged in. Call bsky_login first.");
+      await ensureSession();
       let rkey = args.rkey;
       // If full URI was given, extract the rkey
       if (rkey.startsWith("at://")) {

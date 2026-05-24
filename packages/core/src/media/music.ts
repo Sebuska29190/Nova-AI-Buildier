@@ -124,7 +124,8 @@ async function generateAmbientMusic(voicePath: string): Promise<string | null> {
 }
 
 function whichFfmpeg(): string {
-  // Try Bun.which if available, else fallback
+  const envPath = process.env.FFMPEG_PATH;
+  if (envPath) return envPath;
   try {
     const { which } = require("bun");
     return which("ffmpeg") || "ffmpeg";

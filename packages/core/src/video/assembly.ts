@@ -12,6 +12,14 @@ function safeMessage(e: unknown): string {
 }
 
 function which(cmd: string): string | undefined {
+  // Check FFMPEG_PATH env var first (user's custom ffmpeg location)
+  const envPath = process.env.FFMPEG_PATH;
+  if (envPath && cmd === "ffmpeg") return envPath;
+  if (envPath && cmd === "ffprobe") {
+    // Derive ffprobe path from ffmpeg path
+    const probePath = envPath.replace(/ffmpeg\.exe$/i, "ffprobe.exe").replace(/ffmpeg$/i, "ffprobe");
+    if (probePath !== envPath) return probePath;
+  }
   try {
     const r = Bun.which(cmd);
     return r || undefined;
@@ -116,12 +124,17 @@ export async function createVideo(
       durations.push(dur);
     }
     const total = durations.reduce((a, b) => a + b, 0);
-    if (total < duration + 2) durations[durations.length - 1] += (duration + 2) - total;
+    // Ensure video doesn't exceed audio duration
+    if (total > duration + 0.5) {
+      // Scale down all durations proportionally
+      const scale = duration / total;
+      durations = durations.map(d => d * scale);
+    }
   } else {
     const durEach = duration / images.length;
     durations = images.map(() => durEach);
   }
-  durations[durations.length - 1] += 2; // hold last frame
+  durations[durations.length - 1] = Math.min(durations[durations.length - 1] + 2, duration); // hold last frame but never exceed audio
 
   // Generate animated clips with user-chosen animation style
   const clipFiles: string[] = [];

@@ -1456,11 +1456,116 @@ Return valid JSON only (no markdown, no code fences):
     });
   });
 
+  // ─── Stock Media Search ────────────────────────────────────────
+  app.get("/api/stock/search", async (c) => {
+    try {
+      const q = c.req.query("q");
+      const page = parseInt(c.req.query("page") || "1");
+      if (!q) return c.json({ error: "query required" }, 400);
+      const apiKey = process.env.PEXELS_API_KEY;
+      if (!apiKey) return c.json({ photos: [] });
+      const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=20&page=${page}&orientation=landscape`, {
+        headers: { Authorization: apiKey }, signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return c.json({ error: `Pexels HTTP ${res.status}` }, 502);
+      const data = await res.json();
+      return c.json({ photos: (data.photos || []).map((p: any) => ({
+        id: p.id, url: p.url, photographer: p.photographer,
+        src: { medium: p.src?.medium, large: p.src?.large, original: p.src?.original }, alt: p.alt,
+      }))});
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  // ─── Music Library ─────────────────────────────────────────────
+  app.get("/api/music/library", (c) => {
+    const tracks = [
+      { id: "chill-1", title: "Sunset Chill", artist: "Nova Audio", duration: 180, genre: "chill", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+      { id: "upbeat-1", title: "Morning Energy", artist: "Nova Audio", duration: 210, genre: "upbeat", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+      { id: "cinematic-1", title: "Epic Journey", artist: "Nova Audio", duration: 240, genre: "cinematic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+      { id: "lofi-1", title: "Night Study", artist: "Nova Audio", duration: 195, genre: "lofi", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+      { id: "corporate-1", title: "Tech Forward", artist: "Nova Audio", duration: 165, genre: "corporate", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
+      { id: "ambient-1", title: "Deep Space", artist: "Nova Audio", duration: 300, genre: "ambient", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
+      { id: "pop-1", title: "Summer Vibes", artist: "Nova Audio", duration: 200, genre: "pop", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
+      { id: "jazz-1", title: "Late Night Jazz", artist: "Nova Audio", duration: 280, genre: "jazz", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
+      { id: "electronic-1", title: "Neon Pulse", artist: "Nova Audio", duration: 220, genre: "electronic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
+      { id: "acoustic-1", title: "Acoustic Dreams", artist: "Nova Audio", duration: 190, genre: "acoustic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
+    ];
+    return c.json({ tracks });
+  });
+
+  // ─── Integrations ─────────────────────────────────────────────
+  app.get("/api/integrations/services", (c) => {
+    try {
+      const { integrationManager } = require("../integrations/manager.ts");
+      return c.json({ services: integrationManager.listServices() });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.get("/api/integrations/accounts", (c) => {
+    try {
+      const { integrationManager } = require("../integrations/manager.ts");
+      return c.json({ accounts: integrationManager.listAccounts() });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.post("/api/integrations/accounts", async (c) => {
+    try {
+      const { integrationManager } = require("../integrations/manager.ts");
+      const body = await c.req.json<{ service: string; name: string; config: Record<string, string> }>();
+      if (!body.service || !body.name) return c.json({ error: "service and name required" }, 400);
+      const acc = integrationManager.addAccount(body.service, body.name, body.config || {});
+      return c.json({ account: acc }, 201);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.delete("/api/integrations/accounts/:id", (c) => {
+    try {
+      const { integrationManager } = require("../integrations/manager.ts");
+      const ok = integrationManager.removeAccount(c.req.param("id"));
+      if (!ok) return c.json({ error: "Not found" }, 404);
+      return c.json({ status: "deleted" });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.put("/api/integrations/accounts/:id/toggle", async (c) => {
+    try {
+      const { integrationManager } = require("../integrations/manager.ts");
+      const body = await c.req.json<{ enabled: boolean }>();
+      const acc = integrationManager.toggleAccount(c.req.param("id"), body.enabled);
+      if (!acc) return c.json({ error: "Not found" }, 404);
+      return c.json({ account: acc });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.post("/api/integrations/accounts/:id/test", async (c) => {
+    try {
+      const { integrationManager } = require("../integrations/manager.ts");
+      const result = await integrationManager.testConnection(c.req.param("id"));
+      return c.json(result);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.get("/api/integrations/accounts/:id/logs", (c) => {
+    try {
+      const { integrationManager } = require("../integrations/manager.ts");
+      const limit = parseInt(c.req.query("limit") || "20");
+      return c.json({ logs: integrationManager.getLogs(c.req.param("id"), limit) });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
   // ─── Cron ─────────────────────────────────────────────────────────
   app.get("/api/cron", (c) => {
     try {
-      const jobs = cronManager.listJobs();
+      const jobs = cronManager.listJobs(true); // include disabled
       return c.json({ jobs });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.get("/api/cron/:id", (c) => {
+    try {
+      const job = cronManager.getJob(c.req.param("id"));
+      if (!job) return c.json({ error: "Job not found" }, 404);
+      return c.json({ job });
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
@@ -1487,6 +1592,57 @@ Return valid JSON only (no markdown, no code fences):
         nextRun,
       });
       return c.json({ job }, 201);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.put("/api/cron/:id", async (c) => {
+    try {
+      const body = await c.req.json<{ description?: string; schedule?: string; enabled?: boolean }>();
+      const id = c.req.param("id");
+
+      if (body.description !== undefined || body.schedule !== undefined) {
+        const updateFields: any = {};
+        if (body.description !== undefined) updateFields.description = body.description;
+        if (body.schedule !== undefined) updateFields.schedule = body.schedule;
+        if (body.schedule) {
+          updateFields.nextRun = new Date(Date.now() + 3600000).toISOString();
+        }
+        cronManager.updateJob(id, updateFields);
+      }
+
+      if (body.enabled === true) cronManager.resumeJob(id);
+      else if (body.enabled === false) cronManager.pauseJob(id);
+
+      const job = cronManager.getJob(id);
+      if (!job) return c.json({ error: "Job not found" }, 404);
+      return c.json({ job });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.put("/api/cron/:id/enable", async (c) => {
+    try {
+      const body = await c.req.json<{ enabled: boolean }>();
+      const id = c.req.param("id");
+      if (body.enabled) cronManager.resumeJob(id);
+      else cronManager.pauseJob(id);
+      return c.json({ enabled: body.enabled });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.post("/api/cron/:id/run", async (c) => {
+    try {
+      const id = c.req.param("id");
+      const run = await cronManager.runNow(id);
+      return c.json({ run }, run.status === "error" ? 500 : 200);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  app.get("/api/cron/:id/runs", (c) => {
+    try {
+      const id = c.req.param("id");
+      const limit = parseInt(c.req.query("limit") || "20");
+      const runs = cronManager.getJobRuns(id, limit);
+      return c.json({ runs });
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
