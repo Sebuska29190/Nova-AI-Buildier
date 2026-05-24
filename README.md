@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.7.1-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-0.7.0-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT%2BAttribution-green" alt="license">
-  <img src="https://img.shields.io/badge/tools-102-orange" alt="tools">
-  <img src="https://img.shields.io/badge/skills-46-yellow" alt="skills">
+  <img src="https://img.shields.io/badge/tools-108-orange" alt="tools">
+  <img src="https://img.shields.io/badge/skills-26-yellow" alt="skills">
   <img src="https://img.shields.io/badge/providers-12-purple" alt="providers">
   <img src="https://img.shields.io/badge/platforms-5-cyan" alt="platforms">
 </p>
@@ -11,20 +11,22 @@
 
 ## What is Nova AI Builder?
 
-Nova AI Builder is a self-hosted platform for building, training, and deploying autonomous AI agents. It connects any LLM provider (DeepSeek, OpenAI, Anthropic, Gemini, Grok, Qwen, Kimi, and more) with a rich set of **102 tools**, **46+ reusable skills**, and **5 messaging platforms**. Everything runs locally — your API keys never leave your machine.
+Nova AI Builder is a self-hosted platform for building, training, and deploying autonomous AI agents. It connects any LLM provider (DeepSeek, OpenAI, Anthropic, Gemini, Grok, Qwen, Kimi, and more) with a rich set of **108 tools**, **26+ reusable skills**, and **5 messaging platforms**. Everything runs locally — your API keys never leave your machine.
 
 ### Why Nova?
 
 | Feature | Nova | LangChain | AutoGPT | CrewAI |
 |---------|------|-----------|---------|--------|
 | **Web UI + Terminal** | ✅ Built-in | ❌ Need separate | ❌ CLI only | ❌ |
-| **Tool count** | 102 | Manual build | ~20 | ~15 |
+| **Tool count** | 108 | Manual build | ~20 | ~15 |
 | **Self-improving skills** | ✅ AI creates skills from sessions | ❌ | ❌ | ❌ |
+| **Video dubbing (AI)** | ✅ Transcribe → Translate → TTS → SRT | ❌ | ❌ | ❌ |
 | **Natural-language cron** | ✅ | ❌ | ❌ | ❌ |
 | **FTS5 transcript search** | ✅ SQLite FTS5 | ❌ | ❌ | ❌ |
 | **Parallel subagents** | ✅ spawn_parallel + merge | ❌ | ❌ | Limited |
 | **Skill Hub (agentskills.io)** | ✅ | ❌ | ❌ | ❌ |
 | **Video generation** | ✅ FFmpeg pipeline | ❌ | ❌ | ❌ |
+| **AI Dubbing** | ✅ Whisper + Edge TTS | ❌ | ❌ | ❌ |
 | **Crypto trading agent** | ✅ Built-in | ❌ | ❌ | ❌ |
 | **Messaging platforms** | 5 | Plugin | ❌ | ❌ |
 
@@ -46,17 +48,18 @@ Nova AI Builder is a self-hosted platform for building, training, and deploying 
   - [Web Browser Automation](#8-web-browser-automation)
   - [Web Search & Fetch](#9-web-search--fetch)
   - [Video Generator & Editor](#10-video-generator--editor)
-  - [Crypto Trading Agent](#11-crypto-trading-agent)
-  - [Shopping Agent](#12-shopping-agent)
-  - [Messaging Platforms](#13-messaging-platforms)
-  - [Email Integration](#14-email-integration)
-  - [Computer Use (Mouse/Keyboard)](#15-computer-use-mousekeyboard)
-  - [Diagram & Wiki Generation](#16-diagram--wiki-generation)
-  - [Memory & Knowledge Base](#17-memory--knowledge-base)
-  - [Code Execution](#18-code-execution)
-  - [Canvas & Excalidraw](#19-canvas--excalidraw)
-  - [Social Media](#20-social-media)
-- [All 102 Tools](#all-102-tools)
+  - [AI Video Dubbing](#11-ai-video-dubbing)
+  - [Crypto Trading Agent](#12-crypto-trading-agent)
+  - [Shopping Agent](#13-shopping-agent)
+  - [Messaging Platforms](#14-messaging-platforms)
+  - [Email Integration](#15-email-integration)
+  - [Computer Use (Mouse/Keyboard)](#16-computer-use-mousekeyboard)
+  - [Diagram & Wiki Generation](#17-diagram--wiki-generation)
+  - [Memory & Knowledge Base](#18-memory--knowledge-base)
+  - [Code Execution](#19-code-execution)
+  - [Canvas & Excalidraw](#20-canvas--excalidraw)
+  - [Social Media](#21-social-media)
+- [All 108 Tools](#all-108-tools)
 - [Supported LLM Providers](#supported-llm-providers)
 - [UI Pages](#ui-pages)
 - [API Endpoints](#api-endpoints)
@@ -74,7 +77,8 @@ Nova AI Builder is a self-hosted platform for building, training, and deploying 
 - **Bun** >= 1.1.0 ([install guide](https://bun.sh/docs/installation))
 - **Windows** 10/11, **Linux** (x86_64), or **macOS**
 - **Node.js** >= 18 (optional, only if you prefer npm)
-- **FFmpeg** (optional, required only for video generation)
+- **FFmpeg** (required for video generation and dubbing — download from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/))
+- **Python** >= 3.10 (required for Whisper speech-to-text in dubbing, optional otherwise)
 - **Git** (optional, required for fetching community skills)
 
 ### Step-by-Step
@@ -91,17 +95,21 @@ bun install
 cp .env.example .env
 
 # 4. Edit .env — add at least one API key
-#    DEEPSEEK_API_KEY=sk-your-key-here
+#    DEEPSEEK_API_KEY=***
 #    (DeepSeek is the recommended default — cheapest and most reliable)
 notepad .env       # Windows
 nano .env           # Linux/macOS
 
-# 5. Optional: install FFmpeg for video generation
-# Windows: winget install Gyan.FFmpeg
+# 5. Install FFmpeg for video generation & dubbing
+# Windows: download from https://www.gyan.dev/ffmpeg/builds/ and add to PATH
+#          or set FFMPEG_PATH=C:\Windows\system32\ffmpeg.exe in environment variables
 # Linux: sudo apt install ffmpeg
 # macOS: brew install ffmpeg
 
-# 6. Optional: configure messaging platforms
+# 6. Optional: install Whisper for AI speech-to-text (dubbing)
+pip install openai-whisper
+
+# 7. Optional: configure messaging platforms
 #    See "Configuration" section for Telegram, Discord, Slack, WhatsApp setup
 ```
 
@@ -119,7 +127,7 @@ bun run packages/core/src/main.ts
 
 # Check health
 curl http://localhost:4123/healthz
-# {"status":"ok","version":"0.7.1","uptime":5,...}
+# {"status":"ok","version":"0.7.0","uptime":5,...}
 ```
 
 ---
@@ -132,7 +140,7 @@ Navigate to **http://localhost:4123** in your browser.
 
 ### 2. Chat with the Assistant
 
-Click **Chat Assistant** in the sidebar. Type your message and press Enter. The assistant has access to all 102 tools.
+Click **Chat Assistant** in the sidebar. Type your message and press Enter. The assistant has access to all 108 tools.
 
 ### 3. Create Your First Agent
 
@@ -143,20 +151,29 @@ Click **Chat Assistant** in the sidebar. Type your message and press Enter. The 
 5. Click **▶ Start** to run the agent
 6. Configure schedule (e.g., "every 6 hours") if you want it to run periodically
 
-### 4. Schedule a Cron Job
+### 4. Dub a Video (new!)
+
+1. Go to **Video Editor** page
+2. Upload an MP4 file
+3. Select source language (or Auto-detect) and target language
+4. Click **Start Dubbing**
+5. The pipeline: transcribe (Whisper) → translate (LLM) → TTS (Edge) → assemble → SRT subtitles
+6. Download the dubbed MP4 + SRT file
+
+### 5. Schedule a Cron Job
 
 1. Go to **Cron** page
 2. Click **New Cron Job**
 3. Type: `summarize crypto news every morning at 8am`
 4. Click **Create**
 
-### 5. Search Your Conversations
+### 6. Search Your Conversations
 
 1. Go to **Sessions** page
 2. Type a query in the search bar
 3. Results show highlight snippets from all past transcripts
 
-### 6. Install Skills from the Hub
+### 7. Install Skills from the Hub
 
 1. Go to **Skills** page
 2. In the "agentskills.io Hub" section, search for a skill
@@ -178,13 +195,13 @@ nova-ai-builder/
 │   │   │   └── store.ts            #   Agent CRUD + file store
 │   │   │
 │   │   ├── plugin/                 # Tool registration system
-│   │   │   ├── tools.ts            #   60+ core tools (all registered here)
-│   │   │   ├── community-skills.ts #   20 community skill tools
-│   │   │   └── tools_session_search.ts
+│   │   │   ├── tools.ts            #   41 core tools (all registered here)
+│   │   │   ├── community-skills.ts #   65 community skill tools
+│   │   │   └── tools_session_search.ts  #   FTS5 session search tools (2)
 │   │   │
 │   │   ├── skill/                  # Skills subsystem
 │   │   │   ├── loader.ts           #   Load skills from disk
-│   │   │   ├── self-improve.ts     #   AI auto-creates skills from successful sessions
+│   │   │   ├── self-improve.ts     #   AI auto-creates skills from sessions
 │   │   │   └── hub.ts              #   agentskills.io integration
 │   │   │
 │   │   ├── session/                # Session & transcript management
@@ -199,18 +216,26 @@ nova-ai-builder/
 │   │   │
 │   │   ├── crypto/                 # Crypto news + prices
 │   │   ├── trading/                # Trading analysis pipeline
-│   │   ├── video/                  # FFmpeg video generation + editing
+│   │   ├── video/                  # FFmpeg video generation + dubbing
+│   │   │   ├── pipeline.ts         #   Video generation pipeline
+│   │   │   ├── tts.ts              #   Edge TTS engine (voice synthesis)
+│   │   │   ├── subtitles.ts        #   SRT subtitle generation
+│   │   │   ├── dubbing-service.ts  #   Full dubbing pipeline (new!)
+│   │   │   ├── assembly.ts         #   Clip assembly
+│   │   │   ├── story.ts            #   Storyboard generation
+│   │   │   ├── editor-tools.ts     #   Editing utilities
+│   │   │   ├── burn_subs.py        #   Python subtitle burning script
+│   │   │   └── types.ts            #   Shared types
 │   │   ├── shopping/               # EU e-commerce product search
-│   │   ├── gateway/                # Messaging platform adapters
-│   │   │   └── platforms/          #   Telegram, Discord, Slack, WhatsApp, WeChat
-│   │   ├── api/                    # REST API (Hono routes)
+│   │   ├── gateway/                # Platform adapters
+│   │   ├── api/                    # REST API (Hono routes — 163+ endpoints)
 │   │   ├── terminal/               # WebSocket PTY terminal
 │   │   └── memory/                 # Memory store (markdown files + cache)
 │   │
-│   ├── ui/                         # React 19 + Vite 6 frontend
-│   │   └── src/routes/             #   Each page = one .tsx component
+│   ├── ui/                         # React 19 + Vite 6 frontend (migrated from Svelte 5)
+│   │   └── src/routes/             #   23 pages, each = one .tsx component
 │   │
-│   ├── provider-deepseek/          # LLM provider plugins (pluggable)
+│   ├── provider-deepseek/          # LLM provider plugins (pluggable, 12 total)
 │   ├── provider-anthropic/
 │   ├── provider-openai/
 │   ├── provider-gemini/
@@ -219,7 +244,26 @@ nova-ai-builder/
 │   ├── provider-zhipu/
 │   ├── provider-kimi/
 │   ├── provider-minimax/
-│   └── provider-custom/
+│   ├── provider-custom/
+│   ├── provider-ollama-v2/
+│   └── provider-lmstudio/
+│
+├── skills/                         # User skills (26+ local skills on disk)
+│   ├── blockchain/
+│   ├── community/
+│   ├── creative/
+│   ├── data-science/
+│   ├── devops/
+│   ├── finance/
+│   ├── github/
+│   ├── media/
+│   ├── research/
+│   └── ...                         # More categories
+│
+├── data/                           # Runtime data (gitignored)
+│   ├── dubbing/                    # Dubbing job outputs + persistence
+│   │   └── jobs.json               #   Persistent job history
+│   └── ...                         # DBs, configs
 │
 ├── .env.example                    # Template — copy to .env and fill keys
 ├── .gitignore                      # Protects .env, data/, skills/, logs/
@@ -399,7 +443,42 @@ Full FFmpeg-based pipeline for automated video creation and editing.
 
 ---
 
-### 11. Crypto Trading Agent
+### 11. AI Video Dubbing
+
+Translate and re-voice any MP4 video with AI. Full 6-step pipeline:
+
+1. **Extract audio** — FFmpeg, 16kHz WAV
+2. **Transcribe** — OpenAI Whisper (speech-to-text, auto language detection)
+3. **Translate** — LLM translates to target language
+4. **TTS** — Edge TTS generates natural voiceover in target language (20+ voices)
+5. **Time-stretch** — Match original video duration (FFmpeg atempo)
+6. **Assemble** — Replace audio track, output MP4 + SRT subtitles
+
+**Key features:**
+- 20+ Edge TTS voices (French, German, Polish, Spanish, Italian, Japanese, etc.)
+- SRT subtitles generated and saved alongside video
+- Whisper auto-detects source language
+- Original video duration preserved (no speed-up/slow-down artifacts)
+- Full job history persisted to disk (survives server restarts)
+
+**Requirements:**
+- FFmpeg (with libx264 + aac encoders)
+- Python + openai-whisper (`pip install openai-whisper`)
+- Edge TTS (auto-detected: CLI, Python module, or inline)
+
+**UI page:** `Video Editor` — dubbing tab with job list, progress, logs, download
+
+**API endpoints:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/dub/start` | Start dubbing job (multipart: video + language) |
+| GET | `/api/dub/jobs` | List all dubbing jobs with status |
+| GET | `/api/dub/jobs/:id` | Get single job details |
+| GET | `/api/dub/download/:id` | Download dubbed MP4 |
+
+---
+
+### 12. Crypto Trading Agent
 
 Real-time crypto market analysis and signal generation.
 
@@ -418,7 +497,7 @@ Real-time crypto market analysis and signal generation.
 
 ---
 
-### 12. Shopping Agent
+### 13. Shopping Agent
 
 Search for products across European e-commerce sites.
 
@@ -436,7 +515,7 @@ Search for products across European e-commerce sites.
 
 ---
 
-### 13. Messaging Platforms
+### 14. Messaging Platforms
 
 Nova connects to 5 messaging platforms as a bot. It can receive messages as agent prompts and send responses back.
 
@@ -452,7 +531,7 @@ Nova connects to 5 messaging platforms as a bot. It can receive messages as agen
 
 ---
 
-### 14. Email Integration
+### 15. Email Integration
 
 Full IMAP/SMTP email capabilities.
 
@@ -462,7 +541,7 @@ Full IMAP/SMTP email capabilities.
 
 ---
 
-### 15. Computer Use (Mouse/Keyboard)
+### 16. Computer Use (Mouse/Keyboard)
 
 Direct mouse and keyboard control (requires running on a real desktop).
 
@@ -470,7 +549,7 @@ Direct mouse and keyboard control (requires running on a real desktop).
 
 ---
 
-### 16. Diagram & Wiki Generation
+### 17. Diagram & Wiki Generation
 
 Generate architecture diagrams and project wikis.
 
@@ -478,7 +557,7 @@ Generate architecture diagrams and project wikis.
 
 ---
 
-### 17. Memory & Knowledge Base
+### 18. Memory & Knowledge Base
 
 Persistent storage across sessions. Agents save reports, users save notes.
 
@@ -492,7 +571,7 @@ Persistent storage across sessions. Agents save reports, users save notes.
 
 ---
 
-### 18. Code Execution
+### 19. Code Execution
 
 Safe code execution in isolated environments.
 
@@ -500,7 +579,7 @@ Safe code execution in isolated environments.
 
 ---
 
-### 19. Canvas & Excalidraw
+### 20. Canvas & Excalidraw
 
 Generate design mockups, wireframes, and Excalidraw diagrams.
 
@@ -508,7 +587,7 @@ Generate design mockups, wireframes, and Excalidraw diagrams.
 
 ---
 
-### 20. Social Media
+### 21. Social Media
 
 X (Twitter) integration — search recent tweets.
 
@@ -518,7 +597,7 @@ X (Twitter) integration — search recent tweets.
 
 ---
 
-## All 102 Tools
+## All 108 Tools
 
 | # | Tool Name | Description |
 |---|-----------|-------------|
@@ -593,7 +672,7 @@ X (Twitter) integration — search recent tweets.
 | 87-97 | `workspace_*` | All workspace file operations (11 tools) |
 | 98 | `x_search` | Search tweets via X/Twitter API |
 | 99 | `youtube_search` | Search YouTube |
-| 100-102 | Additional community tools | (_community skills_) |
+| 100-108 | Additional community tools | (_community skills_) |
 
 ---
 
@@ -631,13 +710,21 @@ Providers auto-detect: set the corresponding `API_KEY` in `.env` and the provide
 | **Workspace** | `/workspace` | File system browser with file operations |
 | **Trading** | `/trading` | Crypto analysis, signals, and live dashboard |
 | **Video** | `/video` | Preset-based video generation |
-| **Video Editor** | `/video-editor` | Advanced scene-by-scene video editing |
+| **Video Editor** | `/editor` | AI Dubbing — upload, transcribe, translate, re-voice (NEW!) |
+| **Video Editor (Advanced)** | `/video-editor` | Advanced scene-by-scene video editing |
 | **Shopping** | `/shopping` | European e-commerce product search |
 | **Memory DB** | `/memory` | Persistent memory store |
-| **Tools** | `/tools` | Browse and inspect all 102 registered tools |
+| **Tools** | `/tools` | Browse and inspect all 108 registered tools |
 | **Plugins** | `/plugins` | Discover and install plugins |
 | **Worker** | `/worker` | Background worker job management |
 | **Terminal** | `/terminal` | WebSocket-based terminal emulator |
+| **Config** | `/config` | Server configuration management |
+| **Analytics** | `/analytics` | Usage statistics and metrics |
+| **Docs** | `/docs` | Built-in documentation viewer |
+| **Env** | `/env` | Environment variable manager |
+| **Logs** | `/logs` | Server log viewer |
+| **Models** | `/models` | Model configuration and management |
+| **Profiles** | `/profiles` | User profiles and settings |
 
 ---
 
@@ -667,6 +754,14 @@ DELETE /api/sessions/:id      — Delete session
 GET  /api/tools               — List all registered tools
 GET  /api/skills              — List all loaded skills
 GET  /api/providers           — List active LLM providers
+```
+
+### Dubbing
+```
+POST /api/dub/start           — Start dubbing job (multipart: video + language + sourceLanguage)
+GET  /api/dub/jobs            — List all dubbing jobs
+GET  /api/dub/jobs/:id        — Get job details (status, progress, logs)
+GET  /api/dub/download/:id    — Download dubbed MP4 output
 ```
 
 ### Channels
@@ -729,6 +824,10 @@ SLACK_SIGNING_SECRET=...
 EMAIL_IMAP_HOST=imap.gmail.com
 EMAIL_IMAP_USER=you@gmail.com
 EMAIL_IMAP_PASS=your-app-password
+
+# ─── VIDEO DUBBING ────────────────────────────────────────
+FFMPEG_PATH=C:\Windows\system32\ffmpeg.exe  # Windows: explicit FFmpeg path
+PYTHON_PATH=                                # Optional: explicit Python path for Whisper
 
 # ─── EXTERNAL APIS ────────────────────────────────────────
 GOOGLE_API_KEY=...              # Google Custom Search (Shopping)
@@ -806,7 +905,7 @@ launchctl load ~/Library/LaunchAgents/com.nova.builder.plist
 
 ### What is protected:
 - ✅ **`.env`** — gitignored, never committed
-- ✅ **`data/`** — gitignored (contains encrypted provider config)
+- ✅ **`data/`** — gitignored (contains encrypted provider config, dubbing jobs)
 - ✅ **`*.db`, `*.sqlite`** — gitignored (session databases)
 - ✅ **`skills/`, `logs/`** — gitignored (runtime artifacts)
 - ✅ **Hardcoded keys** — none in source code (verified by scan)
