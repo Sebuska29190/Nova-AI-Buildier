@@ -2061,7 +2061,19 @@ Return valid JSON only (no markdown, no code fences):
         return c.json({ error: "No browser found. Install Chrome, Edge, or Brave." }, 500);
       }
 
-      execSync(`start "" "${browserCmd}" --user-data-dir="${profileDir}" "${loginUrl}" --new-window`, {
+      // Normalize path for Chrome (forward slashes are more reliable on Windows)
+      const normalizedDir = profileDir.replace(/\\/g, "/");
+
+      // Kill only browser processes using THIS specific profile
+      // Match by account ID in the command line (unique to this profile)
+      try {
+        execSync(`powershell -Command "Get-Process -Name chrome,msedge,brave -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match '${id}' } | Stop-Process -Force -ErrorAction SilentlyContinue"`, { timeout: 3000, windowsHide: true });
+      } catch {}
+
+      // Wait briefly for processes to release
+      await new Promise(r => setTimeout(r, 1000));
+
+      execSync(`start "" "${browserCmd}" --user-data-dir="${normalizedDir}" "${loginUrl}" --new-window --no-first-run --no-default-browser-check`, {
         timeout: 5000, shell: "cmd.exe", windowsHide: false,
       });
 

@@ -1,7 +1,7 @@
 # Knowledge Base Index
 
 Auto-generated index of all knowledge entries grouped by category.
-Last updated: 2026-05-25T14:04:17.808Z
+Last updated: 2026-05-25T14:13:14.190Z
 
 ## Categories
 

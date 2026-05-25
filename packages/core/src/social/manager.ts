@@ -210,17 +210,53 @@ export async function verifyBrowserLogin(id: string): Promise<{ ok: boolean; err
   const account = getAccount(id);
   if (!account) return { ok: false, error: "Account not found" };
 
-  // Check if profile has any cookies (Chrome stores them in Cookies file)
   try {
-    const { readdirSync } = await import("node:fs");
-    const files = readdirSync(account.profileDir);
-    const hasCookies = files.some(f => f.toLowerCase().includes("cookie") || f.toLowerCase().includes("local storage"));
-    if (hasCookies) {
+    const { readdirSync, existsSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+
+    if (!existsSync(account.profileDir)) {
+      return { ok: false, error: "Browser profile directory not found. Try opening the browser first." };
+    }
+
+    // Chrome/Edge stores cookies inside profile subdirectories: Default/Cookies, Profile 1/Cookies, etc.
+    // Also look for Login Data (saved passwords), which confirms an active login session
+    const cookieFiles = ["Cookies", "Cookies.db", "Network/Cookies"];
+    const loginIndicators = ["Login Data", "Login Data For Account", "Default/Web Data"];
+
+    function findInDir(dir: string, depth = 0): boolean {
+      if (depth > 3) return false;
+      try {
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+          // Check for cookie files
+          if (!entry.isDirectory()) {
+            const name = entry.name.toLowerCase();
+            if (name === "cookies" || name === "cookies.db") return true;
+            continue;
+          }
+          // Recurse into subdirectories
+          if (findInDir(fullPath, depth + 1)) return true;
+        }
+      } catch {}
+      return false;
+    }
+
+    const hasSession = findInDir(account.profileDir);
+
+    if (hasSession) {
       updateAccount(id, { authStatus: "connected", errorMessage: undefined });
       return { ok: true };
     }
-    return { ok: false, error: "No browser session found. Try logging in through the browser." };
-  } catch {
-    return { ok: false, error: "Could not check profile directory" };
+
+    // If the Default folder exists but no cookies yet, user may not have finished logging in
+    const defaultDir = join(account.profileDir, "Default");
+    if (existsSync(defaultDir)) {
+      return { ok: false, error: "Profile exists but no login session detected. Make sure you completed the login in the browser, then try again." };
+    }
+
+    return { ok: false, error: "No browser session found. The browser may not have finished setting up the profile. Try opening the browser again and logging in." };
+  } catch (e: any) {
+    return { ok: false, error: `Could not verify login: ${e.message}` };
   }
 }
