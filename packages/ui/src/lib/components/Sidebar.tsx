@@ -3,7 +3,7 @@ import {
   FolderGit2, Video, FileCode, Cpu, Coins, ShoppingBag, Terminal,
   Settings, KeyRound, ScrollText, UserCog, ToyBrick, Calendar,
   BarChart3, BookOpen, Search, Sliders, Orbit, Sparkles, Globe2, Plug,
-  GitBranch, Building2
+  GitBranch, Building2, Activity
 } from "lucide-react";
 
 interface SidebarProps {
@@ -55,6 +55,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     { id: "aimodels", icon: ToyBrick, label: "AI Models" },
     { id: "schedule", icon: Calendar, label: "Cron Schedule" },
     { id: "analytics", icon: BarChart3, label: "Analytics" },
+    { id: "tools-analytics", icon: Activity, label: "Tool Analytics", badge: "NEW" },
     { id: "docs", icon: BookOpen, label: "Documentation" },
   ]},
 ];

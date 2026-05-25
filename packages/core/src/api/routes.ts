@@ -469,6 +469,56 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e) { return c.json({ error: safeMessage(e) }, 400); }
   });
 
+  // Tool Analytics Dashboard
+  app.get("/api/analytics/dashboard", async (c) => {
+    try {
+      const summary = usageTracker.summarize();
+      const { toolAudit } = await import("../safety/tool-audit.ts");
+      const recent = toolAudit.getRecent(20);
+      const stats = toolAudit.getStats();
+
+      // Per-tool usage from audit log
+      const toolCounts: Record<string, number> = {};
+      const toolSuccess: Record<string, { ok: number; fail: number }> = {};
+      for (const entry of toolAudit.getRecent(1000)) {
+        toolCounts[entry.toolName] = (toolCounts[entry.toolName] || 0) + 1;
+        if (!toolSuccess[entry.toolName]) toolSuccess[entry.toolName] = { ok: 0, fail: 0 };
+        if (entry.success) toolSuccess[entry.toolName].ok++;
+        else toolSuccess[entry.toolName].fail++;
+      }
+
+      const topTools = Object.entries(toolCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([name, count]) => ({
+          name,
+          count,
+          successRate: toolSuccess[name]
+            ? Math.round((toolSuccess[name].ok / (toolSuccess[name].ok + toolSuccess[name].fail)) * 100)
+            : 100,
+        }));
+
+      const successRate = recent.length
+        ? Math.round((recent.filter((e) => e.success).length / recent.length) * 100)
+        : 100;
+
+      return c.json({
+        topTools,
+        topAgents: summary.topAgents,
+        recentCalls: recent.map((e) => ({
+          toolName: e.toolName,
+          agentId: e.agentId,
+          durationMs: e.durationMs,
+          success: e.success,
+          timestamp: e.timestamp,
+        })),
+        successRate,
+        totalToolCalls: summary.totalToolCalls,
+        uniqueTools: stats.uniqueTools,
+      });
+    } catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
   // Agent files
   app.get("/api/agents/:id/files", (c) => {
     const agent = agentStore.get(c.req.param("id"));

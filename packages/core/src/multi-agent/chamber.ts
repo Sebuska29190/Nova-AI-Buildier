@@ -83,6 +83,8 @@ class ChamberManager {
     )`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_chamber_msgs ON chamber_messages(chamber_id, round ASC)`);
     this.initialized = true;
+    // Reset stale "running" chambers from previous sessions
+    this.db.run("UPDATE agent_chambers SET status = 'idle' WHERE status = 'running'");
     this.registerTools();
   }
 
@@ -160,11 +162,11 @@ class ChamberManager {
   async runRoom(id: string): Promise<{ success: boolean; error?: string }> {
     const chamber = this.get(id);
     if (!chamber) return { success: false, error: "Chamber not found" };
-    if (chamber.status === "running") return { success: false, error: "Chamber is already running. Stop it first or wait for completion." };
 
-    // Stale "running" from crash — force reset
+    // Stale "running" from crash or restart — force reset
     if (chamber.status === "running") {
       this.db.run("UPDATE agent_chambers SET status = 'idle' WHERE id = ?", [id]);
+      chamber.status = "idle";
     }
 
     const sortedAgents = [...chamber.agents].sort((a, b) => a.order - b.order);
@@ -273,10 +275,13 @@ class ChamberManager {
     const ctrl = this.activeRuns.get(id);
     if (ctrl) {
       ctrl.abort();
+    }
+    const chamber = this.get(id);
+    if (chamber && chamber.status === "running") {
       this.db.run("UPDATE agent_chambers SET status = 'idle' WHERE id = ?", [id]);
       return true;
     }
-    return false;
+    return !!ctrl;
   }
 
   isRunning(id: string): boolean {

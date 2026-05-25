@@ -34,6 +34,7 @@ import { IntegrationsPage } from "./routes/IntegrationsPage";
 import { RagPage } from "./routes/RagPage";
 import { ChambersPage } from "./routes/ChambersPage";
 import { WorkflowsPage } from "./routes/WorkflowsPage";
+import { ToolsAnalyticsPage } from "./routes/ToolsAnalyticsPage";
 
 // Page component map
 const pages: Record<string, React.ComponentType<any>> = {
@@ -67,6 +68,7 @@ const pages: Record<string, React.ComponentType<any>> = {
   "rag": RagPage,
   "chambers": ChambersPage,
   "workflows": WorkflowsPage,
+  "tools-analytics": ToolsAnalyticsPage,
   "tools": WorkspacePage,
 };
 
