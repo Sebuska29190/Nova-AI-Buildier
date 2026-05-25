@@ -269,6 +269,30 @@ export function ChatPage({
     }
   }
 
+  // ─── Drag & Drop ─────────────────────────────────────────────
+  const [dragOver, setDragOver] = useState(false);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0) {
+      setFiles((prev) => [...prev, ...droppedFiles]);
+    }
+  }
+
   // ─── Send ────────────────────────────────────────────────────
   async function send() {
     if (!input.trim() || loading) return;
@@ -423,7 +447,20 @@ export function ChatPage({
   const filteredCommands = SLASH_COMMANDS.filter(c => c.cmd.toLowerCase().includes(`/${suggestionFilter}`));
 
   return (
-    <div className="flex h-full bg-[#0a0c10] text-gray-200 overflow-hidden font-sans">
+    <div className="flex h-full bg-[#0a0c10] text-gray-200 overflow-hidden font-sans"
+      ref={dropRef}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}>
+      {/* Drag overlay */}
+      {dragOver && (
+        <div className="fixed inset-0 z-[100] bg-[#00f2fe]/5 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="bg-[#0b0f19] border-2 border-dashed border-[#00f2fe]/50 rounded-2xl px-8 py-6 text-center shadow-2xl">
+            <p className="text-[#00f2fe] text-lg font-bold mb-1">Drop files here</p>
+            <p className="text-slate-400 text-xs">Images, documents, audio, video</p>
+          </div>
+        </div>
+      )}
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}

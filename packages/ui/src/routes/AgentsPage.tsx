@@ -27,7 +27,37 @@ export function AgentsPage() {
   const [agentFiles, setAgentFiles] = useState<any[]>([]);
   const [editingFile, setEditingFile] = useState<{ name: string; content: string } | null>(null);
   const [allSkills, setAllSkills] = useState<any[]>([]);
-  const [agentTab, setAgentTab] = useState<"info" | "files" | "skills">("info");
+  const [agentTab, setAgentTab] = useState<"info" | "files" | "skills" | "memory">("info");
+  const [agentMemories, setAgentMemories] = useState<any[]>([]);
+  const [agentMemoryTotal, setAgentMemoryTotal] = useState(0);
+  const [newMemory, setNewMemory] = useState("");
+  const [memoryType, setMemoryType] = useState("observation");
+  const [memoryImportance, setMemoryImportance] = useState(3);
+
+  // Memory functions
+  async function loadAgentMemory(agentId: string) {
+    try {
+      const res = await fetch(`/api/agents/${agentId}/memory`);
+      if (res.ok) { const d = await res.json(); setAgentMemories(d.memories || []); setAgentMemoryTotal(d.total || 0); }
+    } catch {}
+  }
+  async function addAgentMemory(agentId: string) {
+    if (!newMemory.trim()) return;
+    try {
+      await fetch(`/api/agents/${agentId}/memory`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: memoryType, content: newMemory.trim(), importance: memoryImportance }),
+      });
+      setNewMemory("");
+      loadAgentMemory(agentId);
+    } catch {}
+  }
+  async function deleteAgentMemory(agentId: string, memoryId: string) {
+    try {
+      await fetch(`/api/agents/${agentId}/memory/${memoryId}`, { method: "DELETE" });
+      loadAgentMemory(agentId);
+    } catch {}
+  }
 
   useEffect(() => {
     loadAgents();
@@ -295,10 +325,10 @@ export function AgentsPage() {
 
           {/* Sub-tabs */}
           <div className="flex gap-1 mb-4 border-b border-slate-800 pb-0">
-            {(["info", "files", "skills"] as const).map((t) => (
-              <button key={t} onClick={() => { setAgentTab(t); if (t === "files" && selectedAgent) loadAgentFiles(selectedAgent.id); }}
+            {(["info", "files", "skills", "memory"] as const).map((t) => (
+              <button key={t} onClick={() => { setAgentTab(t); if (t === "files" && selectedAgent) loadAgentFiles(selectedAgent.id); if (t === "memory" && selectedAgent) loadAgentMemory(selectedAgent.id); }}
                 className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-all border-b-2 ${agentTab === t ? "border-[#00f2fe] text-white" : "border-transparent text-slate-500 hover:text-slate-300"}`}>
-                {t === "info" ? "📋 Info" : t === "files" ? "📁 Files" : "⚡ Skills"}
+                {t === "info" ? "📋 Info" : t === "files" ? "📁 Files" : t === "skills" ? "⚡ Skills" : "🧠 Memory"}
               </button>
             ))}
           </div>
@@ -403,6 +433,66 @@ export function AgentsPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {agentTab === "memory" && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-slate-400">Agent Memory <span className="text-slate-600">({agentMemoryTotal} entries)</span></p>
+              </div>
+
+              {/* Add memory */}
+              <div className="flex gap-2 mb-4">
+                <input value={newMemory} onChange={(e) => setNewMemory(e.target.value)}
+                  placeholder="Add a memory for this agent..."
+                  className="flex-1 bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00f2fe]"
+                  onKeyDown={(e) => { if (e.key === "Enter" && selectedAgent) addAgentMemory(selectedAgent.id); }} />
+                <select value={memoryType} onChange={(e) => setMemoryType(e.target.value)}
+                  className="bg-[#020408]/60 border border-slate-800 rounded-lg px-2 py-2 text-xs text-white">
+                  <option value="observation">Observation</option>
+                  <option value="decision">Decision</option>
+                  <option value="fact">Fact</option>
+                  <option value="preference">Preference</option>
+                </select>
+                <button onClick={() => selectedAgent && addAgentMemory(selectedAgent.id)}
+                  className="btn-premium text-[10px] px-3 py-2 rounded-lg whitespace-nowrap">Save</button>
+              </div>
+
+              {/* Memory list */}
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {agentMemories.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic text-center py-6">No memories yet. Add one above.</p>
+                ) : (
+                  agentMemories.map((mem: any) => (
+                    <div key={mem.id} className="flex items-start gap-2 p-2 bg-[#020408]/40 rounded-lg border border-slate-800/50 group">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                            mem.type === "decision" ? "bg-amber-500/20 text-amber-400" :
+                            mem.type === "fact" ? "bg-blue-500/20 text-blue-400" :
+                            mem.type === "preference" ? "bg-purple-500/20 text-purple-400" :
+                            "bg-slate-600/20 text-slate-400"
+                          }`}>{mem.type}</span>
+                          <span className="text-[9px] text-slate-600">
+                            {mem.importance === 5 ? "🔴 " : mem.importance >= 3 ? "🟡 " : "🟢 "}
+                            Importance: {mem.importance}/5
+                          </span>
+                          <span className="text-[9px] text-slate-600 ml-auto">{new Date(mem.createdAt || mem.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs text-slate-300 whitespace-pre-wrap">{mem.content}</p>
+                        {mem.tags?.length > 0 && (
+                          <div className="flex gap-1 mt-1">
+                            {mem.tags.map((t: string) => <span key={t} className="text-[9px] text-slate-600">#{t}</span>)}
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => deleteAgentMemory(selectedAgent.id, mem.id)}
+                        className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs">✕</button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -514,6 +604,48 @@ export function AgentsPage() {
                       <option value="high">High</option>
                     </select>
                   </div>
+                </div>
+              </details>
+              {/* Sub-agent delegation */}
+              <details className="group">
+                <summary className="text-[9px] text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-300 flex items-center gap-1.5">
+                  Sub-Agent Delegation
+                </summary>
+                <div className="mt-2 space-y-2 pl-2">
+                  <div className="flex gap-2">
+                    <select value={taskModel} onChange={(e) => setTaskModel(e.target.value)}
+                      className="flex-1 bg-[#020408]/60 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+                      {agents.filter((a: any) => a.id !== selectedAgent.id).map((a: any) => (
+                        <option key={a.id} value={a.id}>{a.name} ({a.id})</option>
+                      ))}
+                    </select>
+                    <button onClick={async () => {
+                      const subAgent = agents.find((a: any) => a.id === taskModel);
+                      if (!subAgent || !taskInput.trim()) { setTaskResult("Select a sub-agent and write a task first."); return; }
+                      try {
+                        setTaskRunning(true);
+                        const res = await fetch("/api/subagent", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            id: subAgent.id,
+                            name: subAgent.name,
+                            modelRef: subAgent.modelRef,
+                            systemPrompt: subAgent.systemPrompt,
+                            message: taskInput,
+                          }),
+                        });
+                        const data = await res.json();
+                        setTaskResult(`[Delegated to ${subAgent.name}]\n${JSON.stringify(data.result, null, 2)}`);
+                      } catch (e: any) {
+                        setTaskResult(`Delegation failed: ${e.message}`);
+                      } finally { setTaskRunning(false); }
+                    }} disabled={taskRunning}
+                      className="btn-premium text-[10px] px-3 py-1.5 rounded-lg whitespace-nowrap">
+                      Delegate
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">Select another agent and click Delegate to assign a subtask.</p>
                 </div>
               </details>
               <div className="flex justify-between items-center pt-2 border-t border-slate-800">
