@@ -314,3 +314,29 @@ registerTool({
     return result.success ? `✅ ${result.message}` : `❌ ${result.message}`;
   },
 });
+
+registerTool({
+  name: "integration_execute",
+  description: "Execute an action on a connected integration service — send Slack/Discord message, send Telegram message, create GitHub issue",
+  parameters: {
+    type: "object",
+    properties: {
+      accountId: { type: "string", description: "Integration account ID (from integration_list_accounts)" },
+      action: { type: "string", description: "Action: send_message (Slack/Discord/Telegram), create_issue (GitHub)" },
+      params: { type: "object", description: "Parameters: { text/message: string } for send_message, { repo: string, title: string, body?: string } for create_issue" },
+    },
+    required: ["accountId", "action", "params"],
+    additionalProperties: false,
+  },
+  async execute(args: { accountId: string; action: string; params: Record<string, any> }) {
+    try {
+      const acc = integrationManager.getAccount(args.accountId);
+      if (!acc) return `❌ Account ${args.accountId} not found`;
+      if (!acc.enabled) return `❌ Account ${acc.name} is disabled`;
+      const result = await integrationManager.executeAction(acc.service, args.action, args.params, acc.config);
+      return `✅ ${acc.service}: ${args.action} succeeded${result.url ? ` — ${result.url}` : ""}`;
+    } catch (e: unknown) {
+      return `❌ ${safeMessage(e)}`;
+    }
+  },
+});

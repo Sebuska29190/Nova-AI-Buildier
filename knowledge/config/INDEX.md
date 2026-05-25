@@ -24,3 +24,4 @@
 - [Workspace Set: D:\nova](2026-05-24-Workspace Set_ D__nova.md) — 2026-05-24 `[workspace, filesystem]`
 - [Workspace Set: D:\nova](2026-05-24-Workspace Set_ D__nova.md) — 2026-05-24 `[workspace, filesystem]`
 - [Workspace Set: D:\nova\video_output\job_mpju4ohw](2026-05-24-Workspace Set_ D__nova_video_output_job_mpju4ohw.md) — 2026-05-24 `[workspace, filesystem]`
+- [Workspace Set: D:\](2026-05-25-Workspace Set_ D__.md) — 2026-05-25 `[workspace, filesystem]`

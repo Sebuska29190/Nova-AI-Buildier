@@ -45,3 +45,9 @@ config/
 
 # Hermes workspace config
 .hermes/
+knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_agent_runner.ts.md
+knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety___tests___circuit-breaker-tools.test.md
+knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety_tool-audit.ts.md
+knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety_index.ts.md
+knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety_circuit-breaker-tools.ts.md
+knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety___tests___tool-audit.test.ts.md

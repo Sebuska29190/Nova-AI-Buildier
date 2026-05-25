@@ -21,6 +21,10 @@ Nova AI Builder is a self-hosted platform for building, training, and deploying 
 | **Web UI + Terminal** | ✅ Built-in | ❌ Need separate | ❌ CLI only | ❌ |
 | **Tool count** | 120+ | Manual build | ~20 | ~15 |
 | **Plugin system** | ✅ 26 plugins with schema-driven config | ❌ | ❌ | ❌ |
+| **Agent Persistent Memory** | ✅ Auto-learns from runs | ❌ | ❌ | ❌ |
+| **Agent Chambers** | ✅ Multi-agent teams with shared chat | ❌ | ❌ | Limited |
+| **Workflow Builder** | ✅ Chain agents, tools, conditions | ❌ | ❌ | ❌ |
+| **Tool Audit & Monitoring** | ✅ Full call logging + cost tracking | ❌ | ❌ | ❌ |
 | **Self-improving skills** | ✅ AI creates skills from sessions | ❌ | ❌ | ❌ |
 | **Video dubbing (AI)** | ✅ Transcribe → Translate → TTS → SRT | ❌ | ❌ | ❌ |
 | **Natural-language cron** | ✅ | ❌ | ❌ | ❌ |
@@ -33,6 +37,7 @@ Nova AI Builder is a self-hosted platform for building, training, and deploying 
 | **RAG Knowledge Base** | ✅ FTS5 + LLM answers | ❌ | ❌ | ❌ |
 | **Integrations Hub** | ✅ 30+ services | ❌ | ❌ | ❌ |
 | **Social Media** | ✅ Bluesky, X/Twitter | ❌ | ❌ | ❌ |
+| **API Key Auth** | ✅ Optional Bearer token | ❌ | ❌ | ❌ |
 | **Messaging platforms** | 5 | Plugin | ❌ | ❌ |
 
 ---
@@ -50,23 +55,27 @@ Nova AI Builder is a self-hosted platform for building, training, and deploying 
   - [Parallel Subagent Delegation](#5-parallel-subagent-delegation)
   - [Skill Hub (agentskills.io)](#6-skill-hub-agentskillsio)
   - [Plugin System](#7-plugin-system)
-  - [File System & Workspace](#8-file-system--workspace)
-  - [Web Browser Automation](#9-web-browser-automation)
-  - [Web Search & Fetch](#10-web-search--fetch)
-  - [Video Generator & Editor](#11-video-generator--editor)
-  - [AI Video Dubbing](#12-ai-video-dubbing)
-  - [Crypto Trading Agent](#13-crypto-trading-agent)
-  - [RAG Knowledge Base](#14-rag-knowledge-base)
-  - [Integrations Hub](#15-integrations-hub)
-  - [Social Media](#16-social-media)
-  - [Shopping Agent](#17-shopping-agent)
-  - [Messaging Platforms](#18-messaging-platforms)
-  - [Email Integration](#19-email-integration)
-  - [Computer Use (Mouse/Keyboard)](#20-computer-use-mousekeyboard)
-  - [Diagram & Wiki Generation](#21-diagram--wiki-generation)
-  - [Memory & Knowledge Base](#22-memory--knowledge-base)
-  - [Code Execution](#23-code-execution)
-  - [Canvas & Excalidraw](#24-canvas--excalidraw)
+  - [Agent Persistent Memory](#8-agent-persistent-memory)
+  - [Agent Chambers](#9-agent-chambers)
+  - [Workflow Builder](#10-workflow-builder)
+  - [Monitoring & Audit](#11-monitoring--audit)
+  - [File System & Workspace](#12-file-system--workspace)
+  - [Web Browser Automation](#13-web-browser-automation)
+  - [Web Search & Fetch](#14-web-search--fetch)
+  - [Video Generator & Editor](#15-video-generator--editor)
+  - [AI Video Dubbing](#16-ai-video-dubbing)
+  - [Crypto Trading Agent](#17-crypto-trading-agent)
+  - [RAG Knowledge Base](#18-rag-knowledge-base)
+  - [Integrations Hub](#19-integrations-hub)
+  - [Social Media](#20-social-media)
+  - [Shopping Agent](#21-shopping-agent)
+  - [Messaging Platforms](#22-messaging-platforms)
+  - [Email Integration](#23-email-integration)
+  - [Computer Use (Mouse/Keyboard)](#24-computer-use-mousekeyboard)
+  - [Diagram & Wiki Generation](#25-diagram--wiki-generation)
+  - [Memory & Knowledge Base](#26-memory--knowledge-base)
+  - [Code Execution](#27-code-execution)
+  - [Canvas & Excalidraw](#28-canvas--excalidraw)
 - [All 120+ Tools](#all-120-tools)
 - [Supported LLM Providers](#supported-llm-providers)
 - [UI Pages](#ui-pages)
@@ -221,9 +230,23 @@ nova-ai-builder/
 │   │   ├── cron/                   # Natural-language cron scheduler
 │   │   │   └── manager.ts          #   Parse NL → cron expression → execute via agents
 │   │   │
-│   │   ├── multi-agent/            # Parallel subagent delegation
+│   │   ├── multi-agent/            # Parallel subagent + chambers
 │   │   │   ├── subagent.ts         #   spawnSubAgent, spawnParallel, mergeResults
+│   │   │   ├── chamber.ts          #   Agent Chamber — multi-team discussion
 │   │   │   └── tools_parallel.ts   #   spawn_parallel tool registration
+│   │   │
+│   │   ├── workflow/               # Workflow builder
+│   │   │   └── engine.ts           #   Chain agents, tools, conditions
+│   │   │
+│   │   ├── monitor/                # Usage tracking & monitoring
+│   │   │   └── usage.ts            #   Cost tracking, tool audit logging
+│   │   │
+│   │   ├── auth/                   # API authentication
+│   │   │   └── manager.ts          #   Bearer token auth middleware
+│   │   │
+│   │   ├── safety/                 # Safety & audit
+│   │   │   ├── circuit-breaker-tools.ts
+│   │   │   └── tool-audit.ts       #   Real-time tool call audit logger
 │   │   │
 │   │   ├── crypto-hub/             # Crypto Hub V2 — dashboard, signals, alerts, portfolio
 │   │   ├── trading/                # Trading analysis pipeline
@@ -424,7 +447,126 @@ Each plugin defines its own `configSchema` — required fields, types (text/pass
 
 ---
 
-### 8. File System & Workspace
+
+
+### 8. Agent Persistent Memory
+
+Every agent has its own persistent memory store that grows with each run. Memories are automatically injected into the agent's system prompt before execution, and consolidated after each run.
+
+**How it works:**
+- **Types:** `episodic` (what happened) and `semantic` (what was learned)
+- **Importance:** 1-5 scale — high-importance memories are always shown
+- **Auto-consolidation:** After each run, key learnings are extracted from the output (sentences containing "learned", "discovered", "important", etc.)
+- **Deduplication:** Similar memories are not duplicated (70% similarity threshold)
+- **Workspace sync:** MEMORY.md is updated in the agent's workspace files
+
+**Agent tools (use in chat):**
+| Tool | Description |
+|------|-------------|
+| `agent_memory_save` | Save a fact or learning (specify type, importance, tags) |
+| `agent_memory_search` | Search past memories by keyword or importance |
+| `agent_memory_forget` | Remove a specific memory or clear all |
+| `agent_memory_summarize` | Get a summary of what this agent remembers |
+
+**Example:**
+```
+User: "Research API authentication patterns"
+Agent (run 1): finds that "API key expires every 24h"
+               → auto-saved as semantic memory (importance 4)
+Agent (run 2): before starting, sees "★★★★ API key expires every 24h"
+               → knows this without being told again
+```
+
+**UI page:** Agent details → Memory tab (planned)
+**API endpoints:** `GET/POST/DELETE /api/agents/:id/memory`
+
+---
+
+### 9. Agent Chambers
+
+Multi-agent teams that collaborate on tasks through shared discussion. Each agent takes turns contributing, can delegate subtasks to others, and the team reaches consensus before completing.
+
+**Architecture:**
+```
+┌──────────────────────────────────────────┐
+│           Agent Chamber                   │
+│                                           │
+│  Shared transcript (all agents see it)    │
+│                                           │
+│  Round 1: Researcher finds info           │
+│  Round 1: Writer drafts based on research │
+│  Round 2: Reviewer critiques draft        │
+│  Round 2: Writer revises                  │
+│  → Consensus: "Task complete"             │
+└──────────────────────────────────────────┘
+```
+
+**Key features:**
+- **Round-robin execution:** Each agent speaks in order, sees the full transcript
+- **Delegation:** `@researcher: investigate X` — target agent picks it up on their next turn
+- **Consensus detection:** Automatically ends when 2/3 of agents signal "[done]"
+- **Shared context:** All agents see the full discussion history
+- **Persistent memory:** Each agent's personal memory is injected alongside shared context
+
+**Agent tools (use in chat):**
+| Tool | Description |
+|------|-------------|
+| `chamber_list` | List all chambers with status |
+| `chamber_status` | View chamber details, agents, recent messages |
+| `chamber_run` | Start or resume a chamber discussion |
+
+**UI page:** `/chambers` — create, run, view full discussion
+**API endpoints:** CRUD + run/stop
+
+---
+
+### 10. Workflow Builder
+
+Chain agents, tools, and conditions into repeatable workflows with variable passing and branching.
+
+**Step types:**
+| Type | Description | Config |
+|------|-------------|--------|
+| **agent** | Run an agent with a message | agentId, message (supports `{{variables}}`) |
+| **tool** | Call any registered tool | toolName, arguments |
+| **condition** | Branch based on previous step output | variable, operator (equals/contains/gt/lt/exists), value |
+| **delay** | Wait before next step | ms |
+| **notify** | Log a message | message |
+
+**Variable passing:** Steps can reference previous results with `{{stepId}}` syntax in messages and arguments.
+
+**Branching:** Each step has `nextOnSuccess` and `nextOnFailure` — go to different steps based on outcome.
+
+**Agent tool:**
+| Tool | Description |
+|------|-------------|
+| `workflow_run` | Execute a workflow by ID |
+
+**UI page:** `/workflows` — create, edit, run workflows
+**API endpoints:** CRUD + execute
+
+---
+
+### 11. Monitoring & Audit
+
+Complete visibility into what agents are doing — every tool call is logged, usage is tracked, and cost data is collected.
+
+**Tool Audit (in-memory real-time):**
+Every tool call is recorded with: agent ID, tool name, parameter hash, result preview, success/failure, iteration number. Use `GET /api/usage/audit` to inspect.
+
+**Usage Tracker (persistent SQLite):**
+Long-term storage of API calls, tool calls, and agent runs with token counts and cost estimates. Query by date range and agent.
+
+**API endpoints:**
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/usage` | Summary stats (total calls, cost, tokens) with optional `?since=ISO&agentId=X` |
+| `GET /api/usage/top` | Top 5 agents by cost |
+| `GET /api/usage/audit` | Recent tool calls with optional `?taskId=X` or `?n=20` |
+
+**Security:** Optional `NOVA_AUTH_TOKEN` env var enables Bearer token authentication for all API endpoints.
+
+### 12. File System & Workspace
 
 Agents have full file system access within a configurable workspace root. Multi-folder support allows referencing multiple directories.
 
@@ -446,7 +588,7 @@ Agents have full file system access within a configurable workspace root. Multi-
 
 ---
 
-### 9. Web Browser Automation
+### 13. Web Browser Automation
 
 Stealth browser (Chromium) with fingerprint spoofing. Navigate, extract, screenshot, click, type — all through a headless browser.
 
@@ -454,7 +596,7 @@ Stealth browser (Chromium) with fingerprint spoofing. Navigate, extract, screens
 
 ---
 
-### 10. Web Search & Fetch
+### 14. Web Search & Fetch
 
 Multiple search backends: Brave Search API, DuckDuckGo, Google Custom Search, arXiv, YouTube.
 
@@ -466,7 +608,7 @@ Multiple search backends: Brave Search API, DuckDuckGo, Google Custom Search, ar
 
 ---
 
-### 11. Video Generator & Editor
+### 15. Video Generator & Editor
 
 Full FFmpeg-based pipeline for automated video creation and editing.
 
@@ -485,7 +627,7 @@ Full FFmpeg-based pipeline for automated video creation and editing.
 
 ---
 
-### 12. AI Video Dubbing
+### 16. AI Video Dubbing
 
 Translate and re-voice any MP4 video with AI. Full 6-step pipeline:
 
@@ -520,7 +662,7 @@ Translate and re-voice any MP4 video with AI. Full 6-step pipeline:
 
 ---
 
-### 13. Crypto Trading Agent
+### 17. Crypto Trading Agent
 
 Real-time crypto market analysis and signal generation.
 
@@ -541,7 +683,7 @@ Real-time crypto market analysis and signal generation.
 
 ---
 
-### 14. RAG Knowledge Base
+### 18. RAG Knowledge Base
 
 Upload documents (TXT, MD, CSV, JSON, PDF) and query them with natural language. Nova indexes content with FTS5 full-text search and uses an LLM to generate answers from relevant documents.
 
@@ -564,36 +706,57 @@ Upload documents (TXT, MD, CSV, JSON, PDF) and query them with natural language.
 
 ---
 
-### 15. Integrations Hub
+### 19. Integrations Hub
 
-Connect 30+ external services to Nova through a centralized integration manager. Each service has dedicated configuration, authentication, and status monitoring.
+Centralized credential manager for 30+ external services. Store API keys, tokens, and webhook URLs in one place, test connections, and execute basic actions through the AI agent.
 
-**Available integrations:**
+**What it does:**
+| Capability | Details |
+|------------|---------|
+| **Credential vault** | Store API keys, tokens, webhooks for 30+ services in SQLite |
+| **Connection test** | Verify credentials work (GitHub auth, Slack/Discord test webhook, Telegram getMe) |
+| **Action execution** | Send messages (Slack/Discord/Telegram), create GitHub issues |
+| **Agent tools** | 6 registered tools the AI can call directly |
 
+**Supported services (credentials only for most):**
 | Category | Services |
 |----------|----------|
-| **Social** | Bluesky, X/Twitter, LinkedIn, Instagram, Facebook, TikTok, YouTube |
-| **Messaging** | Telegram, Discord, Slack, WhatsApp, WeChat |
-| **Productivity** | Notion, Linear, Airtable, Google Sheets, Google Calendar, Google Drive |
-| **AI & Data** | HuggingFace, Replicate, Weights & Biases, ComfyUI |
-| **DevOps** | GitHub, GitLab, Docker Hub, Pulumi, Cloudflare |
-| **Finance** | CoinGecko, TradingView, Alpha Vantage |
-| **Media** | Pexels, Pixabay, ElevenLabs |
-| **Other** | Email (IMAP/SMTP), RSS Feeds, Webhooks |
+| **Communication** | Slack (send), Discord (send), Telegram (send) |
+| **Developer** | GitHub (create issue), GitLab, Linear, Jira, Bitbucket, Supabase |
+| **Productivity** | Notion, Trello, Asana, Google Calendar, Google Drive, Gmail |
+| **DevOps** | Datadog, Sentry, PagerDuty, AWS |
+| **AI** | OpenAI, Anthropic, Stability AI, ElevenLabs, Pinecone |
+| **Business** | Shopify, Stripe, HubSpot |
+| **Social** | Reddit, Twitter/X, YouTube |
+| **Design** | Figma |
 
-**How it works:**
-1. Go to the **Integrations** page
-2. Toggle any service on
-3. Fill in the required credentials (API keys, tokens, URLs)
-4. The integration becomes available as tools for the agent
+**Agent tools (use in chat):**
+| Tool | What it does |
+|------|-------------|
+| `integration_list` | List all available services you can connect |
+| `integration_add` | Connect a service (provide API key/webhook) |
+| `integration_list_accounts` | Show your connected accounts |
+| `integration_remove` | Disconnect an account |
+| `integration_test` | Test if credentials are valid |
+| `integration_execute` | Execute action: send message (Slack/Discord/Telegram) or create GitHub issue |
 
-**Key tools:** `integration_list`, `integration_configure`, `integration_status`
+**Example agent usage:**
+```
+User: "Connect to my Slack workspace"
+Agent: calls integration_add(slack, "My Slack", { webhook_url: "..." })
+       → "✅ Connected slack: My Slack"
 
-**UI page:** `Integrations`
+User: "Send a message to #general saying the deploy is done"
+Agent: calls integration_list_accounts → finds Slack account ID
+       calls integration_execute(accountId, "send_message", { text: "🚀 Deploy done!" })
+       → "✅ slack: send_message succeeded"
+```
+
+**UI page:** `Integrations` — browse, connect, test, toggle, remove
 
 ---
 
-### 16. Social Media
+### 20. Social Media
 
 Multi-platform social media management — post text, images, and videos to Bluesky and X/Twitter.
 
@@ -616,7 +779,7 @@ Multi-platform social media management — post text, images, and videos to Blue
 
 ---
 
-### 17. Shopping Agent
+### 21. Shopping Agent
 
 Search for products across European e-commerce sites.
 
@@ -634,7 +797,7 @@ Search for products across European e-commerce sites.
 
 ---
 
-### 18. Messaging Platforms
+### 22. Messaging Platforms
 
 Nova connects to 5 messaging platforms as a bot. It can receive messages as agent prompts and send responses back.
 
@@ -650,7 +813,7 @@ Nova connects to 5 messaging platforms as a bot. It can receive messages as agen
 
 ---
 
-### 19. Email Integration
+### 23. Email Integration
 
 Full IMAP/SMTP email capabilities.
 
@@ -660,7 +823,7 @@ Full IMAP/SMTP email capabilities.
 
 ---
 
-### 20. Computer Use (Mouse/Keyboard)
+### 24. Computer Use (Mouse/Keyboard)
 
 Direct mouse and keyboard control (requires running on a real desktop).
 
@@ -668,7 +831,7 @@ Direct mouse and keyboard control (requires running on a real desktop).
 
 ---
 
-### 21. Diagram & Wiki Generation
+### 25. Diagram & Wiki Generation
 
 Generate architecture diagrams and project wikis.
 
@@ -676,7 +839,7 @@ Generate architecture diagrams and project wikis.
 
 ---
 
-### 22. Memory & Knowledge Base
+### 26. Memory & Knowledge Base
 
 Persistent storage across sessions. Agents save reports, users save notes.
 
@@ -690,7 +853,7 @@ Persistent storage across sessions. Agents save reports, users save notes.
 
 ---
 
-### 23. Code Execution
+### 27. Code Execution
 
 Safe code execution in isolated environments.
 
@@ -698,7 +861,7 @@ Safe code execution in isolated environments.
 
 ---
 
-### 24. Canvas & Excalidraw
+### 28. Canvas & Excalidraw
 
 Generate design mockups, wireframes, and Excalidraw diagrams.
 
@@ -792,9 +955,20 @@ Generate design mockups, wireframes, and Excalidraw diagrams.
 | 107 | `rag_list` | List uploaded RAG documents |
 | 108 | `rag_delete` | Delete a RAG document |
 | 109 | `integration_list` | List all integrations with status |
-| 110 | `integration_configure` | Configure an integration |
-| 111 | `integration_status` | Check integration health |
-| 112+ | Additional community tools | (_26 plugins, community skills_) |
+| 110 | `integration_add` | Connect a service integration |
+| 111 | `integration_list_accounts` | List connected integration accounts |
+| 112 | `integration_remove` | Remove a connected integration |
+| 113 | `integration_test` | Test a connected integration |
+| 114 | `integration_execute` | Execute action on integration (send Slack, create GitHub issue) |
+| 115 | `agent_memory_save` | Save a memory for the current agent |
+| 116 | `agent_memory_search` | Search through memories from previous runs |
+| 117 | `agent_memory_forget` | Remove a memory |
+| 118 | `agent_memory_summarize` | Get a summary of what this agent remembers |
+| 119 | `chamber_list` | List all agent chambers |
+| 120 | `chamber_status` | View chamber details |
+| 121 | `chamber_run` | Start a chamber discussion |
+| 122 | `workflow_run` | Execute a workflow |
+| 123+ | Additional community tools | (_26 plugins, community skills_) |
 
 ---
 
@@ -825,9 +999,11 @@ Providers auto-detect: set the corresponding `API_KEY` in `.env` and the provide
 |------|-------|-------------|
 | **Chat Assistant** | `/chat` | Main chat interface with full tool access |
 | **Agents** | `/agents` | Create, manage, and run autonomous agents + parallel workers |
+| **Agent Chambers** | `/chambers` | Multi-agent teams that collaborate via shared discussion |
+| **Workflows** | `/workflows` | Visual workflow builder — chain agents, tools, and conditions |
 | **Sessions** | `/sessions` | View past conversations + FTS5 search |
 | **Skills** | `/skills` | Browse, install, and publish skills (local + agentskills.io hub) |
-| **Cron** | `/cron` | Schedule recurring tasks with natural language — run now, pause/resume, history |
+| **Cron** | `/cron` | Schedule recurring tasks with natural language |
 | **Channels** | `/channels` | Manage Telegram, Discord, Slack, WhatsApp connections |
 | **Workspace** | `/workspace` | File system browser with file operations |
 | **Trading** | `/trading` | Crypto Hub V2 — dashboard, signals, alerts, portfolio with P&L |
@@ -844,7 +1020,7 @@ Providers auto-detect: set the corresponding `API_KEY` in `.env` and the provide
 | **Worker** | `/worker` | Background worker job management |
 | **Terminal** | `/terminal` | WebSocket-based terminal emulator |
 | **Config** | `/config` | Server configuration management |
-| **Analytics** | `/analytics` | Usage statistics and metrics |
+| **Analytics** | `/analytics` | Usage statistics, cost tracking, tool audit |
 | **Docs** | `/docs` | Built-in documentation viewer |
 | **Env** | `/env` | Environment variable manager |
 | **Logs** | `/logs` | Server log viewer |
@@ -881,13 +1057,42 @@ GET  /api/skills              — List all loaded skills
 GET  /api/providers           — List active LLM providers
 ```
 
+### Agent Memory
+```
+GET  /api/agents/:id/memory        — List agent memories (optional ?type=&q=)
+POST /api/agents/:id/memory        — Save a memory
+DELETE /api/agents/:id/memory/:id  — Delete a specific memory
+DELETE /api/agents/:id/memory      — Clear all memories for an agent
+```
+
+### Agent Chambers
+```
+GET  /api/chambers             — List all chambers
+POST /api/chambers             — Create chamber (name, task, agents, maxRounds)
+GET  /api/chambers/:id         — Get chamber details + messages
+POST /api/chambers/:id/run     — Start the chamber discussion
+POST /api/chambers/:id/stop    — Stop a running chamber
+DELETE /api/chambers/:id       — Delete a chamber
+```
+
+### Workflows
+```
+GET  /api/workflows             — List all workflows
+POST /api/workflows             — Create workflow (name, steps)
+GET  /api/workflows/:id         — Get workflow details
+PUT  /api/workflows/:id         — Update workflow
+DELETE /api/workflows/:id       — Delete workflow
+POST /api/workflows/:id/run     — Execute workflow
+```
+
+### Monitoring & Usage
+```
+GET  /api/usage                 — Usage summary (?since=&agentId=)
+GET  /api/usage/top             — Top 5 agents by cost
+GET  /api/usage/audit           — Tool call audit log (?taskId=&n=)
+```
+
 ### Dubbing
-```
-POST /api/dub/start           — Start dubbing job (multipart: video + language + sourceLanguage)
-GET  /api/dub/jobs            — List all dubbing jobs
-GET  /api/dub/jobs/:id        — Get job details (status, progress, logs)
-GET  /api/dub/download/:id    — Download dubbed MP4 output
-```
 
 ### Plugins
 ```
@@ -969,9 +1174,9 @@ NOVA_UI_DIR=./packages/ui/dist # UI static files
 NOVA_DB_PATH=./nova.db         # SQLite database path
 
 # ─── OPTIONAL AUTH ────────────────────────────────────────
-NOVA_AUTH_TOKEN=nv-...         # Require Bearer token for API access
-NOVA_JWT_SECRET=...            # Custom JWT secret
-NOVA_ENCRYPTION_KEY=...        # Encryption key for stored API keys
+NOVA_AUTH_TOKEN=nv-...         # Require Bearer token for ALL API endpoints
+#                                    When set, every API call needs:
+#                                    Authorization: Bearer nv-...
 
 # ─── MESSAGING PLATFORMS ──────────────────────────────────
 TELEGRAM_BOT_TOKEN=...

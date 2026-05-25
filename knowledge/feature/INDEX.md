@@ -1,2 +1,10 @@
 - [File Created: d:\nova\RAPORT_BLEDOW.md](2026-05-23-File Created_ d__nova_RAPORT_BLEDOW.md.md) — 2026-05-23 `[workspace, file-created, md]`
 - [File Created: bsky_login.py](2026-05-24-File Created_ bsky_login.py.md) — 2026-05-24 `[workspace, file-created, py]`
+- [File Created: nova/packages/core/src/safety/tool-audit.ts](2026-05-25-File Created_ nova_packages_core_src_safety_tool-audit.ts.md) — 2026-05-25 `[workspace, file-created, ts]`
+- [File Created: nova/packages/core/src/safety/circuit-breaker-tools.ts](2026-05-25-File Created_ nova_packages_core_src_safety_circuit-breaker-tools.ts.md) — 2026-05-25 `[workspace, file-created, ts]`
+- [File Created: nova/packages/core/src/agent/runner.ts](2026-05-25-File Created_ nova_packages_core_src_agent_runner.ts.md) — 2026-05-25 `[workspace, file-created, ts]`
+- [File Created: nova/packages/core/src/agent/runner.ts](2026-05-25-File Created_ nova_packages_core_src_agent_runner.ts.md) — 2026-05-25 `[workspace, file-created, ts]`
+- [File Created: nova/packages/core/src/safety/__tests__/circuit-breaker-tools.test.ts](2026-05-25-File Created_ nova_packages_core_src_safety___tests___circuit-breaker-tools.test.md) — 2026-05-25 `[workspace, file-created, ts]`
+- [File Created: nova/packages/core/src/safety/__tests__/tool-audit.test.ts](2026-05-25-File Created_ nova_packages_core_src_safety___tests___tool-audit.test.ts.md) — 2026-05-25 `[workspace, file-created, ts]`
+- [File Created: nova/packages/core/src/safety/index.ts](2026-05-25-File Created_ nova_packages_core_src_safety_index.ts.md) — 2026-05-25 `[workspace, file-created, ts]`
+- [File Created: nova/packages/core/src/safety/__tests__/circuit-breaker-tools.test.ts](2026-05-25-File Created_ nova_packages_core_src_safety___tests___circuit-breaker-tools.test.md) — 2026-05-25 `[workspace, file-created, ts]`

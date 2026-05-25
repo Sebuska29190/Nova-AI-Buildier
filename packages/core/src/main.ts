@@ -31,6 +31,11 @@ import { createRouter } from "./api/routes.ts";
 import { registry } from "./plugin/registry.ts";
 import { sessionManager } from "./session/manager.ts";
 import { agentStore } from "./agent/store.ts";
+import { agentMemory } from "./agent/memory.ts";
+import { chamberManager } from "./multi-agent/chamber.ts";
+import { workflowEngine } from "./workflow/engine.ts";
+import { usageTracker } from "./monitor/usage.ts";
+import { authManager } from "./auth/manager.ts";
 import { memoryStore } from "./memory/store.ts";
 import { loadProviderConfigs } from "./config/provider-config.ts";
 import "./search/web.ts"; // registers web_search tool
@@ -63,6 +68,28 @@ console.log("  ╚════════════════════�
 sessionManager.init(process.env.NOVA_DB_PATH);
 agentStore.init(process.env.NOVA_DB_PATH);
 memoryStore.init();
+agentMemory.init(process.env.NOVA_DB_PATH);
+chamberManager.init(process.env.NOVA_DB_PATH);
+workflowEngine.init(process.env.NOVA_DB_PATH);
+usageTracker.init(process.env.NOVA_DB_PATH);
+authManager.init();
+
+// ─── Set default workspace ─────────────────────────────────────
+import { workspaceManager } from "./workspace/manager.ts";
+if (!workspaceManager.getRoot()) {
+  workspaceManager.setRoot(process.cwd());
+  console.log(`  ✓ Default workspace set to: ${process.cwd()}`);
+}
+
+// ─── Auto-Loader: safety + monitored modules ───────────────────
+import("./autoloader.ts").then(({ loadModules }) => {
+  loadModules("safety").then((loaded) => {
+    if (loaded.length > 0) console.log(`  ✓ Auto-loaded safety modules: ${loaded.join(", ")}`);
+  }).catch(() => {});
+  loadModules("monitored").then((loaded) => {
+    if (loaded.length > 0) console.log(`  ✓ Auto-loaded monitored modules: ${loaded.join(", ")}`);
+  }).catch(() => {});
+});
 
 // Init Knowledge Base
 import { knowledgeBase } from "./knowledge/store.ts";

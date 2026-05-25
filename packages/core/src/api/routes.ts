@@ -33,6 +33,9 @@ import { kernel, agentFS, ledger } from "../kernel/index.ts";
 import { tmuxAvailable, listSessions as tmuxListSessions, createSession as tmuxCreateSession, killSession as tmuxKillSession, sendKeys as tmuxSendKeys, capturePane as tmuxCapturePane, getStatus as tmuxGetStatus } from "../tmux/tools.ts";
 import { listCommunityPlugins, getCommunityPlugin, installPlugin, uninstallPlugin, getPluginConfig, savePluginConfig } from "../plugin/community-plugins.ts";
 import { agentScheduler } from "../agent/scheduler.ts";
+import { chamberManager } from "../multi-agent/chamber.ts";
+import { workflowEngine } from "../workflow/engine.ts";
+import { usageTracker } from "../monitor/usage.ts";
 import { getAllProviderConfigs, saveProviderConfig, deleteProviderConfig, testProviderConnection } from "../config/provider-config.ts";
 import { logStore } from "../log/capture.ts";
 import { cronManager } from "../cron/manager.ts";
@@ -179,7 +182,7 @@ export function createRouter(): Hono {
       const { workspaceManager } = await import("../workspace/manager.ts");
       workspaceManager.setRoot(body.workspace);
     }
-    const result = await runAgent({ sessionId, message: body.message, modelRef: modelRef ?? "deepseek/deepseek-chat", thinkingLevel: body.thinkingLevel, systemPrompt: sysPrompt, tools: true });
+    const result = await runAgent({ sessionId, message: body.message, modelRef: modelRef ?? "deepseek/deepseek-chat", thinkingLevel: body.thinkingLevel, systemPrompt: sysPrompt, tools: true, agentId: body.agentId });
 
     // Reset agent status after response
     if (body.agentId) agentStore.update(body.agentId, { status: "ready" as any });
@@ -300,10 +303,45 @@ Return valid JSON only (no markdown, no code fences):
       const { workspaceManager } = await import("../workspace/manager.ts");
       workspaceManager.setRoot(body.path);
       return c.json({ status: "ok", workspace: body.path });
-    } catch (e: any) {
-      return c.json({ error: e.message }, 500);
-    }
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
   });
+
+  // ─── Agent Memory ──────────────────────────────────────────
+  app.get("/api/agents/:id/memory", async (c) => {
+    try {
+      const { agentMemory } = await import("../agent/memory.ts");
+      const type = c.req.query("type") as any;
+      const query = c.req.query("q");
+      const memories = agentMemory.search(c.req.param("id"), query, type, undefined, 100);
+      return c.json({ memories, total: agentMemory.count(c.req.param("id")) });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/agents/:id/memory", async (c) => {
+    try {
+      const { agentMemory } = await import("../agent/memory.ts");
+      const body = await c.req.json<{ content: string; type: string; importance?: number; tags?: string }>();
+      if (!body.content || !body.type) return c.json({ error: "content and type required" }, 400);
+      const memory = agentMemory.add(c.req.param("id"), body.type as any, body.content, (body.importance || 3) as any, (body.tags || "").split(",").map((t) => t.trim()).filter(Boolean));
+      return c.json({ memory }, 201);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.delete("/api/agents/:id/memory/:memoryId", async (c) => {
+    try {
+      const { agentMemory } = await import("../agent/memory.ts");
+      return c.json({ deleted: agentMemory.forget(c.req.param("memoryId")) });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.delete("/api/agents/:id/memory", async (c) => {
+    try {
+      const { agentMemory } = await import("../agent/memory.ts");
+      const count = agentMemory.forgetByAgent(c.req.param("id"));
+      return c.json({ deleted: count });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
   app.delete("/api/agents/:id", (c) => {
     const ok = agentStore.delete(c.req.param("id"));
     if (!ok) return c.json({ error: "Agent not found" }, 404);
@@ -323,6 +361,112 @@ Return valid JSON only (no markdown, no code fences):
       await agentScheduler.stopAgent(c.req.param("id"));
       return c.json({ status: "stopped" });
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // ─── Agent Chambers ──────────────────────────────────────────
+  app.get("/api/chambers", (c) => {
+    try {
+      const chambers = chamberManager.list();
+      return c.json({ chambers });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.get("/api/chambers/:id", (c) => {
+    try {
+      const chamber = chamberManager.get(c.req.param("id"));
+      if (!chamber) return c.json({ error: "Chamber not found" }, 404);
+      const messages = chamberManager.getMessages(c.req.param("id"), 500);
+      return c.json({ chamber, messages });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/chambers", async (c) => {
+    try {
+      const body = await c.req.json<{ name: string; task: string; agents: { agentId: string; role: string; order: number }[]; maxRounds?: number }>();
+      if (!body.name || !body.task || !body.agents?.length) return c.json({ error: "name, task, and agents required" }, 400);
+      const chamber = chamberManager.create(body.name, body.task, body.agents, body.maxRounds);
+      return c.json({ chamber }, 201);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/chambers/:id/run", async (c) => {
+    try {
+      const result = await chamberManager.runRoom(c.req.param("id"));
+      return c.json(result);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/chambers/:id/stop", (c) => {
+    try {
+      return c.json({ stopped: chamberManager.stopRoom(c.req.param("id")) });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.delete("/api/chambers/:id", (c) => {
+    try {
+      return c.json({ deleted: chamberManager.delete(c.req.param("id")) });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.delete("/api/chambers/:id", (c) => {
+    try {
+      return c.json({ deleted: chamberManager.delete(c.req.param("id")) });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // ─── Workflows ──────────────────────────────────────────────
+  app.get("/api/workflows", (c) => {
+    try { return c.json({ workflows: workflowEngine.list() }); }
+    catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.post("/api/workflows", async (c) => {
+    try {
+      const b = await c.req.json<{ name: string; description?: string; steps: any[] }>();
+      return c.json({ workflow: workflowEngine.create(b.name, b.description || "", b.steps) }, 201);
+    } catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.get("/api/workflows/:id", (c) => {
+    try { const w = workflowEngine.get(c.req.param("id")); if (!w) return c.json({ error: "Not found" }, 404); return c.json({ workflow: w }); }
+    catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.put("/api/workflows/:id", async (c) => {
+    try { const b = await c.req.json(); return c.json({ updated: workflowEngine.update(c.req.param("id"), b) }); }
+    catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.delete("/api/workflows/:id", (c) => {
+    try { return c.json({ deleted: workflowEngine.delete(c.req.param("id")) }); }
+    catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.post("/api/workflows/:id/run", async (c) => {
+    try { return c.json(await workflowEngine.execute(c.req.param("id"))); }
+    catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/workflows/:id/run", async (c) => {
+    try { return c.json(await workflowEngine.execute(c.req.param("id"))); }
+    catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // ─── Monitoring ──────────────────────────────────────────────
+  app.get("/api/usage", (c) => {
+    try {
+      const since = c.req.query("since");
+      const agentId = c.req.query("agentId");
+      return c.json(usageTracker.summarize(since, agentId));
+    } catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.get("/api/usage/top", (c) => {
+    try { const since = c.req.query("since"); return c.json({ top: usageTracker.summarize(since).topAgents }); }
+    catch (e) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+  app.get("/api/usage/audit", async (c) => {
+    try {
+      const { toolAudit } = await import("../safety/tool-audit.ts");
+      const taskId = c.req.query("taskId");
+      const n = parseInt(c.req.query("n") || "20", 10);
+      const entries = taskId ? toolAudit.getEntries(taskId) : toolAudit.getRecent(n);
+      return c.json({ entries, stats: toolAudit.getStats() });
+    } catch (e) { return c.json({ error: safeMessage(e) }, 400); }
   });
 
   // Agent files

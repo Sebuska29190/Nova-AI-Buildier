@@ -32,6 +32,8 @@ import { EditorPage } from "./routes/EditorPage";
 import { SocialPage } from "./routes/SocialPage";
 import { IntegrationsPage } from "./routes/IntegrationsPage";
 import { RagPage } from "./routes/RagPage";
+import { ChambersPage } from "./routes/ChambersPage";
+import { WorkflowsPage } from "./routes/WorkflowsPage";
 
 // Page component map
 const pages: Record<string, React.ComponentType<any>> = {
@@ -60,10 +62,12 @@ const pages: Record<string, React.ComponentType<any>> = {
   settings: ConfigPage,
   apikeys: EnvPage,
   editor: EditorPage,
-  social: SocialPage,
-  integrations: IntegrationsPage,
-  rag: RagPage,
-  tools: WorkspacePage,
+  "social": SocialPage,
+  "integrations": IntegrationsPage,
+  "rag": RagPage,
+  "chambers": ChambersPage,
+  "workflows": WorkflowsPage,
+  "tools": WorkspacePage,
 };
 
 function AppContent() {

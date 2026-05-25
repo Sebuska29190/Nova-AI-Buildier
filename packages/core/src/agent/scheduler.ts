@@ -48,7 +48,9 @@ class AgentScheduler {
     const { workspaceManager } = await import("../workspace/manager.ts");
     const workspaceContext = opts?.workspace
       ? `\n\n## Workspace\nYou have been assigned this workspace folder:\n\`${opts.workspace}\`\n\nUse workspace tools to explore, read, and write files in this folder.`
-      : "\n\n**Note:** No workspace folder is set. If you need to access files, ask the user to set one.";
+      : workspaceManager.getRoot()
+        ? `\n\n## Workspace\nYour workspace is \`${workspaceManager.getRoot()}\`.\nUse workspace tools to explore and modify files.`
+        : "\n\n**Note:** No workspace folder is set. If you need to access files, ask the user to set one.";
 
     const runId = randomUUID().slice(0, 8);
     const sessionId = sessionManager.createSession(agent.modelRef, {
@@ -82,6 +84,7 @@ class AgentScheduler {
           skills: agent.skills,
           signal: abortController.signal,
           runId,
+          agentId,
         });
 
         // Update job status

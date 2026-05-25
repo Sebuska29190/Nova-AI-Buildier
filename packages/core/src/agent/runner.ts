@@ -11,6 +11,13 @@ import { checkQuota } from "../quota.ts";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { loadSkills } from "../skill/loader.ts";
+import { agentMemory } from "./memory.ts";
+import { toolBreaker } from "../safety/circuit-breaker-tools.ts";
+import { toolAudit } from "../safety/tool-audit.ts";
+import { usageTracker } from "../monitor/usage.ts";
+
+// Session → Agent mapping for memory tools
+export const sessionAgentMap = new Map<string, string>();
 
 // Cache dla wydajności — TTL 30s
 let _rulesCache: string | null = null;
@@ -30,6 +37,7 @@ export interface RunParams {
   fallbacks?: string[];
   signal?: AbortSignal;
   runId?: string;
+  agentId?: string; // Agent ID for persistent memory
 }
 
 export interface RunResult {
@@ -90,6 +98,24 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
     messages.push({ role: "system", content: finalSystemPrompt });
   }
 
+  // ─── Current date/time injection ─────────────────────────────
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  messages.push({
+    role: "system",
+    content: `\n## Current Date & Time\nToday is **${dateStr}**, current time is **${timeStr}**.\nYour knowledge cutoff is earlier than today — always use the current date for any time-sensitive information, news, prices, or events.`,
+  });
+
+  // ─── Agent Persistent Memory ──────────────────────────────────
+  if (params.agentId) {
+    sessionAgentMap.set(params.sessionId, params.agentId);
+    const memoryBlock = agentMemory.injectMemory(params.agentId);
+    if (memoryBlock) {
+      messages.push({ role: "system", content: memoryBlock });
+    }
+  }
+
   // Rebuild transcript into API messages
   // Skip tool-related entries (assistant with tool_calls and tool results) since
   // they are ephemeral — already processed in previous requests. Only keep
@@ -137,6 +163,12 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
     try {
       const result = await toolLoop(params, ctx);
       breaker.recordSuccess();
+
+      // ─── Post-run memory consolidation ────────────────────────
+      if (params.agentId) {
+        agentMemory.consolidateRun(params.agentId, result.text, params.runId || result.sessionId).catch(() => {});
+      }
+
       return result;
     } catch (e: unknown) {
       const classified = classifyError(e, providerId);
@@ -146,6 +178,10 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
         return { sessionId: params.sessionId, text: `Error: ${safeMessage(e)}`, modelRef, usage: { input: 0, output: 0 } };
       }
       continue;
+    } finally {
+      if (params.agentId) {
+        sessionAgentMap.delete(params.sessionId);
+      }
     }
   }
   throw new Error("All models failed");
@@ -158,6 +194,11 @@ function thisRole(role: string, content: string, toolCallId?: string): AgentMess
 }
 
 async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: AgentMessage[]; signal?: AbortSignal; thinkingLevel?: string; tools: { type: "function"; function: { name: string; description?: string; parameters: Record<string, unknown> } }[] }): Promise<RunResult> {
+  // ─── Safety Middleware initialization ──────────────────────────
+  const taskId = params.sessionId;
+  const agentId = params.agentId || "default";
+  toolBreaker.initTask(taskId);
+
   const seenTools = new Set<string>();
   const fileMutations: { action: string; path: string; detail: string }[] = [];
 
@@ -259,11 +300,44 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
         ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: resultText.slice(0, 10000), name: tc.function.name });
         sessionManager.append(params.sessionId, "tool", resultText.slice(0, 10000), tc.id, tc.function.name);
         emitEvent({ type: "event", kind: "tool_result", sessionId: params.sessionId, data: { toolCallId: tc.id } });
+
+        // ─── Audit & Usage Logging ──────────────────────────────
+        const agentId = sessionAgentMap.get(params.sessionId);
+        toolAudit.record({
+          taskId: params.runId || params.sessionId,
+          agentId: agentId || "unknown",
+          toolName: tc.function.name,
+          paramsHash: toolAudit.hashParams(parsedArgs as Record<string, unknown>),
+          resultPreview: resultText.slice(0, 200),
+          durationMs: 0,
+          success: true,
+          iteration,
+        });
+        usageTracker.log({
+          agentId: agentId || undefined,
+          sessionId: params.sessionId,
+          modelRef: params.modelRef,
+          action: "tool_call",
+          durationMs: 0,
+        });
       } catch (e: unknown) {
         const errMsg = `Error executing ${tc.function.name}: ${safeMessage(e)}`;
         console.error(`[toolLoop] Tool execution error: ${errMsg}`);
         ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: errMsg, name: tc.function.name });
         sessionManager.append(params.sessionId, "tool", errMsg, tc.id, tc.function.name);
+
+        // ─── Audit Failure ──────────────────────────────────────
+        const agentId = sessionAgentMap.get(params.sessionId);
+        toolAudit.record({
+          taskId: params.runId || params.sessionId,
+          agentId: agentId || "unknown",
+          toolName: tc.function.name,
+          paramsHash: toolAudit.hashParams(parsedArgs as Record<string, unknown>),
+          resultPreview: errMsg.slice(0, 200),
+          durationMs: 0,
+          success: false,
+          iteration,
+        });
       }
     }
 
