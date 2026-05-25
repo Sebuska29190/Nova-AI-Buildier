@@ -1,11 +1,11 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.7.0-blue" alt="version">
-  <img src="https://img.shields.io/badge/license-MIT%2BAttribution-green" alt="license">
-  <img src="https://img.shields.io/badge/tools-120+-orange" alt="tools">
+  <img src="https://img.shields.io/badge/version-0.8.0-blue" alt="version">
+  <img src="https://img.shields.io/badge/tools-130+-orange" alt="tools">
   <img src="https://img.shields.io/badge/plugins-26-blueviolet" alt="plugins">
-  <img src="https://img.shields.io/badge/skills-26-yellow" alt="skills">
+  <img src="https://img.shields.io/badge/skills-64-yellow" alt="skills">
   <img src="https://img.shields.io/badge/providers-12-purple" alt="providers">
-  <img src="https://img.shields.io/badge/platforms-5-cyan" alt="platforms">
+  <img src="https://img.shields.io/badge/platforms-9-cyan" alt="platforms">
 </p>
 
 ---
@@ -35,6 +35,7 @@ Nova AI Builder is a self-hosted platform for building, training, and deploying 
 | **AI Dubbing** | ✅ Whisper + Edge TTS | ❌ | ❌ | ❌ |
 | **Crypto trading agent** | ✅ Built-in | ❌ | ❌ | ❌ |
 | **RAG Knowledge Base** | ✅ FTS5 + LLM answers | ❌ | ❌ | ❌ |
+| **Tool Analytics Dashboard** | ✅ Usage + audit metrics | ❌ | ❌ | ❌ |
 | **Integrations Hub** | ✅ 30+ services | ❌ | ❌ | ❌ |
 | **Social Media** | ✅ Bluesky, X/Twitter | ❌ | ❌ | ❌ |
 | **API Key Auth** | ✅ Optional Bearer token | ❌ | ❌ | ❌ |
@@ -758,24 +759,25 @@ Agent: calls integration_list_accounts → finds Slack account ID
 
 ### 20. Social Media
 
-Multi-platform social media management — post text, images, and videos to Bluesky and X/Twitter.
+Multi-platform social media management — compose, publish, and manage accounts. Supports two auth methods: **API credentials** (Bluesky, X/Twitter) and **browser automation** (TikTok, Instagram, YouTube, LinkedIn, Facebook, Reddit, Threads).
 
 **Capabilities:**
-- **Bluesky** — post text updates with news automation (cron-scheduled RSS → AI → post)
-- **X/Twitter** — search recent tweets
-- **Multi-account** — manage multiple Bluesky accounts
-- **Scheduled posting** — cron-driven automated content publishing
-- **Deduplication** — prevents reposting identical content
+- **Compose & Publish** — write once, post to multiple platforms simultaneously
+- **Bluesky API** — post via App Password (no browser needed) with cron-scheduled news automation
+- **X/Twitter API** — post via Bearer Token
+- **Browser platforms** — login once via Chrome profile, cookies saved for future posts
+- **Account status tracking** — see pending / connected / error per account
+- **Post history** — local log of all published posts with status per platform
 
-**How it works:**
-1. Configure Bluesky credentials: `BSKY_IDENTIFIER`, `BSKY_APP_PASSWORD` in `.env`
-2. Use `social_post` to publish updates
-3. Use `social_upload_video` to share video content
-4. Set up cron jobs for automated news posting
+**Auth methods:**
+| Method | Platforms |
+|--------|-----------|
+| **🔑 API Key** | Bluesky (handle + app password), X/Twitter (bearer token) |
+| **🌐 Browser** | TikTok, Instagram, YouTube, LinkedIn, Facebook, Reddit, Threads |
 
-**Key tools:** `social_list_accounts`, `social_add_account`, `social_post`, `social_upload_video`, `social_remove_account`, `x_search`
+**Key tools:** `social_list_accounts`, `social_add_account`, `social_post`, `social_upload_video`, `social_remove_account`, `integration_execute` (Bluesky posting)
 
-**UI page:** `Social`
+**UI page:** `Social` — compose panel, account management, post history
 
 ---
 
@@ -1021,6 +1023,7 @@ Providers auto-detect: set the corresponding `API_KEY` in `.env` and the provide
 | **Terminal** | `/terminal` | WebSocket-based terminal emulator |
 | **Config** | `/config` | Server configuration management |
 | **Analytics** | `/analytics` | Usage statistics, cost tracking, tool audit |
+| **Tool Analytics** | `/tools-analytics` | Tool call metrics, per-tool success rates, agent leaderboard |
 | **Docs** | `/docs` | Built-in documentation viewer |
 | **Env** | `/env` | Environment variable manager |
 | **Logs** | `/logs` | Server log viewer |
@@ -1090,9 +1093,19 @@ POST /api/workflows/:id/run     — Execute workflow
 GET  /api/usage                 — Usage summary (?since=&agentId=)
 GET  /api/usage/top             — Top 5 agents by cost
 GET  /api/usage/audit           — Tool call audit log (?taskId=&n=)
+GET  /api/analytics/dashboard   — Tool analytics: top tools, agent leaderboard, recent calls
 ```
 
-### Dubbing
+### Social Media
+```
+GET  /api/social/platforms                  — List available platforms with auth methods
+GET  /api/social/accounts                   — List connected accounts
+POST /api/social/accounts                   — Create account (name, platform, ?apiConfig)
+DELETE /api/social/accounts/:id             — Remove account
+POST /api/social/accounts/:id/connect       — Verify API credentials, update auth status
+POST /api/social/accounts/:id/launch        — Open browser for login
+POST /api/social/accounts/:id/verify        — Verify browser login (cookie check)
+```
 
 ### Plugins
 ```
@@ -1110,15 +1123,6 @@ GET  /api/integrations        — List all integrations with status
 POST /api/integrations/:id/toggle — Enable/disable an integration
 GET  /api/integrations/:id/config — Get integration config
 POST /api/integrations/:id/config — Save integration config
-```
-
-### Social Media
-```
-POST /api/social/post         — Post text to connected social accounts
-POST /api/social/upload-video — Upload video to social accounts
-GET  /api/social/accounts     — List connected accounts
-POST /api/social/accounts     — Add social account
-DELETE /api/social/accounts/:id — Remove social account
 ```
 
 ### RAG Knowledge Base
