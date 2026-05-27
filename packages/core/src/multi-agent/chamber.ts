@@ -175,8 +175,8 @@ class ChamberManager {
 
     this.db.run("UPDATE agent_chambers SET status = 'running' WHERE id = ?", [id]);
 
-    // Run in background — don't block the caller
-    const promise = (async () => {
+    // Run and wait for completion
+    const result = await (async () => {
       try {
         for (let round = 1; round <= chamber.maxRounds; round++) {
           if (abortCtrl.signal.aborted) throw new Error("Chamber cancelled");
@@ -265,10 +265,7 @@ class ChamberManager {
       }
     })();
 
-    // Don't await — return immediately, run in background
-    promise.catch(() => {});
-
-    return { success: true };
+    return result;
   }
 
   stopRoom(id: string): boolean {

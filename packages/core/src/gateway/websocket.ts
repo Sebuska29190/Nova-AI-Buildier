@@ -116,7 +116,7 @@ async function handleChatSend(client: WsClient, msg: any): Promise<void> {
   } catch (e: unknown) {
     client.send(JSON.stringify({ type: "error", runId, error: safeMessage(e) }));
   } finally {
-    unsubAssistant(); unsubThinking(); unsubTool(); unsubDone();
+    unsubAssistant(); unsubThinking(); unsubTool(); unsubDone(); unsubJobDone();
     abortControllers.delete(runId);
     clientRunIds.get(client.id)?.delete(runId);
   }

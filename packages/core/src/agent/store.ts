@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { mkdirSync, existsSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
+import { mkdirSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 
 export interface AgentConfig {
   id: string;
@@ -91,7 +91,7 @@ class AgentStore {
     const now = new Date().toISOString();
     this.db.run(
       "UPDATE agents SET name=?, description=?, model_ref=?, system_prompt=?, thinking_level=?, skills=?, emoji=?, status=?, updated_at=? WHERE id=?",
-      [merged.name ?? "", merged.description ?? "", merged.modelRef ?? "", merged.systemPrompt ?? "", merged.thinkingLevel ?? "", JSON.stringify(merged.skills ?? []), merged.emoji ?? "", merged.status ?? "idle", now, id],
+      [merged.name ?? "", merged.description ?? "", merged.modelRef ?? "", merged.systemPrompt ?? "", merged.thinkingLevel ?? "", JSON.stringify(merged.skills ?? []), merged.emoji ?? "", merged.status ?? "ready", now, id],
     );
 
     if (params.systemPrompt !== undefined) {

@@ -25,3 +25,14 @@
 - [Workspace Set: D:\nova](2026-05-24-Workspace Set_ D__nova.md) — 2026-05-24 `[workspace, filesystem]`
 - [Workspace Set: D:\nova\video_output\job_mpju4ohw](2026-05-24-Workspace Set_ D__nova_video_output_job_mpju4ohw.md) — 2026-05-24 `[workspace, filesystem]`
 - [Workspace Set: D:\](2026-05-25-Workspace Set_ D__.md) — 2026-05-25 `[workspace, filesystem]`
+- [Workspace Set: D:\AetherVis](2026-05-25-Workspace Set_ D__AetherVis.md) — 2026-05-25 `[workspace, filesystem]`
+- [Workspace Set: D:\AetherVis](2026-05-25-Workspace Set_ D__AetherVis.md) — 2026-05-25 `[workspace, filesystem]`
+- [Workspace Set: D:\AetherVis](2026-05-25-Workspace Set_ D__AetherVis.md) — 2026-05-25 `[workspace, filesystem]`
+- [Workspace Set: D:\AetherVis](2026-05-25-Workspace Set_ D__AetherVis.md) — 2026-05-25 `[workspace, filesystem]`
+- [Workspace Set: C:\Users\Domowy\Downloads](2026-05-26-Workspace Set_ C__Users_Domowy_Downloads.md) — 2026-05-26 `[workspace, filesystem]`
+- [Workspace Set: D:\home\user](2026-05-26-Workspace Set_ D__home_user.md) — 2026-05-26 `[workspace, filesystem]`
+- [Workspace Set: D:\home\user\baza_prawnicza](2026-05-26-Workspace Set_ D__home_user_baza_prawnicza.md) — 2026-05-26 `[workspace, filesystem]`
+- [Workspace Set: D:\home\user\baza_prawnicza](2026-05-26-Workspace Set_ D__home_user_baza_prawnicza.md) — 2026-05-26 `[workspace, filesystem]`
+- [Workspace Set: D:\nova](2026-05-26-Workspace Set_ D__nova.md) — 2026-05-26 `[workspace, filesystem]`
+- [Workspace Set: D:\nova](2026-05-26-Workspace Set_ D__nova.md) — 2026-05-26 `[workspace, filesystem]`
+- [Workspace Set: D:\Users\cheetahclaws\Desktop\baza_prawnicza_saos](2026-05-26-Workspace Set_ D__Users_cheetahclaws_Desktop_baza_prawnicza_saos.md) — 2026-05-26 `[workspace, filesystem]`

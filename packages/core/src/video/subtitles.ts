@@ -26,8 +26,7 @@ function splitSubtitleChunks(text: string, maxWords = 8, maxCjkChars = 18): stri
 
 function audioDurationFast(filePath: string): number {
   try {
-    const ff = process.env.FFMPEG_PATH || "C:\\Windows\\system32\\ffmpeg.exe";
-    if (!process.env.FFMPEG_PATH) process.env.FFMPEG_PATH = ff;
+    const ff = process.env.FFMPEG_PATH || "ffmpeg";
     const out = execSync(`"${ff}" -i "${filePath}" -f null - 2>&1`, { encoding: "utf-8", timeout: 10000, windowsHide: true, shell: "cmd.exe" });
     const m = out.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/);
     if (m) {

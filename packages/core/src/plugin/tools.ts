@@ -502,11 +502,11 @@ registerTool({
     required: ["name", "systemPrompt", "message"],
     additionalProperties: false,
   },
-  handler: async (params: { name: string; systemPrompt: string; message: string; modelRef?: string }) => {
+  async execute(args: { name: string; systemPrompt: string; message: string; modelRef?: string }) {
     const { spawnSubAgent } = await import("../multi-agent/subagent.ts");
     const result = await spawnSubAgent(
-      { id: `sub-${params.name}-${Date.now()}`, name: params.name, systemPrompt: params.systemPrompt, modelRef: params.modelRef || "deepseek/deepseek-chat" },
-      params.message,
+      { id: `sub-${args.name}-${Date.now()}`, name: args.name, systemPrompt: args.systemPrompt, modelRef: args.modelRef || "deepseek/deepseek-chat" },
+      args.message,
     );
     return result || "(no response from sub-agent)";
   },

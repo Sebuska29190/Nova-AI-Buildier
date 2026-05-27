@@ -169,6 +169,15 @@ class IntegrationManager {
           ok = r.ok; msg = ok ? `Bot: ${(await r.json()).result?.username || "OK"}` : `HTTP ${r.status}`;
           break;
         }
+        case "youtube": {
+          const r = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&type=video&key=${acc.config.api_key}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          ok = r.ok;
+          msg = ok ? "YouTube Data API connected" : `HTTP ${r.status}`;
+          break;
+        }
         default:
           msg = "No test available for this service (config saved)";
           ok = true;
@@ -192,44 +201,414 @@ class IntegrationManager {
   }
 
   async executeAction(service: string, action: string, params: Record<string, any>, config: Record<string, string>): Promise<any> {
+    const $ = (url: string, opts?: any) => fetch(url, { signal: AbortSignal.timeout(15000), ...opts });
+
     switch (service) {
       case "slack":
       case "discord": {
         const r = await fetch(config.webhook_url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: params.text || params.message || "(empty)" }),
           signal: AbortSignal.timeout(15000),
         });
         if (!r.ok) throw new Error(`Webhook HTTP ${r.status}`);
         return { sent: true };
       }
+
       case "telegram": {
         const r = await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: config.chat_id, text: params.text || params.message || "(empty)", parse_mode: "HTML" }),
           signal: AbortSignal.timeout(15000),
         });
         if (!r.ok) throw new Error(`Telegram HTTP ${r.status}: ${await r.text()}`);
         return { sent: true };
       }
+
+      // ── Developer ──────────────────────────────────────────
+
       case "github": {
+        const h = { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json", "User-Agent": "Nova/1.0" };
         if (action === "create_issue") {
-          const r = await fetch(`https://api.github.com/repos/${params.repo}/issues`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json", "User-Agent": "Nova/1.0" },
-            body: JSON.stringify({ title: params.title, body: params.body || "" }),
-            signal: AbortSignal.timeout(15000),
-          });
+          const r = await $(`https://api.github.com/repos/${params.repo}/issues`, { method: "POST", headers: h, body: JSON.stringify({ title: params.title, body: params.body || "" }) });
           if (!r.ok) throw new Error(`GitHub HTTP ${r.status}`);
-          const data = await r.json();
-          return { url: data.html_url, number: data.number };
+          const d: any = await r.json();
+          return { url: d.html_url, number: d.number };
         }
-        throw new Error(`Unknown GitHub action: ${action}`);
+        if (action === "list_issues") {
+          const r = await $(`https://api.github.com/repos/${params.repo}/issues?state=${params.state || "open"}&per_page=${params.perPage || 10}`, { headers: h });
+          if (!r.ok) throw new Error(`GitHub HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { issues: d.map((i: any) => ({ number: i.number, title: i.title, state: i.state, url: i.html_url, labels: i.labels?.map((l: any) => l.name) })) };
+        }
+        if (action === "list_repos") {
+          const r = await $(`https://api.github.com/user/repos?per_page=${params.perPage || 30}&sort=updated`, { headers: h });
+          if (!r.ok) throw new Error(`GitHub HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { repos: d.map((r: any) => ({ name: r.full_name, url: r.html_url, private: r.private, language: r.language, stars: r.stargazers_count })) };
+        }
+        throw new Error(`Unknown GitHub action: ${action} (available: create_issue, list_issues, list_repos)`);
       }
+
+      case "gitlab": {
+        const h = { "PRIVATE-TOKEN": config.token, "Content-Type": "application/json" };
+        const base = config.url || "https://gitlab.com";
+        if (action === "list_projects") {
+          const r = await $(`${base}/api/v4/projects?per_page=${params.perPage || 20}&membership=true&order_by=updated_at`, { headers: h });
+          if (!r.ok) throw new Error(`GitLab HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { projects: d.map((p: any) => ({ id: p.id, name: p.path_with_namespace, url: p.web_url, visibility: p.visibility })) };
+        }
+        if (action === "create_issue") {
+          const r = await $(`${base}/api/v4/projects/${encodeURIComponent(params.project)}/issues`, { method: "POST", headers: h, body: JSON.stringify({ title: params.title, description: params.description || "" }) });
+          if (!r.ok) throw new Error(`GitLab HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { url: d.web_url, iid: d.iid };
+        }
+        throw new Error(`Unknown GitLab action: ${action} (available: list_projects, create_issue)`);
+      }
+
+      case "bitbucket": {
+        const auth = Buffer.from(`${config.username}:${config.app_password}`).toString("base64");
+        const h = { Authorization: `Basic ${auth}`, "Content-Type": "application/json" };
+        if (action === "list_repos") {
+          const r = await $(`https://api.bitbucket.org/2.0/repositories/${config.username}?pagelen=${params.perPage || 10}&sort=-updated_on`, { headers: h });
+          if (!r.ok) throw new Error(`Bitbucket HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { repos: d.values?.map((r: any) => ({ name: r.full_name, url: r.links?.html?.href, language: r.language, private: r.is_private })) || [] };
+        }
+        throw new Error(`Unknown Bitbucket action: ${action} (available: list_repos)`);
+      }
+
+      case "supabase": {
+        const h = { apikey: config.service_key, Authorization: `Bearer ${config.service_key}`, "Content-Type": "application/json" };
+        const base = config.url;
+        if (action === "query") {
+          if (!params.table) throw new Error("table parameter required");
+          const r = await $(`${base}/rest/v1/${params.table}?select=${params.select || "*"}&limit=${params.limit || 50}`, { headers: h });
+          if (!r.ok) throw new Error(`Supabase HTTP ${r.status}`);
+          return { rows: await r.json() };
+        }
+        throw new Error(`Unknown Supabase action: ${action} (available: query)`);
+      }
+
+      // ── Productivity ───────────────────────────────────────
+
+      case "notion":
+      case "notion_db": {
+        const h = { Authorization: `Bearer ${config.api_key}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" };
+        if (action === "search") {
+          const r = await $("https://api.notion.com/v1/search", { method: "POST", headers: h, body: JSON.stringify({ query: params.query || "", page_size: params.perPage || 10 }) });
+          if (!r.ok) throw new Error(`Notion HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { results: d.results?.map((p: any) => ({ id: p.id, title: p.properties?.title?.title?.[0]?.plain_text || p.url || "(untitled)", url: p.url, type: p.object })) || [] };
+        }
+        if (action === "create_page") {
+          const r = await $("https://api.notion.com/v1/pages", { method: "POST", headers: h, body: JSON.stringify({ parent: { database_id: params.database_id || params.parent_id }, properties: params.properties || {} }) });
+          if (!r.ok) throw new Error(`Notion HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { url: d.url, id: d.id };
+        }
+        throw new Error(`Unknown Notion action: ${action} (available: search, create_page)`);
+      }
+
+      case "linear": {
+        const h = { Authorization: config.api_key, "Content-Type": "application/json" };
+        if (action === "list_issues") {
+          const r = await $("https://api.linear.app/graphql", { method: "POST", headers: h, body: JSON.stringify({ query: `{ issues(first: ${params.perPage || 20}) { nodes { id title identifier state { name } url priority } } }` }) });
+          if (!r.ok) throw new Error(`Linear HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { issues: d.data?.issues?.nodes?.map((i: any) => ({ id: i.identifier, title: i.title, state: i.state?.name, url: i.url, priority: i.priority })) || [] };
+        }
+        if (action === "create_issue") {
+          const r = await $("https://api.linear.app/graphql", { method: "POST", headers: h, body: JSON.stringify({ query: `mutation { issueCreate(input: { title: "${params.title.replace(/"/g, '\\"')}", teamId: "${params.teamId}" ${params.description ? `, description: "${params.description.replace(/"/g, '\\"')}"` : ""} }) { success issue { id identifier url } } }` }) });
+          if (!r.ok) throw new Error(`Linear HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { url: d.data?.issueCreate?.issue?.url, identifier: d.data?.issueCreate?.issue?.identifier };
+        }
+        throw new Error(`Unknown Linear action: ${action} (available: list_issues, create_issue)`);
+      }
+
+      case "jira": {
+        const base = `https://${config.domain}`;
+        const auth = Buffer.from(`${config.email}:${config.api_token}`).toString("base64");
+        const h = { Authorization: `Basic ${auth}`, "Content-Type": "application/json", "Accept": "application/json" };
+        if (action === "list_projects") {
+          const r = await $(`${base}/rest/api/3/project`, { headers: h });
+          if (!r.ok) throw new Error(`Jira HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { projects: d.map((p: any) => ({ key: p.key, name: p.name, url: `${base}/browse/${p.key}` })) };
+        }
+        if (action === "create_issue") {
+          const body = { fields: { project: { key: params.projectKey }, summary: params.summary, issuetype: { name: params.issueType || "Task" }, description: params.description ? { type: "doc", version: 1, content: [{ type: "paragraph", content: [{ type: "text", text: params.description }] }] } : undefined } };
+          const r = await $(`${base}/rest/api/3/issue`, { method: "POST", headers: h, body: JSON.stringify(body) });
+          if (!r.ok) throw new Error(`Jira HTTP ${r.status}: ${await r.text()}`);
+          const d: any = await r.json();
+          return { key: d.key, url: `${base}/browse/${d.key}` };
+        }
+        throw new Error(`Unknown Jira action: ${action} (available: list_projects, create_issue)`);
+      }
+
+      case "trello": {
+        const q = `key=${config.api_key}&token=${config.token}`;
+        if (action === "list_boards") {
+          const r = await $(`https://api.trello.com/1/members/me/boards?${q}&fields=name,url`);
+          if (!r.ok) throw new Error(`Trello HTTP ${r.status}`);
+          return { boards: await r.json() };
+        }
+        if (action === "list_lists") {
+          if (!params.boardId) throw new Error("boardId required");
+          const r = await $(`https://api.trello.com/1/boards/${params.boardId}/lists?${q}&fields=name`);
+          if (!r.ok) throw new Error(`Trello HTTP ${r.status}`);
+          return { lists: await r.json() };
+        }
+        if (action === "create_card") {
+          if (!params.listId || !params.name) throw new Error("listId and name required");
+          const r = await $(`https://api.trello.com/1/cards?${q}&idList=${params.listId}&name=${encodeURIComponent(params.name)}${params.desc ? `&desc=${encodeURIComponent(params.desc)}` : ""}`, { method: "POST" });
+          if (!r.ok) throw new Error(`Trello HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { url: d.url, id: d.id };
+        }
+        throw new Error(`Unknown Trello action: ${action} (available: list_boards, list_lists, create_card)`);
+      }
+
+      case "asana": {
+        const h = { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" };
+        if (action === "list_projects") {
+          const r = await $(`https://app.asana.com/api/1.0/projects?limit=${params.perPage || 20}&opt_fields=name,notes,color`, { headers: h });
+          if (!r.ok) throw new Error(`Asana HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { projects: d.data?.map((p: any) => ({ gid: p.gid, name: p.name, color: p.color })) || [] };
+        }
+        if (action === "create_task") {
+          if (!params.projects && !params.workspace) throw new Error("projects or workspace required");
+          const r = await $("https://app.asana.com/api/1.0/tasks", { method: "POST", headers: h, body: JSON.stringify({ data: { name: params.name, notes: params.notes || "", projects: params.projects ? [params.projects] : undefined, workspace: params.workspace } }) });
+          if (!r.ok) throw new Error(`Asana HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { gid: d.data?.gid, url: `https://app.asana.com/0/0/${d.data?.gid}` };
+        }
+        throw new Error(`Unknown Asana action: ${action} (available: list_projects, create_task)`);
+      }
+
+      // ── AI ─────────────────────────────────────────────────
+
+      case "openai": {
+        const h = { Authorization: `Bearer ${config.api_key}`, "Content-Type": "application/json" };
+        if (action === "list_models") {
+          const r = await $("https://api.openai.com/v1/models", { headers: h });
+          if (!r.ok) throw new Error(`OpenAI HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { models: d.data?.map((m: any) => m.id) || [] };
+        }
+        if (action === "chat") {
+          const r = await $("https://api.openai.com/v1/chat/completions", { method: "POST", headers: h, body: JSON.stringify({ model: params.model || "gpt-4o-mini", messages: params.messages || [{ role: "user", content: params.prompt }], max_tokens: params.maxTokens || 500 }) });
+          if (!r.ok) throw new Error(`OpenAI HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { text: d.choices?.[0]?.message?.content || "" };
+        }
+        throw new Error(`Unknown OpenAI action: ${action} (available: list_models, chat)`);
+      }
+
+      case "anthropic": {
+        const h = { "x-api-key": config.api_key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" };
+        if (action === "chat") {
+          const r = await $("https://api.anthropic.com/v1/messages", { method: "POST", headers: h, body: JSON.stringify({ model: params.model || "claude-sonnet-4-20250514", max_tokens: params.maxTokens || 500, messages: [{ role: "user", content: params.prompt || params.messages?.[0]?.content || "" }] }) });
+          if (!r.ok) throw new Error(`Anthropic HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { text: d.content?.[0]?.text || "" };
+        }
+        throw new Error(`Unknown Anthropic action: ${action} (available: chat)`);
+      }
+
+      case "stability": {
+        const h = { Authorization: `Bearer ${config.api_key}`, Accept: "application/json" };
+        if (action === "generate_image") {
+          const r = await $("https://api.stability.ai/v2beta/stable-image/generate/sd3", { method: "POST", headers: { ...h, "Content-Type": "multipart/form-data" }, body: (() => { const fd = new FormData(); fd.append("prompt", params.prompt); if (params.aspectRatio) fd.append("aspect_ratio", params.aspectRatio); if (params.negativePrompt) fd.append("negative_prompt", params.negativePrompt); return fd; })() });
+          if (!r.ok) throw new Error(`Stability AI HTTP ${r.status}`);
+          return { image: "generated (binary)", contentType: r.headers.get("content-type") };
+        }
+        throw new Error(`Unknown Stability action: ${action} (available: generate_image)`);
+      }
+
+      case "elevenlabs": {
+        const h = { "xi-api-key": config.api_key, "Content-Type": "application/json" };
+        if (action === "list_voices") {
+          const r = await $("https://api.elevenlabs.io/v1/voices", { headers: h });
+          if (!r.ok) throw new Error(`ElevenLabs HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { voices: d.voices?.map((v: any) => ({ id: v.voice_id, name: v.name, category: v.category })) || [] };
+        }
+        if (action === "text_to_speech") {
+          if (!params.voiceId) throw new Error("voiceId required");
+          const r = await $(`https://api.elevenlabs.io/v1/text-to-speech/${params.voiceId}`, { method: "POST", headers: h, body: JSON.stringify({ text: params.text, model_id: params.modelId || "eleven_multilingual_v2" }) });
+          if (!r.ok) throw new Error(`ElevenLabs HTTP ${r.status}`);
+          return { audio: "generated (binary stream)", contentType: r.headers.get("content-type") };
+        }
+        throw new Error(`Unknown ElevenLabs action: ${action} (available: list_voices, text_to_speech)`);
+      }
+
+      case "pinecone": {
+        const h = { "Api-Key": config.api_key, "Content-Type": "application/json", "X-Pinecone-API-Version": "2024-10" };
+        if (action === "list_indexes") {
+          const r = await $("https://api.pinecone.io/indexes", { headers: h });
+          if (!r.ok) throw new Error(`Pinecone HTTP ${r.status}`);
+          return { indexes: await r.json() };
+        }
+        throw new Error(`Unknown Pinecone action: ${action} (available: list_indexes)`);
+      }
+
+      // ── YouTube ─────────────────────────────────────────────
+
+      case "youtube": {
+        const key = config.api_key;
+        if (!key) throw new Error("YouTube API key not configured");
+        switch (action) {
+          case "search_videos": {
+            if (!params.query) throw new Error("query parameter required");
+            const r = await $(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(params.query)}&maxResults=${params.maxResults || 10}&type=video&key=${key}`);
+            if (!r.ok) throw new Error(`YouTube API HTTP ${r.status}`);
+            const data: any = await r.json();
+            return { videos: (data.items || []).map((v: any) => ({ id: v.id.videoId, title: v.snippet.title, channel: v.snippet.channelTitle, description: v.snippet.description?.slice(0, 200), publishedAt: v.snippet.publishedAt, url: `https://youtu.be/${v.id.videoId}`, thumbnail: v.snippet.thumbnails?.medium?.url })) };
+          }
+          case "get_video_stats": {
+            if (!params.videoId) throw new Error("videoId parameter required");
+            const r = await $(`https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${params.videoId}&key=${key}`);
+            if (!r.ok) throw new Error(`YouTube API HTTP ${r.status}`);
+            const data: any = await r.json();
+            const v = data.items?.[0];
+            if (!v) throw new Error("Video not found");
+            return { id: v.id, title: v.snippet.title, channel: v.snippet.channelTitle, views: parseInt(v.statistics.viewCount || "0"), likes: parseInt(v.statistics.likeCount || "0"), comments: parseInt(v.statistics.commentCount || "0"), url: `https://youtu.be/${v.id}` };
+          }
+          case "search_channels": {
+            if (!params.query) throw new Error("query parameter required");
+            const r = await $(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(params.query)}&maxResults=${params.maxResults || 5}&type=channel&key=${key}`);
+            if (!r.ok) throw new Error(`YouTube API HTTP ${r.status}`);
+            const data: any = await r.json();
+            return { channels: (data.items || []).map((c: any) => ({ id: c.snippet.channelId, title: c.snippet.channelTitle, description: c.snippet.description?.slice(0, 200), thumbnail: c.snippet.thumbnails?.medium?.url })) };
+          }
+          default: throw new Error(`Unknown YouTube action: ${action} (available: search_videos, get_video_stats, search_channels)`);
+        }
+      }
+
+      // ── Business ────────────────────────────────────────────
+
+      case "shopify": {
+        const base = `https://${config.store}.myshopify.com`;
+        const h = { "X-Shopify-Access-Token": config.access_token, "Content-Type": "application/json" };
+        if (action === "list_products") {
+          const r = await $(`${base}/admin/api/2024-01/products.json?limit=${params.limit || 20}`, { headers: h });
+          if (!r.ok) throw new Error(`Shopify HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { products: d.products?.map((p: any) => ({ id: p.id, title: p.title, status: p.status, variants: p.variants?.length, url: `https://${config.store}.myshopify.com/products/${p.handle}` })) || [] };
+        }
+        if (action === "list_orders") {
+          const r = await $(`${base}/admin/api/2024-01/orders.json?status=${params.status || "any"}&limit=${params.limit || 20}`, { headers: h });
+          if (!r.ok) throw new Error(`Shopify HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { orders: d.orders?.map((o: any) => ({ id: o.id, name: o.name, total: o.total_price, currency: o.currency, financialStatus: o.financial_status, createdAt: o.created_at })) || [] };
+        }
+        throw new Error(`Unknown Shopify action: ${action} (available: list_products, list_orders)`);
+      }
+
+      case "stripe": {
+        const h = { Authorization: `Bearer ${config.secret_key}`, "Content-Type": "application/x-www-form-urlencoded" };
+        if (action === "list_products") {
+          const r = await $(`https://api.stripe.com/v1/products?limit=${params.limit || 20}&active=true`, { headers: h });
+          if (!r.ok) throw new Error(`Stripe HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { products: d.data?.map((p: any) => ({ id: p.id, name: p.name, description: p.description, active: p.active })) || [] };
+        }
+        if (action === "list_charges") {
+          const r = await $(`https://api.stripe.com/v1/charges?limit=${params.limit || 20}`, { headers: h });
+          if (!r.ok) throw new Error(`Stripe HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { charges: d.data?.map((c: any) => ({ id: c.id, amount: c.amount / 100, currency: c.currency, status: c.status, created: new Date(c.created * 1000).toISOString(), description: c.description, receiptUrl: c.receipt_url })) || [] };
+        }
+        if (action === "list_customers") {
+          const r = await $(`https://api.stripe.com/v1/customers?limit=${params.limit || 20}`, { headers: h });
+          if (!r.ok) throw new Error(`Stripe HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { customers: d.data?.map((c: any) => ({ id: c.id, email: c.email, name: c.name, created: new Date(c.created * 1000).toISOString() })) || [] };
+        }
+        throw new Error(`Unknown Stripe action: ${action} (available: list_products, list_charges, list_customers)`);
+      }
+
+      case "hubspot": {
+        const h = { Authorization: `Bearer ${config.access_token}`, "Content-Type": "application/json" };
+        if (action === "list_contacts") {
+          const r = await $(`https://api.hubapi.com/crm/v3/objects/contacts?limit=${params.limit || 20}&properties=firstname,lastname,email,phone`, { headers: h });
+          if (!r.ok) throw new Error(`HubSpot HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { contacts: d.results?.map((c: any) => ({ id: c.id, firstName: c.properties?.firstname, lastName: c.properties?.lastname, email: c.properties?.email, phone: c.properties?.phone })) || [] };
+        }
+        if (action === "list_deals") {
+          const r = await $(`https://api.hubapi.com/crm/v3/objects/deals?limit=${params.limit || 20}&properties=dealname,amount,dealstage`, { headers: h });
+          if (!r.ok) throw new Error(`HubSpot HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { deals: d.results?.map((d: any) => ({ id: d.id, name: d.properties?.dealname, amount: d.properties?.amount, stage: d.properties?.dealstage })) || [] };
+        }
+        throw new Error(`Unknown HubSpot action: ${action} (available: list_contacts, list_deals)`);
+      }
+
+      // ── DevOps ──────────────────────────────────────────────
+
+      case "sentry": {
+        const h = { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" };
+        if (action === "list_issues") {
+          const r = await $(`https://${config.organization}.sentry.io/api/0/projects/${config.organization}/${params.project || "sentry"}/issues/?limit=${params.limit || 20}`, { headers: h });
+          if (!r.ok) throw new Error(`Sentry HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { issues: d.map((i: any) => ({ id: i.id, title: i.title, level: i.level, count: i.count, firstSeen: i.firstSeen, lastSeen: i.lastSeen, permalink: i.permalink })) };
+        }
+        throw new Error(`Unknown Sentry action: ${action} (available: list_issues)`);
+      }
+
+      case "datadog": {
+        const auth = Buffer.from(`${config.api_key}:${config.app_key}`).toString("base64");
+        const h = { "DD-API-KEY": config.api_key, "DD-APPLICATION-KEY": config.app_key, "Content-Type": "application/json" };
+        if (action === "list_monitors") {
+          const r = await $("https://api.datadoghq.com/api/v1/monitor?page_size=20", { headers: h });
+          if (!r.ok) throw new Error(`Datadog HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { monitors: d.map((m: any) => ({ id: m.id, name: m.name, type: m.type, status: m.overall_state })) };
+        }
+        throw new Error(`Unknown Datadog action: ${action} (available: list_monitors)`);
+      }
+
+      case "pagerduty": {
+        const h = { Authorization: `Token token=${config.api_key}`, Accept: "application/json" };
+        if (action === "list_incidents") {
+          const r = await $(`https://api.pagerduty.com/incidents?limit=${params.limit || 20}&statuses[]=${params.status || "triggered,acknowledged"}`, { headers: h });
+          if (!r.ok) throw new Error(`PagerDuty HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { incidents: d.incidents?.map((i: any) => ({ id: i.id, title: i.title, status: i.status, urgency: i.urgency, createdAt: i.created_at, url: i.html_url })) || [] };
+        }
+        throw new Error(`Unknown PagerDuty action: ${action} (available: list_incidents)`);
+      }
+
+      // ── Design ──────────────────────────────────────────────
+
+      case "figma": {
+        const h = { "X-Figma-Token": config.token };
+        if (action === "get_file") {
+          if (!params.fileKey) throw new Error("fileKey required");
+          const r = await $(`https://api.figma.com/v1/files/${params.fileKey}`, { headers: h });
+          if (!r.ok) throw new Error(`Figma HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { name: d.name, lastModified: d.lastModified, document: d.document?.children?.map((c: any) => ({ type: c.type, name: c.name, id: c.id })) || [] };
+        }
+        if (action === "get_images") {
+          if (!params.fileKey || !params.ids) throw new Error("fileKey and ids required");
+          const r = await $(`https://api.figma.com/v1/images/${params.fileKey}?ids=${params.ids}&format=png`, { headers: h });
+          if (!r.ok) throw new Error(`Figma HTTP ${r.status}`);
+          const d: any = await r.json();
+          return { images: d.images };
+        }
+        throw new Error(`Unknown Figma action: ${action} (available: get_file, get_images)`);
+      }
+
       default:
-        throw new Error(`Service ${service} action not implemented yet`);
+        throw new Error(`Service ${service} action not implemented yet. Available actions are being added per service.`);
     }
   }
 }
@@ -317,12 +696,12 @@ registerTool({
 
 registerTool({
   name: "integration_execute",
-  description: "Execute an action on a connected integration service — send Slack/Discord message, send Telegram message, create GitHub issue",
+  description: "Execute an action on a connected integration service — supports: Slack/Discord send_message, Telegram send_message, GitHub create_issue/list_issues/list_repos, GitLab list_projects/create_issue, Bitbucket list_repos, Supabase query, Notion search/create_page, Linear list_issues/create_issue, Jira list_projects/create_issue, Trello list_boards/list_lists/create_card, Asana list_projects/create_task, YouTube search_videos/get_video_stats/search_channels, OpenAI list_models/chat, Anthropic chat, Stability generate_image, ElevenLabs list_voices/text_to_speech, Pinecone list_indexes, Shopify list_products/list_orders, Stripe list_products/list_charges/list_customers, HubSpot list_contacts/list_deals, Sentry list_issues, Datadog list_monitors, PagerDuty list_incidents, Figma get_file/get_images",
   parameters: {
     type: "object",
     properties: {
       accountId: { type: "string", description: "Integration account ID (from integration_list_accounts)" },
-      action: { type: "string", description: "Action: send_message (Slack/Discord/Telegram), create_issue (GitHub)" },
+      action: { type: "string", description: "Action to execute. See description for full list per service." },
       params: { type: "object", description: "Parameters: { text/message: string } for send_message, { repo: string, title: string, body?: string } for create_issue" },
     },
     required: ["accountId", "action", "params"],

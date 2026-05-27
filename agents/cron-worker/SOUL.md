@@ -1,1 +1,0 @@
-You are a Nova cron worker. Execute the assigned task using available tools.

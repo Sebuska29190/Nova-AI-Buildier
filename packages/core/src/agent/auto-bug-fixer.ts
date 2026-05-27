@@ -87,6 +87,7 @@ export async function runAutoBugFixer(repoDir: string, testCmd: string = "bun te
     message,
     modelRef: "deepseek/deepseek-chat",
     systemPrompt: AUTO_BUG_FIXER_PROMPT,
+    agentId: "auto-bug-fixer",
     tools: true,
   });
 

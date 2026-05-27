@@ -1,8 +1,0 @@
-node_modules
-.git
-*.md
-test*
-.DS_Store
-.env
-bun.lock
-.gitignore

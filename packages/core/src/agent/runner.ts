@@ -15,6 +15,7 @@ import { agentMemory } from "./memory.ts";
 import { toolBreaker } from "../safety/circuit-breaker-tools.ts";
 import { toolAudit } from "../safety/tool-audit.ts";
 import { usageTracker } from "../monitor/usage.ts";
+import { workspaceManager } from "../workspace/manager.ts";
 
 // Session → Agent mapping for memory tools
 export const sessionAgentMap = new Map<string, string>();
@@ -169,6 +170,14 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
         agentMemory.consolidateRun(params.agentId, result.text, params.runId || result.sessionId).catch(() => {});
       }
 
+      // ─── Auto-create skill from complex tasks ────────────────
+      maybeCreateSkill(params.sessionId, params.modelRef).catch(() => {});
+
+      // Cleanup sessionAgentMap on success
+      if (params.agentId) {
+        sessionAgentMap.delete(params.sessionId);
+      }
+
       return result;
     } catch (e: unknown) {
       const classified = classifyError(e, providerId);
@@ -178,11 +187,12 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
         return { sessionId: params.sessionId, text: `Error: ${safeMessage(e)}`, modelRef, usage: { input: 0, output: 0 } };
       }
       continue;
-    } finally {
-      if (params.agentId) {
-        sessionAgentMap.delete(params.sessionId);
-      }
     }
+  }
+
+  // Cleanup sessionAgentMap AFTER all model candidates are exhausted
+  if (params.agentId) {
+    sessionAgentMap.delete(params.sessionId);
   }
   throw new Error("All models failed");
 }
@@ -223,7 +233,7 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
     return `\n\n📁 **File changes** (${fileMutations.length}):\n${lines.join("\n")}`;
   }
 
-  for (let iteration = 0; iteration < 25; iteration++) {
+  for (let iteration = 0; iteration < 50; iteration++) {
     let text = "";
     let toolCalls: ToolCall[] = [];
 
@@ -247,6 +257,17 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
     // Force a final summary after 10 iterations — model may keep calling tools without producing text
     if (iteration >= 10 && !text.trim()) {
       text = `[Analysis complete after ${iteration + 1} tool iterations]`;
+    }
+
+    // At iteration 20, inject a "wrap up" prompt to prevent hitting the limit
+    if (iteration === 20) {
+      const wrapUpMsg: AgentMessage = {
+        role: "user",
+        content: "You are approaching the iteration limit. Please provide your final answer/summary now based on what you've gathered so far. Do not call any more tools — just write the report directly."
+      };
+      ctx.messages.push(wrapUpMsg);
+      sessionManager.append(params.sessionId, "user", wrapUpMsg.content);
+      continue;
     }
 
     // Execute tools
@@ -274,11 +295,15 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
       try { parsedArgs = JSON.parse(tc.function.arguments || "{}"); } catch {}
 
       // Execute tool with timeout
+      const toolStartTime = Date.now();
       try {
+        let toolTimeout: ReturnType<typeof setTimeout> | undefined;
         const resultText = await Promise.race([
           tool.execute(parsedArgs, { sessionId: params.sessionId, signal: params.signal }),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error(`Tool ${tc.function.name} timed out after 60s`)), 60000)),
+          new Promise<string>((_, reject) => { toolTimeout = setTimeout(() => reject(new Error(`Tool ${tc.function.name} timed out after 60s`)), 60000); }),
         ]);
+        if (toolTimeout) clearTimeout(toolTimeout);
+        const toolDurationMs = Date.now() - toolStartTime;
         trackFileMutation(tc.function.name, parsedArgs, resultText);
 
         // LSP diagnostics after file writes
@@ -302,14 +327,14 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
         emitEvent({ type: "event", kind: "tool_result", sessionId: params.sessionId, data: { toolCallId: tc.id } });
 
         // ─── Audit & Usage Logging ──────────────────────────────
-        const agentId = sessionAgentMap.get(params.sessionId);
+        const auditAgentId = sessionAgentMap.get(params.sessionId) || agentId;
         toolAudit.record({
           taskId: params.runId || params.sessionId,
-          agentId: agentId || "unknown",
+          agentId: auditAgentId || "unknown",
           toolName: tc.function.name,
           paramsHash: toolAudit.hashParams(parsedArgs as Record<string, unknown>),
           resultPreview: resultText.slice(0, 200),
-          durationMs: 0,
+          durationMs: toolDurationMs,
           success: true,
           iteration,
         });
@@ -318,9 +343,10 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
           sessionId: params.sessionId,
           modelRef: params.modelRef,
           action: "tool_call",
-          durationMs: 0,
+          durationMs: toolDurationMs,
         });
       } catch (e: unknown) {
+        const toolDurationMs = Date.now() - toolStartTime;
         const errMsg = `Error executing ${tc.function.name}: ${safeMessage(e)}`;
         console.error(`[toolLoop] Tool execution error: ${errMsg}`);
         ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: errMsg, name: tc.function.name });
@@ -330,11 +356,11 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
         const agentId = sessionAgentMap.get(params.sessionId);
         toolAudit.record({
           taskId: params.runId || params.sessionId,
-          agentId: agentId || "unknown",
+          agentId: auditAgentId || "unknown",
           toolName: tc.function.name,
           paramsHash: toolAudit.hashParams(parsedArgs as Record<string, unknown>),
           resultPreview: errMsg.slice(0, 200),
-          durationMs: 0,
+          durationMs: toolDurationMs,
           success: false,
           iteration,
         });
@@ -356,7 +382,7 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
   const lastText = ctx.messages.filter(m => m.role === "assistant" && !m.content.startsWith("__TOOL_CALLS__")).pop()?.content || "";
   const allTools = [...seenTools];
   const summary = allTools.length > 0
-    ? `${lastText || `[Completed after 15 tool iterations]`}\n\n_Tools used: ${allTools.join(", ")}_`
+    ? `${lastText || `[Completed after tool iterations]`}\n\n_Tools used: ${allTools.join(", ")}_`
     : lastText || "Max attempts reached";
   const fullText = summary + buildMutationFooter();
   sessionManager.append(params.sessionId, "assistant", fullText);

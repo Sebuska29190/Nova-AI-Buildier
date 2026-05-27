@@ -147,15 +147,6 @@ class AgentScheduler {
           text: result.text?.slice(0, 500),
         });
 
-        // ✅ Zapis do global memory store
-        memoryStore.save(
-          `agent_report_${runId}`,
-          `# Agent Report: ${agent.name}\n\n**Run ID:** ${runId}\n**Task:** ${opts?.task || "Autonomous task"}\n\n${result.text || "(no output)"}`,
-          ["agent-report", agentId],
-          "project",
-          "medium",
-        );
-
         console.log(`[AgentScheduler] Agent "${agent.name}" completed background task (${runId})`);
 
         // Auto-create skill from successful complex tasks
@@ -225,7 +216,7 @@ class AgentScheduler {
 
     for (const job of jobs) {
       job.abortController.abort();
-      job.status = "completed";
+      job.status = "aborted";
       // Wait for the promise to settle
       try { await job.promise; } catch {}
       this.jobs.delete(job.runId);
@@ -244,7 +235,7 @@ class AgentScheduler {
     const interval = setInterval(async () => {
       if (this.isRunning(agentId)) return; // Skip if already running
       try {
-        await this.startAgent(agentId, task);
+        await this.startAgent(agentId, { task });
       } catch (e: unknown) {
         console.warn(`[AgentScheduler] Scheduled task for "${agentId}" failed: ${safeMessage(e)}`);
       }

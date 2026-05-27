@@ -222,7 +222,7 @@ if (uiDir && existsSync(uiDir)) {
 
 // Start
 const desiredPort = parseInt(process.env.NOVA_PORT ?? "4123", 10);
-const host = process.env.NOVA_HOST ?? "0.0.0.0";
+const host = process.env.NOVA_HOST ?? "127.0.0.1";
 
 // Try ports with automatic fallback — net.createServer test first to avoid hono crashes
 import { createServer as netCreateServer } from "node:net";

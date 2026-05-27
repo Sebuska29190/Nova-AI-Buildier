@@ -1,7 +1,9 @@
 import type { ProviderPlugin, ModelDef, StreamParams } from "@nova/sdk";
 
+const modelId = process.env.CUSTOM_MODEL_NAME ?? "mimo-v2.5";
+
 const models: ModelDef[] = [
-  { id: "custom-model", name: "Custom Model", contextWindow: 128_000, maxTokens: 8_192, cost: { input: 0, output: 0 } },
+  { id: modelId, name: `Custom (${modelId})`, contextWindow: 128_000, maxTokens: 16_384, cost: { input: 0, output: 0 } },
 ];
 
 const plugin: ProviderPlugin = {
@@ -19,7 +21,7 @@ const plugin: ProviderPlugin = {
     const key = process.env.CUSTOM_API_KEY ?? "";
 
     const body: Record<string, unknown> = {
-      model: p.model, messages: p.messages, stream: true, max_tokens: p.maxTokens ?? 4096,
+      model: modelId, messages: p.messages, stream: true, max_tokens: p.maxTokens ?? 4096,
     };
     if (p.tools?.length) body.tools = p.tools;
 

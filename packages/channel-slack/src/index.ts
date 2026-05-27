@@ -4,6 +4,7 @@ const API = "https://slack.com/api";
 export function createSlackPlugin(token: string, channelId: string) {
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let lastTs = "";
+  let msgHandler: ((msg: any) => Promise<void>) | null = null;
 
   const call = async (method: string, params?: Record<string, unknown>) => {
     const res = await fetch(`${API}/${method}`, {
@@ -16,6 +17,8 @@ export function createSlackPlugin(token: string, channelId: string) {
   return {
     id: "slack", name: "Slack",
     async start(bot: any) {
+      msgHandler = bot.onMessage.bind(bot);
+
       const msg: any = await call("conversations.history", { channel: channelId, limit: 1 });
       if (msg?.messages?.[0]) lastTs = msg.messages[0].ts;
       await bot.sendMessage(channelId, "🟢 Nova is online!");
@@ -26,9 +29,15 @@ export function createSlackPlugin(token: string, channelId: string) {
         for (const msg of result.messages.reverse()) {
           if (msg.bot_id || msg.subtype) continue;
           lastTs = msg.ts;
-          await bot.onMessage(async (m: any) => {
-            // Process through agent
-          });
+          if (msgHandler) {
+            await msgHandler({
+              id: msg.ts,
+              channelId: "slack",
+              userId: msg.user || "",
+              text: msg.text,
+              target: channelId,
+            });
+          }
         }
       }, 3000);
     },

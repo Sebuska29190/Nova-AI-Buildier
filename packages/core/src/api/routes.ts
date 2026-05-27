@@ -61,13 +61,31 @@ function authMiddleware(c: any, next: any) {
   return c.json({ error: "Unauthorized" }, 401);
 }
 
+// Simple in-memory rate limiter
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(key: string, maxRequests = 10, windowMs = 60000): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxRequests) return false;
+  entry.count++;
+  return true;
+}
+
 export function createRouter(): Hono {
   const app = new Hono();
-  app.use("*", cors());
+  app.use("*", cors({
+    origin: process.env.NOVA_CORS_ORIGIN || "http://localhost:4123",
+  }));
   app.use("*", authMiddleware);
 
-  // Auth
+  // Auth (rate limited: 10 requests per minute per IP)
   app.post("/api/auth/register", async (c) => {
+    const ip = c.req.header("x-forwarded-for") || "local";
+    if (!rateLimit(`register:${ip}`, 10, 60000)) return c.json({ error: "Too many requests" }, 429);
     const body = await c.req.json<{ username: string; password: string }>();
     if (!body.username || !body.password) return c.json({ error: "username and password required" }, 400);
     const token = registerUser(body.username, body.password);
@@ -75,6 +93,8 @@ export function createRouter(): Hono {
     return c.json({ token, username: body.username });
   });
   app.post("/api/auth/login", async (c) => {
+    const ip = c.req.header("x-forwarded-for") || "local";
+    if (!rateLimit(`login:${ip}`, 10, 60000)) return c.json({ error: "Too many requests" }, 429);
     const body = await c.req.json<{ username: string; password: string }>();
     const token = loginUser(body.username, body.password);
     if (!token) return c.json({ error: "Invalid credentials" }, 401);
@@ -87,7 +107,7 @@ export function createRouter(): Hono {
   });
 
   // Health
-  app.get("/health", (c) => c.json({ status: "ok", version: "0.3.0" }));
+  app.get("/health", (c) => c.json({ status: "ok", version: "0.6.1" }));
 
   // Models
   app.get("/v1/models", (c) => c.json({ object: "list", data: registry.listModels().map((m) => ({ id: m.ref, object: "model", owned_by: m.providerId })) }));
@@ -408,12 +428,6 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
   });
 
-  app.delete("/api/chambers/:id", (c) => {
-    try {
-      return c.json({ deleted: chamberManager.delete(c.req.param("id")) });
-    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
-  });
-
   // ─── Workflows ──────────────────────────────────────────────
   app.get("/api/workflows", (c) => {
     try { return c.json({ workflows: workflowEngine.list() }); }
@@ -437,11 +451,6 @@ Return valid JSON only (no markdown, no code fences):
     try { return c.json({ deleted: workflowEngine.delete(c.req.param("id")) }); }
     catch (e) { return c.json({ error: safeMessage(e) }, 400); }
   });
-  app.post("/api/workflows/:id/run", async (c) => {
-    try { return c.json(await workflowEngine.execute(c.req.param("id"))); }
-    catch (e) { return c.json({ error: safeMessage(e) }, 400); }
-  });
-
   app.post("/api/workflows/:id/run", async (c) => {
     try { return c.json(await workflowEngine.execute(c.req.param("id"))); }
     catch (e) { return c.json({ error: safeMessage(e) }, 400); }
@@ -545,7 +554,8 @@ Return valid JSON only (no markdown, no code fences):
       const body = await c.req.json<{ task: string; model?: string }>();
       const agent = agentStore.get(agentId);
       if (!agent) return c.json({ error: "Agent not found" }, 404);
-      const result = await runAgent(body.task, { agentId, model: body.model || agent.modelRef });
+      const s = sessionManager.createSession(body.model || agent.modelRef, {});
+      const result = await runAgent({ sessionId: s.id, message: body.task, modelRef: body.model || agent.modelRef, agentId, tools: true });
       return c.json({ result });
     } catch (e: any) {
       return c.json({ error: e.message }, 500);
@@ -928,27 +938,26 @@ Return valid JSON only (no markdown, no code fences):
 
   // Trading
   app.get("/api/trading/:symbol", async (c) => {
-    const result = await analyzeSymbol(c.req.param("symbol"));
+    const result = await cryptoHub.analyzeSymbol(c.req.param("symbol"));
     return c.json({ analysis: result });
   });
   app.get("/api/trading/:symbol/history", async (c) => {
-    const range = c.req.query("range") as any || "1mo";
-    const data = await getHistoricalData(c.req.param("symbol"), range);
+    const range = c.req.query("range") as any || "7";
+    const data = await cryptoHub.getPriceHistory(c.req.param("symbol"), range);
     return c.json({ symbol: c.req.param("symbol"), data });
   });
-  app.get("/api/trading/watchlist", (c) => {
-    return c.json({ watchlist: getWatchlist() });
+  app.get("/api/trading/watchlist", async (c) => {
+    return c.json({ watchlist: await cryptoHub.getWatchlist() });
   });
   app.post("/api/trading/watchlist", async (c) => {
     const body = await c.req.json<{ symbol: string; note?: string }>();
     if (!body.symbol) return c.json({ error: "symbol required" }, 400);
-    const entry = addToWatchlist(body.symbol, body.note);
+    const entry = await cryptoHub.addToWatchlist(body.symbol);
     return c.json({ entry }, 201);
   });
-  app.delete("/api/trading/watchlist/:symbol", (c) => {
-    const ok = removeFromWatchlist(c.req.param("symbol"));
-    if (!ok) return c.json({ error: "Symbol not in watchlist" }, 404);
-    return c.json({ status: "removed" });
+  app.delete("/api/trading/watchlist/:symbol", async (c) => {
+    const result = await cryptoHub.removeFromWatchlist(c.req.param("symbol"));
+    return c.json({ status: "removed", result });
   });
 
   // Brainstorm
@@ -1177,22 +1186,6 @@ Return valid JSON only (no markdown, no code fences):
   });
 
   // ─── Workspace API ────────────────────────────────────────────────────────
-  app.get("/api/workspace", (c) => {
-    const state = workspaceManager.getState();
-    if (!state) return c.json({ active: false });
-    return c.json({ active: true, ...state });
-  });
-
-  app.post("/api/workspace/set", async (c) => {
-    try {
-      const body = await c.req.json<{ path: string }>();
-      if (!body.path) return c.json({ error: "path is required" }, 400);
-      const ok = workspaceManager.setRoot(body.path);
-      if (!ok) return c.json({ error: "Failed to set workspace root" }, 400);
-      return c.json({ status: "ok", root: workspaceManager.getRoot() });
-    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
-  });
-
   app.post("/api/workspace/add-folder", async (c) => {
     try {
       const body = await c.req.json<{ path: string }>();

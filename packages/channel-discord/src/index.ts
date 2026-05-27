@@ -44,7 +44,7 @@ export function createDiscordPlugin(cfg: DiscordCfg): ChannelPlugin {
     name: "Discord",
 
     async start(bot: ChannelBot) {
-      msgHandler = async (m) => { await bot.onMessage(async (msg) => { if (msgHandler) await msgHandler(msg); }); };
+      msgHandler = bot.onMessage.bind(bot);
 
       // Fetch last message to start from
       const msgs: any = await api(cfg.token, "GET", `/channels/${cfg.channelId}/messages?limit=1`);

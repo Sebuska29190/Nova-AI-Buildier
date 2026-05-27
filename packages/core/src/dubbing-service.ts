@@ -47,12 +47,9 @@ function findPython(): string {
     if (p && existsSync(p)) { process.env.PYTHON_PATH = p; return p; }
   } catch {}
   // Fallback: common locations
-  const candidates = [
-    "C:\\Users\\Domowy\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe",
-    "C:\\Users\\Domowy\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
-    "C:\\Python313\\python.exe",
-    "C:\\Windows\\py.exe",
-  ];
+  const candidates = process.platform === "win32"
+    ? ["python.exe", "py.exe"]
+    : ["python3", "python"];
   for (const c of candidates) {
     if (existsSync(c)) { process.env.PYTHON_PATH = c; return c; }
   }
@@ -144,7 +141,7 @@ export function startDubbing(params: {
 }
 
 function runFFmpeg(label: string, args: string[], timeout = 120000): Promise<void> {
-  const ff = process.env.FFMPEG_PATH || "C:\\Windows\\system32\\ffmpeg.exe";
+  const ff = process.env.FFMPEG_PATH || "ffmpeg";
   if (!process.env.FFMPEG_PATH) process.env.FFMPEG_PATH = ff;
   const cmd = `"${ff}" ${args.map(a => `"${a}"`).join(" ")}`;
   console.log(`[ffmpeg][${label}] ${cmd.slice(0, 300)}`);
@@ -160,7 +157,7 @@ function runFFmpeg(label: string, args: string[], timeout = 120000): Promise<voi
 }
 
 async function getVideoInfo(videoPath: string): Promise<{ duration: number; width: number; height: number }> {
-  const ff = process.env.FFMPEG_PATH || "C:\\Windows\\system32\\ffmpeg.exe";
+  const ff = process.env.FFMPEG_PATH || "ffmpeg";
   try {
     const result = execSync(`"${ff}" -i "${videoPath}" -f null - 2>&1`, { timeout: 10000, windowsHide: true, encoding: "utf-8", maxBuffer: 1024 * 1024 });
     const err = result.toString();
@@ -185,15 +182,12 @@ async function runPipeline(job: DubJob, params: {
   const TTL = 120000;
 
   // Check FFmpeg
-  const ff = process.env.FFMPEG_PATH || "C:\\Windows\\system32\\ffmpeg.exe";
+  const ff = process.env.FFMPEG_PATH || "ffmpeg";
   try {
     await runFFmpeg("check", ["-version"], 5000);
     job.log.push(`✅ FFmpeg OK (${ff})`);
   } catch (e) {
-    throw new Error(`FFmpeg not found. You confirmed ffmpeg.exe is at C:\\Windows\\system32\\ffmpeg.exe\n` +
-      `Open PowerShell as Admin and run this ONCE:\n` +
-      `  [Environment]::SetEnvironmentVariable("FFMPEG_PATH", "C:\\Windows\\system32\\ffmpeg.exe", "Machine")\n` +
-      `Then CLOSE this terminal, open NEW one, and restart server.`);
+    throw new Error(`FFmpeg not found at "${ff}". Install ffmpeg and ensure it's in your PATH, or set the FFMPEG_PATH environment variable.`);
   }
 
   // Get video info
@@ -331,7 +325,7 @@ async function runPipeline(job: DubJob, params: {
       const subsSafe = join(workDir, "subs_burn.srt");
       writeFileSync(subsSafe, readFileSync(srtPath));
       // Use direct execSync with cwd=workDir to avoid drive-letter issues in filter path
-      const ff = process.env.FFMPEG_PATH || "C:\\Windows\\system32\\ffmpeg.exe";
+      const ff = process.env.FFMPEG_PATH || "ffmpeg";
       const burnCmd = `"${ff}" -y -i "${tempOut}" -vf "subtitles=subs_burn.srt:force_style='FontName=Arial,FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=1'" -c:a copy -c:v libx264 -crf 23 -preset fast "${outPath}"`;
       console.log(`[dub][burn] cmd: ${burnCmd.slice(0, 250)}`);
       execSync(burnCmd, { timeout: TTL * 2, windowsHide: true, cwd: workDir, stdio: "pipe", encoding: "utf-8", maxBuffer: 50 * 1024 * 1024 });
@@ -414,7 +408,7 @@ async function translate(text: string, from: string, to: string, model: string):
 
 // ── Audio Duration ───────────────────────────────────────────
 async function audioDuration(audioPath: string): Promise<number> {
-  const ff = process.env.FFMPEG_PATH || "C:\\Windows\\system32\\ffmpeg.exe";
+  const ff = process.env.FFMPEG_PATH || "ffmpeg";
   try {
     const result = execSync(`"${ff}" -i "${audioPath}" -f null - 2>&1`, { timeout: 10000, windowsHide: true, encoding: "utf-8" });
     const m = result.toString().match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/);

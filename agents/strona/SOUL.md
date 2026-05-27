@@ -1,1 +1,0 @@
-swtorz dla mnie strone internetowa typu blog , o ai , crypto i financach w 75% zautomatyzowana przez ai w tworzeniu artykulow , etc 

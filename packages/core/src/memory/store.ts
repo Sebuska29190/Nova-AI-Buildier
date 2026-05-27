@@ -49,7 +49,7 @@ class MemoryStore {
   save(name: string, content: string, tags: string[] = [], scope: "user" | "project" = "user", importance: "low" | "medium" | "high" = "medium"): MemoryEntry {
     const now = new Date().toISOString();
     const entry: MemoryEntry = {
-      id: randomUUID().slice(0, 8), name, content, tags, scope,
+      id: randomUUID(), name, content, tags, scope,
       createdAt: now, updatedAt: now, lastUsedAt: now, importance,
     };
     this.cache.set(entry.id, entry);

@@ -12,7 +12,7 @@ import { cors } from "hono/cors";
 import { registry } from "./plugin/registry.ts";
 import { runAgent } from "./agent/runner.ts";
 import { sessionManager } from "./session/manager.ts";
-import { emitEvent } from "./event-bus/index.ts";
+import { onEvent } from "./event-bus/index.ts";
 import { safeMessage } from "./errors.ts";
 
 const proxy = new Hono();
@@ -73,7 +73,7 @@ proxy.post("/v1/chat/completions", async (c) => {
           const send = (d: string) => ctrl.enqueue(enc.encode(`data: ${d}\n\n`));
           const runId = `proxy_${Date.now()}`;
 
-          const unsub = emitEvent("event", (e: any) => {
+          const unsub = onEvent("event", (e: any) => {
             if (e.kind === "assistant" && e.runId === runId && e.data?.text) {
               send(JSON.stringify({
                 id: `chatcmpl-${session.id}`,

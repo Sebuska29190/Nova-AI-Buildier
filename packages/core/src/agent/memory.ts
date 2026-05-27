@@ -135,7 +135,7 @@ class AgentMemoryManager {
     // Sentences containing: "learned", "discovered", "found that", "important", "remember"
     const indicators = /(learned|discovered|found\s+that|important|remember|key insight|lesson|warning|always|never|critical|note to self)/gi;
     const sentences = runSummary.match(/[^.!?\n]+[.!?]/g) || [runSummary];
-    const relevant = sentences.filter((s) => indicators.test(s));
+    const relevant = sentences.filter((s) => { indicators.lastIndex = 0; return indicators.test(s); });
 
     let saved = 0;
     for (const sentence of relevant) {
@@ -169,7 +169,8 @@ class AgentMemoryManager {
     const shorter = a.length < b.length ? a : b;
     const longer = a.length < b.length ? b : a;
     if (longer.length === 0) return 1.0;
-    const matches = shorter.split(" ").filter((w) => longer.includes(w)).length;
+    const longerLower = longer.toLowerCase();
+    const matches = shorter.toLowerCase().split(" ").filter((w) => longerLower.includes(w)).length;
     return matches / Math.max(shorter.split(" ").length, 1);
   }
 
