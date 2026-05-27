@@ -611,19 +611,67 @@ Multiple search backends: Brave Search API, DuckDuckGo, Google Custom Search, ar
 
 ### 15. Video Generator & Editor
 
-Full FFmpeg-based pipeline for automated video creation and editing.
+Full FFmpeg-based pipeline for automated video creation and editing. Generates complete videos from text prompts or custom scripts with AI-powered story generation, TTS voiceover, image generation, subtitles, and visual effects.
 
-**Capabilities:**
-- Generate videos from script (scenes, captions, images, music)
-- Add subtitles/overlays/captions
-- Trim, cut, concatenate clips
-- Apply speed effects, transitions
-- Add music/audio tracks
-- Rename output files
+**Pipeline:** Story (LLM) → TTS Audio → Subtitles (SRT) → AI Images → Transitions → Effects → Composition → Subtitle Burn → Output MP4
+
+**Animation Styles (16):**
+| Style | Description |
+|-------|-------------|
+| `ken-burns` | Classic pan + zoom on still images |
+| `zoom-in` / `zoom-out` | Continuous zoom |
+| `fade` | Fade in/out between clips |
+| `slide-left` / `slide-right` | Horizontal slide transitions |
+| `slide-up` / `slide-down` | Vertical slide transitions |
+| `rotate` | Slow rotation with zoom |
+| `random` | Randomly picks a style per clip |
+| `dolly-zoom` | Hitchcock effect — zoom in + pull back |
+| `sway` | Gentle handheld camera sway |
+| `parallax-deep` | Deep parallax with foreground/background shift |
+| `pulse` | Pulsating zoom synced to rhythm |
+| `rotate-zoom` | Spiral rotation zoom |
+| `shake` | Camera shake simulation |
+| `cinematic-pan` | Slow cinematic pan L→R |
+
+**Transitions (13):**
+| Transition | Description |
+|------------|-------------|
+| `cut` | Hard cut (default, fastest) |
+| `fade` | Cross-fade |
+| `dissolve` | Dissolve blend |
+| `wipe-left` / `wipe-right` | Horizontal wipe |
+| `wipe-up` / `wipe-down` | Vertical wipe |
+| `zoom-in` / `zoom-out` | Zoom transition |
+| `blur` | Blur transition |
+| `glitch-cut` | Glitch-style cut |
+| `light-leak` | Light leak overlay |
+| `random` | Random per clip pair |
+
+*Note: Transitions are applied for ≤4 clips. With more clips, falls back to hard cut for performance.*
+
+**Visual Effects (18):**
+`vignette`, `glitch`, `vhs`, `noise`, `blur_bg`, `sharpen`, `color_boost`, `cinematic_grade`, `lut_orange_teal`, `lens_flare`, `light_leak`, `bokeh`, `chromatic_aberration`, `film_burn`, `speed_ramp`, `mirror`, `thermal`, `neon_glow`
+
+**Subtitle Animations (5):**
+| Animation | Description |
+|-----------|-------------|
+| `static` | Standard subtitle burn (default) |
+| `typewriter` | Words appear one by one |
+| `word-fade` | Each word fades in sequentially |
+| `bounce-in` | Words slide up from below |
+| `highlight` | Words appear with highlight background |
+
+**Composition Modes (4):**
+| Mode | Description |
+|------|-------------|
+| `single` | Single video output (default) |
+| `picture-in-picture` | Main video + small inset overlay |
+| `split-screen` | Two videos side-by-side |
+| `grid` | 2×2 or 3×3 grid of video clips |
 
 **Key tools:** `video_generate`, `execute_video_plan`, `video_rename`, `analyze_video_clips`
 
-**UI page:** `Video` — preset-based video generation
+**UI page:** `Video` — preset-based video generation with animation, transition, effects, subtitle, and composition controls
 **UI page:** `Video Editor` — advanced scene-by-scene editing
 
 ---
