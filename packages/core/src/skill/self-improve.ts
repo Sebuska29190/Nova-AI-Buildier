@@ -73,12 +73,19 @@ Output ONLY the JSON object, no other text.`;
 
   try {
     const { piHarness } = await import("../harness/pi.ts");
+    const { registry } = await import("../plugin/registry.ts");
+
+    // Resolve provider from modelRef (e.g. "deepseek/deepseek-chat" -> providerId "deepseek")
+    const resolved = registry.resolveModel(modelRef);
+    const providerId = resolved?.providerId;
+
     const result = await piHarness.send({
       modelRef,
+      providerId,
       messages: [{ role: "user", content: analysisPrompt }],
       temperature: 0.3,
       maxTokens: 2000,
-    });
+    } as any);
 
     const text = result.text || "";
     // Extract JSON from response

@@ -8,7 +8,7 @@ import { safeFilename, VIDEO_LANGUAGES } from "./types.ts";
 import { generateStory } from "./story.ts";
 import { generateTTS } from "./tts.ts";
 import { textToSrt } from "./subtitles.ts";
-import { generateImages } from "./images.ts";
+import { generateImages, generateVideoClips } from "./images.ts";
 import { safeMessage } from "../errors.ts";
 import { createVideo, audioDuration, ffmpegPath } from "./assembly.ts";
 import { mixWithBackgroundMusic } from "../media/music.ts";
@@ -154,16 +154,23 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
   console.log(`[video] Language: ${lang}, storyInstr: "${storyInstr}", ttsVoice: ${params.edgeVoice || langEntry?.edgeVoice || "en-US-GuyNeural"}`);
 
   try {
+    // ── Music Video Mode: skip story/TTS, use uploaded audio as-is ──────
+    const isMusicVideo = params.musicVideoMode === true && params.audioPath && existsSync(params.audioPath);
+    if (isMusicVideo) {
+      params.mediaType = "videos"; // force video clips
+      params.useAudioEffects = false; // don't distort the music
+    }
+
     // Check cancellation before each step
     if (signal.aborted) { job.status = "cancelled"; saveJobs(); return; }
 
     // ── Step 1: Story Generation ──────────────────────────────────────────
     updateJob(job, "generating_story", 10);
-    emitEvent({ type: "event", kind: "message", sessionId: jobId, data: { step: "story", text: "Generating story..." } });
+    emitEvent({ type: "event", kind: "message", sessionId: jobId, data: { step: "story", text: isMusicVideo ? "Music video mode — preparing scenes..." : "Generating story..." } });
 
-    const storyData = params.scriptText ? null : await generateStory(
+    const storyData = (params.scriptText || isMusicVideo) ? null : await generateStory(
       params.topic, model, params.nicheName,
-      params.duration ? Math.floor(params.duration * 135) : undefined,
+      params.duration ? Math.floor(params.duration * 155) : undefined,
       isShort, storyInstr,
     );
 
@@ -175,7 +182,25 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
     let imagePrompts: any[];
     let sfxCues: any[];
 
-    if (params.scriptText) {
+    if (isMusicVideo) {
+      // Music video mode: generate scene prompts from topic keywords
+      title = params.topic || "Music Video";
+      storyText = ""; // no narration text
+      const keywords = (params.topic || "cinematic nature urban").split(/\s+/).filter(w => w.length > 2);
+      const clipCount = params.imageCount || 8;
+      imagePrompts = [];
+      for (let i = 0; i < clipCount; i++) {
+        const kw = keywords[i % keywords.length] || "cinematic";
+        const secs = Math.floor(i * 90 / Math.max(clipCount - 1, 1));
+        const mm = Math.floor(secs / 60), ss = secs % 60;
+        imagePrompts.push({
+          prompt: `${kw} cinematic video`,
+          timestamp: `${mm}:${String(ss).padStart(2, "0")}`,
+          seconds: secs,
+        });
+      }
+      sfxCues = [];
+    } else if (params.scriptText) {
       storyText = params.scriptText.trim();
       const firstSent = storyText.split(/[.!?\n]/)[0].trim();
       title = firstSent ? firstSent.split(" ").slice(0, 8).join(" ") : (params.topic || "Custom Script");
@@ -243,22 +268,26 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
 
       actualDuration = await audioDuration(audioPath);
 
-      console.log(`[pipeline] audio duration: ${actualDuration.toFixed(1)}s (before bg music)`);
-      // Add background music for professional sound
-      const bgMusicPath = join(workDir, "audio_bgmusic.mp3");
-      const mixed = await mixWithBackgroundMusic(audioPath, bgMusicPath, {
-        musicVolume: 0.1, fadeIn: 1.5, fadeOut: 3,
-      });
-      if (mixed && existsSync(bgMusicPath)) {
-        try { unlinkSync(audioPath); } catch {}
-        renameSync(bgMusicPath, audioPath);
-        console.log(`[pipeline] background music mixed OK`);
-        actualDuration = await audioDuration(audioPath);
-        console.log(`[pipeline] audio duration after bg music: ${actualDuration.toFixed(1)}s`);
-      }
+      if (isMusicVideo) {
+        // Music video mode: use audio as-is, no mixing, no effects
+        console.log(`[pipeline] Music video mode — audio duration: ${actualDuration.toFixed(1)}s (no bg music, no effects)`);
+      } else {
+        console.log(`[pipeline] audio duration: ${actualDuration.toFixed(1)}s (before bg music)`);
+        // Add background music for professional sound
+        const bgMusicPath = join(workDir, "audio_bgmusic.mp3");
+        const mixed = await mixWithBackgroundMusic(audioPath, bgMusicPath, {
+          musicVolume: 0.1, fadeIn: 1.5, fadeOut: 3,
+        });
+        if (mixed && existsSync(bgMusicPath)) {
+          try { unlinkSync(audioPath); } catch {}
+          renameSync(bgMusicPath, audioPath);
+          console.log(`[pipeline] background music mixed OK`);
+          actualDuration = await audioDuration(audioPath);
+          console.log(`[pipeline] audio duration after bg music: ${actualDuration.toFixed(1)}s`);
+        }
 
-      // Apply audio effects if requested (reverb, compression, EQ)
-      if (params.useAudioEffects !== false) {
+        // Apply audio effects if requested (reverb, compression, EQ)
+        if (params.useAudioEffects !== false) {
         try {
           const processedPath = join(workDir, "audio_processed.mp3");
           const ff = ffmpegPath();
@@ -279,6 +308,7 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
             } else { try { unlinkSync(processedPath); } catch {} }
           }
         } catch (e) { console.warn(`[pipeline] audio effects failed: ${e}`); }
+        }
       }
     } else {
       console.log(`[pipeline] no audioPath or file not found, generating TTS`);
@@ -286,6 +316,29 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
       const ttsOk = await generateTTS(storyText, audioPath, params.ttsEngine || "auto", ttsVoice);
       if (!ttsOk) throw new Error("TTS generation failed");
       actualDuration = await audioDuration(audioPath);
+
+      // If TTS audio is significantly shorter than target, slow it down
+      const ttsTarget = params.duration ? params.duration * 60 : 0;
+      if (ttsTarget > 0 && actualDuration < ttsTarget * 0.85) {
+        const slowdown = actualDuration / ttsTarget;
+        const atempo = Math.max(0.5, Math.min(1.0, slowdown));
+        console.log(`[pipeline] TTS too short (${actualDuration.toFixed(0)}s vs ${ttsTarget.toFixed(0)}s target), slowing to ${(atempo * 100).toFixed(0)}% speed`);
+        const slowedPath = join(workDir, "audio_slowed.mp3");
+        try {
+          const ff = ffmpegPath();
+          await new Promise<void>((resolve, reject) => {
+            const proc = spawn(ff, ["-y", "-i", audioPath, "-af", `atempo=${atempo.toFixed(2)}`, "-c:a", "libmp3lame", "-b:a", "192k", slowedPath]);
+            proc.on("close", (code) => code === 0 ? resolve() : reject(new Error(`atempo exit ${code}`)));
+            proc.on("error", reject);
+          });
+          if (existsSync(slowedPath) && statSync(slowedPath).size > 1024) {
+            try { unlinkSync(audioPath); } catch {}
+            renameSync(slowedPath, audioPath);
+            actualDuration = await audioDuration(audioPath);
+            console.log(`[pipeline] Audio slowed: now ${actualDuration.toFixed(0)}s`);
+          }
+        } catch (e) { console.warn(`[pipeline] atempo failed: ${e}`); }
+      }
     }
     // Duration normalization: respect user-requested duration ONLY for TTS-generated audio, not uploaded files
     const targetDurationSec = !params.audioPath && params.duration ? params.duration * 60 : 0;
@@ -298,8 +351,9 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
           const proc = spawn(ff, [
             "-y", "-i", audioPath,
             "-af", `apad=pad_dur=${padSec}`,
+            "-t", String(targetDurationSec),
             "-c:a", "libmp3lame", "-b:a", "192k",
-            "-shortest", paddedAudio,
+            paddedAudio,
           ]);
           proc.on("close", (code) => code === 0 ? resolve() : reject(new Error(`pad exit ${code}`)));
           proc.on("error", reject);
@@ -321,7 +375,10 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
     let srtPath: string | undefined;
     const subMode = params.subtitleMode || "story";
 
-    if (subMode !== "none") {
+    if (isMusicVideo) {
+      // Music video mode: no subtitles
+      emitEvent({ type: "event", kind: "message", sessionId: jobId, data: { step: "subtitles", text: "Music video — no subtitles" } });
+    } else if (subMode !== "none") {
       const srtPathActual = join(workDir, "subs.srt");
       await textToSrt(storyText, audioPath, srtPathActual, params.transcriptionSegments);
       if (existsSync(srtPathActual)) srtPath = srtPathActual;
@@ -330,17 +387,27 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
 
     if (signal.aborted) { job.status = "cancelled"; saveJobs(); return; }
 
-    // ── Step 4: Images ────────────────────────────────────────────────────
+    // ── Step 4: Media (Images or Video Clips) ─────────────────────────────
     updateJob(job, "generating_images", 55);
     const imagesDir = join(storyDir, "images");
-    const imgCount = await generateImages(imagePrompts.map((p: any) => ({
+    const mediaPrompts = imagePrompts.map((p: any) => ({
       prompt: p.prompt || "",
       timestamp: p.timestamp || null,
       seconds: p.seconds ?? null,
-    })), imagesDir, params.imageEngine || "auto", isShort, params.imageCount, params.imageStyle, `${title}\n${storyText.slice(0, 500)}`);
+    }));
+    const storyContext = `${title}\n${storyText.slice(0, 500)}`;
+    const useVideoClips = params.mediaType === "videos";
+    let mediaCount: number;
 
-    if (imgCount === 0) throw new Error("Image generation failed");
-    emitEvent({ type: "event", kind: "message", sessionId: jobId, data: { step: "images", text: `${imgCount} images ready` } });
+    if (useVideoClips) {
+      console.log(`[pipeline] Downloading video clips from Pexels (${params.imageCount ?? 6} clips)`);
+      mediaCount = await generateVideoClips(mediaPrompts, imagesDir, params.imageCount, params.stockVideos, storyContext);
+    } else {
+      mediaCount = await generateImages(mediaPrompts, imagesDir, params.imageEngine || "auto", isShort, params.imageCount, params.imageStyle, storyContext);
+    }
+
+    if (mediaCount === 0) throw new Error(useVideoClips ? "Video clip download failed" : "Image generation failed");
+    emitEvent({ type: "event", kind: "message", sessionId: jobId, data: { step: "images", text: useVideoClips ? `${mediaCount} video clips ready` : `${mediaCount} images ready` } });
 
     if (signal.aborted) { job.status = "cancelled"; saveJobs(); return; }
 
@@ -351,7 +418,7 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
     const outputPath = join(workDir, outputFilename);
 
     const timestamps = imagePrompts.map((p: any) => ({ seconds: p.seconds ?? null }));
-    const assemblyOk = await createVideo(imagesDir, audioPath, outputPath, srtPath, timestamps, isShort, quality, params.animationStyle, params.effects, params.transition, params.transitionDuration, params.subtitleAnimation, params.composition);
+    const assemblyOk = await createVideo(imagesDir, audioPath, outputPath, srtPath, timestamps, isShort, quality, params.animationStyle, params.effects, params.transition, params.transitionDuration, params.subtitleAnimation, params.composition, useVideoClips);
     if (!assemblyOk) throw new Error("Video assembly failed");
 
     const sizeMb = existsSync(outputPath) ? readFileSync(outputPath).length / 1048576 : 0;

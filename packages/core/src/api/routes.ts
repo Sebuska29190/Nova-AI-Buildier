@@ -732,6 +732,11 @@ Return valid JSON only (no markdown, no code fences):
         console.error(`[video] transcription error:`, e?.message || String(e));
         transcribedText = `Audio narration ${Date.now()}`;
       }
+      const mediaType = (fd.mediaType as string) || "images";
+      let stockVideos: string[] | undefined;
+      if (fd.stockVideos) {
+        try { stockVideos = JSON.parse(fd.stockVideos as string); } catch {}
+      }
       const params: VideoParams = {
         topic: transcribedText.slice(0, 120) || "Audio narration",
         scriptText: transcribedText,
@@ -755,6 +760,9 @@ Return valid JSON only (no markdown, no code fences):
         transitionDuration: fd.transitionDuration ? parseFloat(fd.transitionDuration as string) : undefined,
         subtitleAnimation: fd.subtitleAnimation as string | undefined,
         composition: fd.composition as string | undefined,
+        mediaType: mediaType as "images" | "videos",
+        stockVideos,
+        musicVideoMode: fd.musicVideoMode === "true",
       };
       const job = await startVideoGeneration(params);
       return c.json({ job, transcribed: transcribedText.slice(0, 200) }, 201);
@@ -1675,6 +1683,36 @@ Return valid JSON only (no markdown, no code fences):
         id: p.id, url: p.url, photographer: p.photographer,
         src: { medium: p.src?.medium, large: p.src?.large, original: p.src?.original }, alt: p.alt,
       }))});
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
+  });
+
+  // ─── Stock Video Search ─────────────────────────────────────────
+  app.get("/api/stock/video-search", async (c) => {
+    try {
+      const q = c.req.query("q");
+      const page = parseInt(c.req.query("page") || "1");
+      if (!q) return c.json({ error: "query required" }, 400);
+      const apiKey = process.env.PEXELS_API_KEY;
+      if (!apiKey) return c.json({ videos: [] });
+      const res = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(q)}&per_page=15&page=${page}&orientation=landscape&min_duration=10&max_duration=60`, {
+        headers: { Authorization: apiKey }, signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return c.json({ error: `Pexels HTTP ${res.status}` }, 502);
+      const data = await res.json();
+      return c.json({ videos: (data.videos || []).filter((v: any) => v.duration >= 8).sort((a: any, b: any) => b.duration - a.duration).map((v: any) => {
+        // Pick HD file (1280 or 1920 width), fallback to largest available
+        const files = v.video_files || [];
+        const hd = files.find((f: any) => f.width === 1280 && f.file_type === "video/mp4")
+          || files.find((f: any) => f.width === 1920 && f.file_type === "video/mp4")
+          || files.filter((f: any) => f.file_type === "video/mp4").sort((a: any, b: any) => b.width - a.width)[0]
+          || files[0];
+        return {
+          id: v.id, url: v.url, photographer: v.user?.name || "Pexels",
+          duration: v.duration, width: hd?.width || 0, height: hd?.height || 0,
+          videoUrl: hd?.link || "",
+          thumbnail: v.image || "",
+        };
+      })});
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 

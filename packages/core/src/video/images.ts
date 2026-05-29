@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { mkdirSync, writeFileSync, unlinkSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import type { ImagePrompt } from "./types.ts";
@@ -254,6 +254,112 @@ async function searchPaintings(query: string): Promise<string | undefined> {
     }
     return objData.primaryImage || undefined;
   } catch { return undefined; }
+}
+
+/**
+ * Download a video file from URL to disk.
+ */
+async function downloadVideoClip(url: string, outPath: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(60000), headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!res.ok) return false;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength < 50000) return false; // too small to be a real video
+    writeFileSync(outPath, Buffer.from(buf));
+    return true;
+  } catch { return false; }
+}
+
+/**
+ * Search Pexels for a video clip and return the HD MP4 URL.
+ */
+async function searchPexelsVideoClip(query: string): Promise<string | undefined> {
+  const apiKey = process.env.PEXELS_API_KEY;
+  if (!apiKey) {
+    console.log("[videos] Pexels: no API key set, skipping");
+    return undefined;
+  }
+  try {
+    const encoded = encodeURIComponent(query);
+    const res = await fetch(
+      `https://api.pexels.com/videos/search?query=${encoded}&per_page=15&orientation=landscape&min_duration=10&max_duration=60`,
+      { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(10000) },
+    );
+    if (!res.ok) return undefined;
+    const data: any = await res.json();
+    const videos = (data.videos || []).filter((v: any) => v.duration >= 8);
+    if (videos.length === 0) return undefined;
+    // Pick from top results, prefer longer clips (20s+)
+    const longClips = videos.filter((v: any) => v.duration >= 20);
+    const pool = longClips.length > 0 ? longClips : videos;
+    const picked = pool[Math.floor(Math.random() * Math.min(pool.length, 8))];
+    const files = picked?.video_files || [];
+    // Prefer HD (1280), fallback to SD (960 or 640), then largest
+    const hd = files.find((f: any) => f.width === 1280 && f.file_type === "video/mp4")
+      || files.find((f: any) => f.width === 1920 && f.file_type === "video/mp4")
+      || files.filter((f: any) => f.file_type === "video/mp4").sort((a: any, b: any) => b.width - a.width)[0]
+      || files[0];
+    if (hd?.link) console.log(`[videos] Pexels: found video clip (${pool.length} results, ${hd.width}x${hd.height}, ${picked.duration}s)`);
+    return hd?.link || undefined;
+  } catch { return undefined; }
+}
+
+/**
+ * Download stock video clips from Pexels for each scene prompt.
+ * Returns the number of clips successfully downloaded.
+ */
+export async function generateVideoClips(prompts: ImagePrompt[], outputDir: string, clipCount?: number, stockUrls?: string[], storyContext = ""): Promise<number> {
+  mkdirSync(outputDir, { recursive: true });
+
+  const targetCount = Math.max(1, Math.min(20, clipCount ?? 6));
+
+  // Trim or pad prompts to match target count
+  let safePrompts: ImagePrompt[];
+  if (prompts.length >= targetCount) {
+    safePrompts = prompts.slice(0, targetCount);
+  } else {
+    safePrompts = [...prompts];
+    while (safePrompts.length < targetCount) {
+      safePrompts.push({ prompt: `Scene ${safePrompts.length + 1}, cinematic video`, timestamp: null, seconds: null });
+    }
+  }
+
+  let count = 0;
+  for (let i = 0; i < safePrompts.length; i++) {
+    const outPath = join(outputDir, `clip_${String(i + 1).padStart(2, "0")}.mp4`);
+    let downloaded = false;
+
+    // If user provided pre-selected stock video URLs, use those first
+    if (stockUrls && stockUrls[i]) {
+      console.log(`[videos] Using pre-selected stock video: ${stockUrls[i]}`);
+      downloaded = await downloadVideoClip(stockUrls[i], outPath);
+      if (downloaded) { count++; continue; }
+    }
+
+    // Search Pexels for a matching video clip
+    const promptText = safePrompts[i].prompt;
+    const words = promptText.split(/\s+/);
+    let query = buildSearchQuery(words);
+    if (storyContext) {
+      const ctxWords = storyContext.split(/\s+/).filter(w => w.length > 3).slice(0, 3);
+      const ctxQuery = buildSearchQuery(ctxWords);
+      if (ctxQuery && ctxQuery !== query) query = `${query} ${ctxQuery}`;
+    }
+
+    if (query) {
+      console.log(`[videos] Searching Pexels video for: "${query}"`);
+      const url = await searchPexelsVideoClip(query);
+      if (url) downloaded = await downloadVideoClip(url, outPath);
+      if (downloaded) console.log(`[videos] Downloaded clip: ${outPath}`);
+    }
+
+    if (downloaded) {
+      count++;
+    } else {
+      console.log(`[videos] No video clip found for scene ${i + 1}, skipping`);
+    }
+  }
+  return count;
 }
 
 export async function generateImages(prompts: ImagePrompt[], outputDir: string, engine: string, isShort = false, imageCount?: number, imageStyle?: string, storyContext = ""): Promise<number> {

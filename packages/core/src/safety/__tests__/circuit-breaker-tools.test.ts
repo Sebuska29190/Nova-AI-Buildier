@@ -115,6 +115,12 @@ describe("ToolCircuitBreaker", () => {
 
   it("should not limit non-agent tools for depth", () => {
     const taskId = "depth-1";
+    breaker = new ToolCircuitBreaker({
+      maxToolCallsPerTask: 20,  // Higher limit so we can test depth
+      maxAgentDepth: 2,
+      taskTimeoutSeconds: 60,
+      maxDuplicateHash: 3,
+    });
     breaker.initTask(taskId);
     
     // Even with many calls, non-agent tools don't increase depth
@@ -123,6 +129,9 @@ describe("ToolCircuitBreaker", () => {
         taskId, toolName: "web_search", paramsHash: uniqueHash(), iteration: i 
       }))).not.toThrow();
     }
+    
+    // Verify depth is still 0
+    expect(breaker.getTaskState(taskId).agentDepth).toBe(0);
   });
 
   it("should track depth for agent tools", () => {
@@ -177,6 +186,12 @@ describe("ToolCircuitBreaker", () => {
 
   it("should allow different hashes", () => {
     const taskId = "loop-1";
+    breaker = new ToolCircuitBreaker({
+      maxToolCallsPerTask: 20,  // Higher limit so we can test 10 different hashes
+      maxAgentDepth: 2,
+      taskTimeoutSeconds: 60,
+      maxDuplicateHash: 3,
+    });
     breaker.initTask(taskId);
     
     // Different params hashes should be fine

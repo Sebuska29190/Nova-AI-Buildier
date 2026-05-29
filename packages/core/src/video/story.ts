@@ -114,7 +114,7 @@ function buildPrompt(topic: string, niche: Niche, nicheId: string, targetWords: 
   } else if (isShort) {
     wordRule = "- Between 80 and 110 words (SHORT — max 60-second video)";
   } else {
-    wordRule = "- Between 300 and 450 words (complete story with development, do NOT write fewer than 300)";
+    wordRule = "- Between 350 and 500 words (complete story with development, do NOT write fewer than 350)";
   }
 
   return `You are a viral content writer for YouTube/TikTok. Your specialty: ${niche.nombre}.
@@ -238,7 +238,7 @@ IMG4 1:00: [scene]
   }
 
   // Fallback 3: free-form, build result manually
-  const wordTarget = targetWords || (isShort ? 90 : 350);
+  const wordTarget = targetWords || (isShort ? 90 : 400);
   const subject = topic || niche.nombre;
   const langNote = langInstr ? `\nCRITICAL LANGUAGE INSTRUCTION: ${langInstr}` : "";
   const freePrompt = `Write a ${wordTarget}-word first-person story about: ${subject}.${langNote}\nStrong hook. One twist. No headers, no bullet points, just the story text.`;

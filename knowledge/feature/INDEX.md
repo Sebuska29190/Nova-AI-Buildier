@@ -46,3 +46,10 @@
 - [File Created: baza_prawnicza/polskie_ustawy/o_kredycie_hipotecznym.md](2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_kredycie_hipotecznym.md.md) — 2026-05-26 `[workspace, file-created, md]`
 - [File Created: orzecznictwo/SN_cywilna/051-150_orzeczenia_SN_cywilna.txt](2026-05-26-File Created_ orzecznictwo_SN_cywilna_051-150_orzeczenia_SN_cywilna.txt.md) — 2026-05-26 `[workspace, file-created, txt]`
 - [File Created: pobieracz_saos.py](2026-05-26-File Created_ pobieracz_saos.py.md) — 2026-05-26 `[workspace, file-created, py]`
+- [File Created: packages/core/src/skill/self-improve.ts](2026-05-28-File Created_ packages_core_src_skill_self-improve.ts.md) — 2026-05-28 `[workspace, file-created, ts]`
+- [File Created: packages/ui/src/routes/MemoryPage.tsx](2026-05-28-File Created_ packages_ui_src_routes_MemoryPage.tsx.md) — 2026-05-28 `[workspace, file-created, tsx]`
+- [File Created: packages/core/src/safety/__tests__/circuit-breaker-tools.test.ts](2026-05-28-File Created_ packages_core_src_safety___tests___circuit-breaker-tools.test.ts.md) — 2026-05-28 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/safety/__tests__/circuit-breaker-tools.test.ts](2026-05-28-File Created_ packages_core_src_safety___tests___circuit-breaker-tools.test.ts.md) — 2026-05-28 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/agent/runner.ts](2026-05-28-File Created_ packages_core_src_agent_runner.ts.md) — 2026-05-28 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/agent/runner.ts](2026-05-28-File Created_ packages_core_src_agent_runner.ts.md) — 2026-05-28 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/agent/runner.ts](2026-05-28-File Created_ packages_core_src_agent_runner.ts.md) — 2026-05-28 `[workspace, file-created, ts]`

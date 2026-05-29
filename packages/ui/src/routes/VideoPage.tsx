@@ -4,6 +4,11 @@ interface StockPhoto {
   id: number; url: string; photographer: string;
   src: { medium: string; large: string; original: string }; alt: string;
 }
+interface StockVideo {
+  id: number; url: string; photographer: string;
+  duration: number; width: number; height: number;
+  videoUrl: string; thumbnail: string;
+}
 interface MusicTrack {
   id: string; title: string; artist: string; duration: number; genre: string; url: string;
 }
@@ -86,7 +91,14 @@ export function VideoPage() {
   const [showStock, setShowStock] = useState(false);
   const [stockQuery, setStockQuery] = useState("");
   const [stockPhotos, setStockPhotos] = useState<StockPhoto[]>([]);
+  const [stockVideos, setStockVideos] = useState<StockVideo[]>([]);
   const [stockLoading, setStockLoading] = useState(false);
+  const [stockTab, setStockTab] = useState<"photos" | "videos">("photos");
+  const [selectedStockVideos, setSelectedStockVideos] = useState<StockVideo[]>([]);
+
+  // Media type
+  const [mediaType, setMediaType] = useState<"images" | "videos">("images");
+  const [musicVideoMode, setMusicVideoMode] = useState(false);
 
   // Scenes
   const [scenes, setScenes] = useState<Scene[]>([]);
@@ -108,7 +120,15 @@ export function VideoPage() {
   async function searchStock() {
     if (!stockQuery.trim()) return;
     setStockLoading(true);
-    try { const res = await fetch(`/api/stock/search?q=${encodeURIComponent(stockQuery)}&page=1`); if (res.ok) setStockPhotos((await res.json()).photos || []); } catch {}
+    try {
+      if (stockTab === "videos") {
+        const res = await fetch(`/api/stock/video-search?q=${encodeURIComponent(stockQuery)}&page=1`);
+        if (res.ok) setStockVideos((await res.json()).videos || []);
+      } else {
+        const res = await fetch(`/api/stock/search?q=${encodeURIComponent(stockQuery)}&page=1`);
+        if (res.ok) setStockPhotos((await res.json()).photos || []);
+      }
+    } catch {}
     setStockLoading(false);
   }
 
@@ -135,6 +155,8 @@ export function VideoPage() {
         if (transition !== "cut") { fd.append("transition", transition); fd.append("transitionDuration", String(transitionDuration)); }
         if (subtitleAnimation !== "static") fd.append("subtitleAnimation", subtitleAnimation);
         if (composition !== "single") fd.append("composition", composition);
+        fd.append("mediaType", mediaType);
+        if (selectedStockVideos.length > 0) fd.append("stockVideos", JSON.stringify(selectedStockVideos.map(v => v.videoUrl)));
         const res = await fetch("/api/video/dub", { method: "POST", body: fd });
         if (!res.ok) throw new Error(`API ${res.status}`);
         await loadJobs();
@@ -160,6 +182,9 @@ export function VideoPage() {
         if (transition !== "cut") { fd.append("transition", transition); fd.append("transitionDuration", String(transitionDuration)); }
         if (subtitleAnimation !== "static") fd.append("subtitleAnimation", subtitleAnimation);
         if (composition !== "single") fd.append("composition", composition);
+        fd.append("mediaType", musicVideoMode ? "videos" : mediaType);
+        if (selectedStockVideos.length > 0) fd.append("stockVideos", JSON.stringify(selectedStockVideos.map(v => v.videoUrl)));
+        if (musicVideoMode) fd.append("musicVideoMode", "true");
         const res = await fetch("/api/video/generate", { method: "POST", body: fd });
         if (!res.ok) throw new Error(`API ${res.status}`);
         await loadJobs();
@@ -189,6 +214,8 @@ export function VideoPage() {
         transitionDuration: transition !== "cut" ? transitionDuration : undefined,
         subtitleAnimation: subtitleAnimation !== "static" ? subtitleAnimation : undefined,
         composition: composition !== "single" ? composition : undefined,
+        mediaType,
+        stockVideos: selectedStockVideos.length > 0 ? selectedStockVideos.map(v => v.videoUrl) : undefined,
       };
       const res = await fetch("/api/video/generate", {
         method: "POST",
@@ -237,7 +264,9 @@ export function VideoPage() {
               <div className="flex gap-1">
                 {inputMode !== "video" && (
                   <button onClick={() => setShowStock(true)}
-                    className="text-[9px] text-[#00f2fe] hover:underline">Stock</button>
+                    className="text-[9px] text-[#00f2fe] hover:underline">
+                    {selectedStockVideos.length > 0 ? `Stock (${selectedStockVideos.length})` : "Stock"}
+                  </button>
                 )}
               </div>
             </div>
@@ -331,7 +360,25 @@ export function VideoPage() {
                     <input type="file" accept=".mp3,audio/mpeg,.wav,audio/wav" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setAudioFile(f); setAudioFileName(f.name); } }} />
                   </label>
                 </div>
-                <p className="text-[9px] text-slate-600">Topic optional — video auto-generated from audio transcription.</p>
+                {audioFileName && (
+                  <div className="flex items-center gap-3">
+                    <label className="text-[9px] text-slate-400 uppercase tracking-wider">Music Video</label>
+                    <button onClick={() => { setMusicVideoMode(!musicVideoMode); if (!musicVideoMode) setMediaType("videos"); }}
+                      className={`relative w-9 h-5 rounded-full transition-all ${musicVideoMode ? "bg-[#00f2fe]" : "bg-slate-700"}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${musicVideoMode ? "left-[18px]" : "left-0.5"}`} />
+                    </button>
+                    <span className="text-[9px] text-slate-500">{musicVideoMode ? "Song = main audio, stock videos auto-matched" : "Narration mode (TTS)"}</span>
+                  </div>
+                )}
+                {musicVideoMode && (
+                  <div>
+                    <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Video Keywords</label>
+                    <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)}
+                      placeholder="e.g. nature ocean sunset city night"
+                      className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00f2fe]/40" />
+                  </div>
+                )}
+                <p className="text-[9px] text-slate-600">{musicVideoMode ? "Keywords used to search matching stock videos on Pexels." : "Topic optional — video auto-generated from audio transcription."}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -389,9 +436,20 @@ export function VideoPage() {
                 </div>
               </div>
               <div>
-                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Images</label>
-                <input type="number" value={imageCount} onChange={(e) => setImageCount(Number(e.target.value))} min={1} max={50}
+                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">
+                  {mediaType === "videos" ? "Video Clips" : "Images"}
+                </label>
+                <input type="number" value={imageCount} onChange={(e) => setImageCount(Number(e.target.value))} min={1} max={20}
                   className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white" disabled={inputMode === "video"} />
+              </div>
+              <div>
+                <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Media Type</label>
+                <div className="flex gap-1">
+                  <button onClick={() => setMediaType("images")}
+                    className={`flex-1 text-[9px] px-2 py-1.5 rounded-lg border ${mediaType === "images" ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-slate-900/60 text-slate-400"}`}>Photos</button>
+                  <button onClick={() => setMediaType("videos")}
+                    className={`flex-1 text-[9px] px-2 py-1.5 rounded-lg border ${mediaType === "videos" ? "border-[#00f2fe] bg-[#00f2fe]/10 text-[#00f2fe]" : "border-slate-800 bg-slate-900/60 text-slate-400"}`}>Videos</button>
+                </div>
               </div>
               <div>
                 <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Subtitles</label>
@@ -401,7 +459,8 @@ export function VideoPage() {
               </div>
               <div>
                 <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Animation</label>
-                <select value={animationStyle} onChange={(e) => setAnimationStyle(e.target.value)} className="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white">
+                <select value={animationStyle} onChange={(e) => setAnimationStyle(e.target.value)} disabled={mediaType === "videos"}
+                  className={`w-full bg-slate-900/60 border border-slate-800 rounded-lg px-2 py-1.5 text-[10px] text-white ${mediaType === "videos" ? "opacity-40" : ""}`}>
                   {ANIMATIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
                 </select>
               </div>
@@ -511,18 +570,80 @@ export function VideoPage() {
       {/* ─── Stock Modal ──────────────────────────────────────────── */}
       {showStock && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowStock(false)}>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-[600px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-[700px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-white">Stock Photos</h3>
+              <h3 className="text-sm font-bold text-white">Stock Media</h3>
               <button onClick={() => setShowStock(false)} className="text-slate-400 hover:text-white text-xs">✕</button>
+            </div>
+            {/* Tabs */}
+            <div className="flex gap-1 mb-3">
+              <button onClick={() => setStockTab("photos")} className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${stockTab === "photos" ? "bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/30" : "text-slate-400 hover:text-white border border-transparent"}`}>Photos</button>
+              <button onClick={() => setStockTab("videos")} className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${stockTab === "videos" ? "bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/30" : "text-slate-400 hover:text-white border border-transparent"}`}>Videos</button>
             </div>
             <div className="flex gap-2 mb-4">
               <input type="text" value={stockQuery} onChange={(e) => setStockQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && searchStock()}
-                placeholder="Search free photos..." className="flex-1 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500" />
+                placeholder={stockTab === "videos" ? "Search stock videos..." : "Search free photos..."}
+                className="flex-1 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500" />
               <button onClick={searchStock} disabled={stockLoading} className="btn-premium px-4 py-2 rounded-lg text-xs disabled:opacity-40">{stockLoading ? "..." : "Search"}</button>
             </div>
-            <div className="text-center py-4 text-[10px] text-slate-600">Set PEXELS_API_KEY for full stock photo access</div>
+
+            {/* Photo results */}
+            {stockTab === "photos" && stockPhotos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {stockPhotos.map((photo) => (
+                  <div key={photo.id} className="rounded-lg overflow-hidden border border-slate-800 hover:border-[#00f2fe]/50 transition-all cursor-pointer">
+                    <img src={photo.src.medium} alt={photo.alt} className="w-full h-24 object-cover" loading="lazy" />
+                    <div className="px-2 py-1 bg-slate-800/60">
+                      <p className="text-[9px] text-slate-400 truncate">{photo.photographer}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {stockTab === "photos" && stockPhotos.length === 0 && !stockLoading && (
+              <div className="text-center py-6 text-[10px] text-slate-600">Set PEXELS_API_KEY for stock photo access</div>
+            )}
+
+            {/* Video results */}
+            {stockTab === "videos" && stockVideos.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {selectedStockVideos.length > 0 && (
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-[#00f2fe]">{selectedStockVideos.length} video(s) selected</span>
+                    <button onClick={() => setSelectedStockVideos([])} className="text-[9px] text-slate-500 hover:text-white">Clear</button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {stockVideos.map((video) => {
+                    const isSelected = selectedStockVideos.some(v => v.id === video.id);
+                    return (
+                      <div key={video.id} onClick={() => {
+                        setSelectedStockVideos(prev => isSelected ? prev.filter(v => v.id !== video.id) : [...prev, video]);
+                      }} className={`rounded-lg overflow-hidden border cursor-pointer transition-all ${isSelected ? "border-[#00f2fe] bg-[#00f2fe]/10" : "border-slate-800 hover:border-slate-600"}`}>
+                        <div className="relative">
+                          <img src={video.thumbnail} alt="" className="w-full h-28 object-cover" loading="lazy" />
+                          <span className="absolute bottom-1 right-1 bg-black/80 text-[9px] text-white px-1.5 py-0.5 rounded">{video.duration}s</span>
+                          {isSelected && <span className="absolute top-1 left-1 bg-[#00f2fe] text-black text-[9px] font-bold px-1.5 py-0.5 rounded">Selected</span>}
+                        </div>
+                        <div className="px-2 py-1.5 bg-slate-800/60">
+                          <p className="text-[9px] text-slate-400 truncate">{video.photographer} &middot; {video.width}x{video.height}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {stockTab === "videos" && stockVideos.length === 0 && !stockLoading && (
+              <div className="text-center py-6 text-[10px] text-slate-600">Set PEXELS_API_KEY for stock video access</div>
+            )}
+
+            {stockTab === "videos" && selectedStockVideos.length > 0 && (
+              <button onClick={() => setShowStock(false)} className="w-full btn-premium px-4 py-2 rounded-lg text-xs font-medium">
+                Use {selectedStockVideos.length} Selected Video{selectedStockVideos.length > 1 ? "s" : ""}
+              </button>
+            )}
           </div>
         </div>
       )}

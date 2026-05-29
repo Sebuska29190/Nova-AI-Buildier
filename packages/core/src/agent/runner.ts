@@ -294,6 +294,17 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
       let parsedArgs: Record<string, unknown> = {};
       try { parsedArgs = JSON.parse(tc.function.arguments || "{}"); } catch {}
 
+      // ─── Safety Middleware: Circuit Breaker check ─────────────
+      const callCtx: import("../safety/circuit-breaker-tools.ts").ToolCallContext = {
+        taskId: params.runId || params.sessionId,
+        agentId: sessionAgentMap.get(params.sessionId) || agentId || "unknown",
+        toolName: tc.function.name,
+        toolParams: parsedArgs,
+        paramsHash: toolAudit.hashParams(parsedArgs),
+        iteration,
+      };
+      toolBreaker.beforeCall(callCtx);
+
       // Execute tool with timeout
       const toolStartTime = Date.now();
       try {
@@ -345,6 +356,9 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
           action: "tool_call",
           durationMs: toolDurationMs,
         });
+
+        // ─── Safety Middleware: afterCall unwind ──────────────
+        toolBreaker.afterCall({ taskId: params.runId || params.sessionId, toolName: tc.function.name });
       } catch (e: unknown) {
         const toolDurationMs = Date.now() - toolStartTime;
         const errMsg = `Error executing ${tc.function.name}: ${safeMessage(e)}`;
@@ -364,6 +378,9 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
           success: false,
           iteration,
         });
+
+        // ─── Safety Middleware: afterCall unwind (failure) ────
+        toolBreaker.afterCall({ taskId: params.runId || params.sessionId, toolName: tc.function.name });
       }
     }
 

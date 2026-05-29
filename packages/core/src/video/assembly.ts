@@ -236,6 +236,7 @@ export async function createVideo(
   transitionDuration?: number,
   subtitleAnimation?: string,
   composition?: string,
+  useVideoClips = false,
 ): Promise<boolean> {
   const ff = ffmpegPath();
   const duration = await audioDuration(audioFile);
@@ -244,10 +245,18 @@ export async function createVideo(
   const fps = 30;
   const q = QUALITY_PRESETS[quality] || QUALITY_PRESETS.medium;
 
-  // Scan images
+  // Scan for video clips or images
+  const clipScan = readdirSync(imagesDir)
+    .filter((f) => /^clip_\d+\.mp4$/i.test(f))
+    .sort();
   const images = readdirSync(imagesDir)
     .filter((f) => /^img_\d+\.(png|jpg|jpeg)$/i.test(f))
     .sort();
+
+  if (useVideoClips && clipScan.length > 0) {
+    // ── Video clip mode: trim, mute, normalize each clip ──
+    return await assembleVideoClips(imagesDir, clipScan, audioFile, outputFile, srtFile, imageTimestamps, isShort, quality, effects, transition, transitionDuration, subtitleAnimation, composition, fps, resW, resH, q, duration);
+  }
 
   if (images.length === 0) return false;
 
@@ -524,6 +533,213 @@ async function applyComposition(
     console.warn(`[composition] failed: ${safeMessage(e)}`);
     return false;
   }
+}
+
+/**
+ * Assemble pre-downloaded video clips into final video.
+ * Each clip is trimmed, muted, and normalized to target resolution.
+ */
+async function assembleVideoClips(
+  workDir: string,
+  clipFiles: string[],
+  audioFile: string,
+  outputFile: string,
+  srtFile: string | undefined,
+  imageTimestamps: Array<{ seconds: number | null }> | undefined,
+  isShort: boolean,
+  quality: string,
+  effects: string | undefined,
+  transition: string | undefined,
+  transitionDuration: number | undefined,
+  subtitleAnimation: string | undefined,
+  composition: string | undefined,
+  fps: number,
+  resW: number,
+  resH: number,
+  q: { crf: string; preset: string; maxrate: string; bufsize: string },
+  totalDuration: number,
+): Promise<boolean> {
+  // Compute per-clip durations
+  let durations: number[] = [];
+  if (imageTimestamps && imageTimestamps.length === clipFiles.length) {
+    const startTimes = imageTimestamps.map((ts) => ts.seconds || 0);
+    let maxTs = Math.max(...startTimes);
+    if (maxTs > 0 && (maxTs > totalDuration * 0.9 || maxTs < totalDuration * 0.5)) {
+      const scale = (totalDuration * 0.85) / maxTs;
+      for (let i = 0; i < startTimes.length; i++) startTimes[i] *= scale;
+    }
+    for (let i = 0; i < startTimes.length; i++) {
+      const nxt = i + 1 < startTimes.length ? startTimes[i + 1] : totalDuration;
+      let dur = Math.max(3, Math.min(nxt - startTimes[i], totalDuration - startTimes[i]));
+      if (i === startTimes.length - 1) dur = Math.max(dur, totalDuration - startTimes[i]);
+      durations.push(dur);
+    }
+    const total = durations.reduce((a, b) => a + b, 0);
+    if (total > totalDuration + 0.5) {
+      const scale = totalDuration / total;
+      durations = durations.map(d => d * scale);
+    }
+  } else {
+    const durEach = totalDuration / clipFiles.length;
+    durations = clipFiles.map(() => durEach);
+  }
+
+  // Trim or extend each clip to match target duration, mute, normalize
+  const processedClips: string[] = [];
+  for (let i = 0; i < clipFiles.length; i++) {
+    const srcPath = join(workDir, clipFiles[i]);
+    const outPath = join(workDir, `proc_${String(i).padStart(3, "0")}.mp4`);
+    const d = durations[i];
+
+    // Get source clip duration
+    let srcDur = 0;
+    try {
+      const probe = which("ffprobe");
+      if (probe) {
+        srcDur = await new Promise<number>((resolve) => {
+          const proc = spawn(probe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", srcPath]);
+          let out = "";
+          proc.stdout?.on("data", (buf: Buffer) => { out += buf.toString(); });
+          proc.on("close", () => resolve(parseFloat(out.trim()) || 0));
+          proc.on("error", () => resolve(0));
+        });
+      }
+    } catch {}
+
+    try {
+      const scalePad = `scale=${resW}:${resH}:force_original_aspect_ratio=decrease,pad=${resW}:${resH}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setsar=1`;
+
+      if (srcDur > 0 && srcDur > d + 1) {
+        // Source is longer than target: seek to random start point and trim
+        const maxStart = Math.max(0, srcDur - d - 1);
+        const seek = Math.random() * maxStart;
+        console.log(`[video-clip ${i}] Source ${srcDur.toFixed(1)}s > target ${d.toFixed(1)}s, seek ${seek.toFixed(1)}s`);
+        await runFFmpeg([
+          "-y", "-ss", seek.toFixed(2), "-i", srcPath,
+          "-t", String(d),
+          "-vf", scalePad,
+          "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(fps),
+          "-crf", q.crf, "-preset", q.preset, "-maxrate", q.maxrate, "-bufsize", q.bufsize,
+          outPath,
+        ]);
+      } else if (srcDur > 0 && srcDur < d - 1) {
+        // Source is shorter than target: freeze last frame to fill duration
+        const padDur = d - srcDur;
+        console.log(`[video-clip ${i}] Source ${srcDur.toFixed(1)}s < target ${d.toFixed(1)}s, freezing last frame +${padDur.toFixed(1)}s`);
+        await runFFmpeg([
+          "-y", "-i", srcPath,
+          "-vf", `${scalePad},tpad=stop_mode=clone:stop_duration=${padDur.toFixed(1)}`,
+          "-t", String(d),
+          "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(fps),
+          "-crf", q.crf, "-preset", q.preset, "-maxrate", q.maxrate, "-bufsize", q.bufsize,
+          outPath,
+        ]);
+      } else {
+        // Source is close to target: just normalize
+        console.log(`[video-clip ${i}] Source ${srcDur.toFixed(1)}s ≈ target ${d.toFixed(1)}s, normalizing`);
+        await runFFmpeg([
+          "-y", "-i", srcPath,
+          "-t", String(d),
+          "-vf", scalePad,
+          "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(fps),
+          "-crf", q.crf, "-preset", q.preset, "-maxrate", q.maxrate, "-bufsize", q.bufsize,
+          outPath,
+        ]);
+      }
+
+      if (existsSync(outPath)) {
+        processedClips.push(outPath);
+      }
+    } catch (e) {
+      console.warn(`[video-clip ${i}] Failed to process: ${safeMessage(e)}`);
+    }
+  }
+
+  if (processedClips.length === 0) return false;
+
+  const hasSrt = Boolean(srtFile && srtFile.trim() && existsSync(srtFile));
+  const hasEffects = Boolean(effects && effects.trim());
+  const hasTransitions = Boolean(transition && transition !== "cut" && processedClips.length > 1);
+  const baseVideo = (hasSrt || hasEffects) ? outputFile.replace(".mp4", "_base.mp4") : outputFile;
+
+  try {
+    // Apply transitions or simple concat
+    let usedTransitions = false;
+    if (hasTransitions && processedClips.length <= 4) {
+      console.log(`[transitions] Applying: ${transition} (${transitionDuration || 0.5}s)`);
+      const minClipDur = Math.min(...durations);
+      const td = Math.min(1.5, Math.max(0.3, transitionDuration || 0.5, minClipDur * 0.4));
+      usedTransitions = await applyTransitions(processedClips, durations, audioFile, baseVideo, transition!, td, q, fps);
+      if (!usedTransitions) console.log(`[transitions] xfade failed, falling back to concat`);
+    }
+
+    if (!usedTransitions) {
+      const concatList = join(workDir, "clips_concat.txt");
+      writeFileSync(concatList, processedClips.map((p) => `file '${p}'`).join("\n"));
+      await runFFmpeg([
+        "-y", "-f", "concat", "-safe", "0", "-i", concatList, "-i", audioFile,
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(fps),
+        "-crf", q.crf, "-preset", q.preset, "-maxrate", q.maxrate, "-bufsize", q.bufsize,
+        "-c:a", "aac", "-b:a", "192k", "-shortest",
+        hasSrt || hasEffects ? baseVideo : outputFile,
+      ]);
+      try { unlinkSync(concatList); } catch {}
+    }
+
+    let currentVideo = baseVideo;
+
+    // Apply visual effects
+    if (hasEffects) {
+      const effectList = effects.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+      if (effectList.length > 0) {
+        console.log(`[effects] Applying: ${effectList.join(", ")}`);
+        const fxFilters = buildEffectsFilter(effectList, isShort);
+        if (fxFilters) {
+          const withFxFile = outputFile.replace(".mp4", "_fx.mp4");
+          await runFFmpeg(["-y", "-i", currentVideo, "-vf", fxFilters,
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-crf", q.crf, "-preset", q.preset,
+            "-c:a", "copy", withFxFile]);
+          try { unlinkSync(currentVideo); } catch {}
+          currentVideo = withFxFile;
+        }
+      }
+    }
+
+    // Composition mode
+    const hasComposition = Boolean(composition && composition !== "single");
+    if (hasComposition) {
+      console.log(`[composition] Applying: ${composition}`);
+      const compFile = outputFile.replace(".mp4", "_comp.mp4");
+      const compOk = await applyComposition(currentVideo, compFile, composition!, q, fps);
+      if (compOk) {
+        try { unlinkSync(currentVideo); } catch {}
+        currentVideo = compFile;
+      }
+    }
+
+    // Burn subtitles
+    if (hasSrt) {
+      try {
+        await burnSubtitles(currentVideo, outputFile, srtFile!, isShort, quality, subtitleAnimation);
+        try { unlinkSync(currentVideo); } catch {}
+      } catch (subErr) {
+        console.warn(`[burnSubtitles] failed: ${subErr instanceof Error ? subErr.message : subErr}`);
+        copyFileSync(currentVideo, outputFile);
+        try { unlinkSync(currentVideo); } catch {}
+      }
+    } else if (hasEffects || hasComposition) {
+      copyFileSync(currentVideo, outputFile);
+      try { unlinkSync(currentVideo); } catch {}
+    }
+  } catch (e) {
+    console.warn(`[assembly] video clips failed: ${safeMessage(e)}`);
+  }
+
+  // Cleanup processed clips
+  for (const cp of processedClips) try { unlinkSync(cp); } catch {}
+
+  return existsSync(outputFile);
 }
 
 export async function burnSubtitles(inputVideo: string, outputVideo: string, srtFile: string, isShort = false, quality = "medium", subtitleAnimation?: string): Promise<void> {

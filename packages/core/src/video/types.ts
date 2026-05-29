@@ -64,6 +64,12 @@ export interface VideoParams {
   inputVideoPath?: string;
   /** Source language of input video (for translation dubbing) */
   sourceLanguage?: string;
+  /** Media type: use stock images or stock video clips */
+  mediaType?: "images" | "videos";
+  /** Pre-selected stock video URLs (from stock search) */
+  stockVideos?: string[];
+  /** Music video mode: use uploaded audio as-is, no TTS, no bg music, no effects */
+  musicVideoMode?: boolean;
 }
 
 export interface VideoJob {
