@@ -428,7 +428,7 @@ async function runPipeline(jobId: string, params: VideoParams, signal: AbortSign
       version: "1.0", created_at: new Date().toISOString(),
       video: { filename: outputFilename, title, is_short: isShort, quality, size_mb: Math.round(sizeMb * 100) / 100 },
       content: { topic: params.topic, word_count: storyText.split(" ").length, story: storyText.slice(0, 500) },
-      production: { model, tts_engine: params.ttsEngine || "auto", image_engine: params.imageEngine || "auto", image_count: imgCount, subtitles: Boolean(srtPath) },
+      production: { model, tts_engine: params.ttsEngine || "auto", image_engine: params.imageEngine || "auto", image_count: mediaCount, subtitles: Boolean(srtPath) },
     };
     writeFileSync(join(workDir, "metadata.json"), JSON.stringify(meta, null, 2));
 

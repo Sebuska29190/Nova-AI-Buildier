@@ -61,7 +61,7 @@ To complete setup, I need to open the browser so you can log in:
 
   social_post: {
     name: "social_post",
-    description: "Post text/image to a connected social media account. Opens browser, posts, and closes.",
+    description: "Post text/image to a connected social media account. Uses API for Bluesky/X, browser automation for others.",
     parameters: {
       type: "object", properties: {
         accountId: { type: "string", description: "Account ID from social_list_accounts" },
@@ -73,36 +73,39 @@ To complete setup, I need to open the browser so you can log in:
       const account = getAccount(args.accountId);
       if (!account) throw new Error(`Account '${args.accountId}' not found. Use social_list_accounts to see available accounts.`);
 
-      // Return automation instructions for the agent
-      const steps: any[] = [
-        { tool: "browser_launch", args: { userDataDir: account.profileDir, headless: false } },
-        { tool: "browser_navigate", args: fetchPostUrl(account.platform) },
-        { tool: "browser_wait", args: { ms: 2000 } },
-      ];
-
-      if (args.mediaPath) {
-        steps.push({ tool: "browser_select_file", args: { selector: "input[type=file]", path: args.mediaPath } });
-        steps.push({ tool: "browser_wait", args: { ms: 3000 } });
+      // API-based posting for Bluesky
+      if (account.platform === "bluesky" && account.authMethod === "api_key") {
+        try {
+          const { postToBluesky } = await import("./platforms/bluesky.ts");
+          const result = await postToBluesky(account.apiConfig, args.text, args.mediaPath);
+          return `✅ Posted to Bluesky: ${result}`;
+        } catch (e: any) {
+          return `❌ Bluesky post failed: ${e.message}`;
+        }
       }
 
-      steps.push(
-        { tool: "browser_type", args: { selector: postTextSelector(account.platform), text: args.text } },
-        { tool: "browser_wait", args: { ms: 1000 } },
-        { tool: "browser_click", args: { selector: postButtonSelector(account.platform) } },
-        { tool: "browser_wait", args: { ms: 3000 } },
-        { tool: "browser_close", args: {} },
-      );
+      // API-based posting for Twitter/X
+      if ((account.platform === "twitter" || account.platform === "x") && account.authMethod === "api_key") {
+        try {
+          const { postToTwitter } = await import("./platforms/twitter.ts");
+          const result = await postToTwitter(account.apiConfig, args.text);
+          return `✅ Posted to X/Twitter: ${result}`;
+        } catch (e: any) {
+          return `❌ Twitter post failed: ${e.message}`;
+        }
+      }
 
-      return `🤖 Browser automation for posting to **${account.name}** (${account.platform}):
+      // Browser-based posting for other platforms
+      const postUrl = fetchPostUrl(account.platform);
+      const steps = [
+        `1. Launch browser with profile: ${account.profileDir}`,
+        `2. Navigate to: ${postUrl}`,
+        `3. ${args.mediaPath ? `Upload: ${args.mediaPath}` : "Type text"}`,
+        `4. Click post button`,
+        `5. Close browser`,
+      ];
 
-Steps to execute:
-1. Launch browser with saved session
-2. Navigate to post page
-3. ${args.mediaPath ? "Upload media" : "Type text"}
-4. Click post
-5. Close browser
-
-Say "execute post to ${account.name}" to run this automation.`;
+      return `🤖 Browser posting to **${account.name}** (${account.platform}):\n\n${steps.join("\n")}\n\nSay "execute post to ${account.name}" to run.`;
     },
   },
 

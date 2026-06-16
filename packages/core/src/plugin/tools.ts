@@ -512,87 +512,6 @@ registerTool({
   },
 });
 
-// ─── Crypto Tools ─────────────────────────────────────────────────
-registerTool({
-  name: "fetch_crypto_news",
-  description: "Fetch latest crypto news from all sources (CoinDesk, CoinTelegraph, The Block, Decrypt, CryptoSlate). Returns array of articles with title, url, source.",
-  parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
-  async execute() {
-    const { batchFetchAll } = await import("../crypto/scraper.ts");
-    const articles = await batchFetchAll();
-    return JSON.stringify(articles.slice(0, 20));
-  },
-});
-
-registerTool({
-  name: "curate_crypto_news",
-  description: "Analyze and rank raw crypto articles by importance. Returns top 5 with sentiment analysis. Requires articles JSON array.",
-  parameters: { type: "object", properties: { articles: { type: "string", description: "JSON array of articles with title, url, source" } }, required: ["articles"], additionalProperties: false },
-  async execute(args: { articles: string }) {
-    const { runCryptoDigest } = await import("../crypto/scheduler.ts");
-    const result = await runCryptoDigest();
-    return JSON.stringify(result);
-  },
-});
-
-registerTool({
-  name: "coingecko_price",
-  description: "Get current BTC, ETH, SOL prices from CoinGecko. Returns price, 24h change, 1h change.",
-  parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
-  async execute() {
-    const { fetchCoinGeckoPrices } = await import("../crypto/scraper.ts");
-    const prices = await fetchCoinGeckoPrices();
-    return JSON.stringify(prices);
-  },
-});
-
-registerTool({
-  name: "send_crypto_digest",
-  description: "Force-run the full crypto news pipeline: fetch, curate, and publish to Telegram immediately.",
-  parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
-  async execute() {
-    const { runCryptoDigest } = await import("../crypto/scheduler.ts");
-    const result = await runCryptoDigest();
-    return `Published ${result.published} articles, skipped ${result.skipped} duplicates.`;
-  },
-});
-
-registerTool({
-  name: "crypto_status",
-  description: "Get crypto scheduler status: running, next run time, last run, published today.",
-  parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
-  async execute() {
-    const { getStatus, getHistory } = await import("../crypto/scheduler.ts");
-    const status = getStatus();
-    const history = getHistory();
-    return JSON.stringify({ ...status, recentPublications: history.slice(-3) });
-  },
-});
-
-registerTool({
-  name: "portfolio_status",
-  description: "Get portfolio value, P&L, and position breakdown.",
-  parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
-  async execute() {
-    const { calculatePortfolio, loadPositions } = await import("../crypto/portfolio.ts");
-    const positions = loadPositions();
-    const snapshot = await calculatePortfolio();
-    return JSON.stringify({ positions, snapshot });
-  },
-});
-
-registerTool({
-  name: "set_portfolio",
-  description: "Set your crypto portfolio positions. Example: {\"BTC\": 0.5, \"ETH\": 2.0}. Resets all positions.",
-  parameters: { type: "object", properties: { positions: { type: "object", description: "Map of symbol->amount, e.g. {\"BTC\": 0.5}" } }, required: ["positions"], additionalProperties: false },
-  async execute(args: { positions: Record<string, number> }) {
-    const { savePositions, loadPositions } = await import("../crypto/portfolio.ts");
-    const positions = Object.entries(args.positions).map(([symbol, amount]) => ({ symbol, amount, entryPrice: undefined }));
-    savePositions(positions);
-    return `Portfolio updated: ${Object.entries(args.positions).map(([k, v]) => `${v} ${k}`).join(", ")}`;
-  },
-});
-
 // ─── Video Editor Tools ─────────────────────────────────────────
 registerTool({
   name: "analyze_video_clips",
@@ -672,26 +591,9 @@ registerTool({
 });
 
 // ─── Computer Use Tools ─────────────────────────────────────────
-registerTool({
-  name: "computer_screenshot",
-  description: "Take a screenshot of the current screen. Returns image path and dimensions.",
-  parameters: { type: "object", properties: {}, required: [], additionalProperties: false },
-  async execute() { const cu = await import("../computer-use.ts"); const r = cu.takeScreenshot(); return `📸 Screenshot saved: ${r.path} (${r.width}x${r.height})`; },
-});
-
-registerTool({
-  name: "computer_mouse_move",
-  description: "Move mouse cursor to (x, y) coordinates.",
-  parameters: { type: "object", properties: { x: { type: "number" }, y: { type: "number" } }, required: ["x", "y"], additionalProperties: false },
-  async execute(args) { const cu = await import("../computer-use.ts"); return cu.mouseMove((args as any).x, (args as any).y); },
-});
-
-registerTool({
-  name: "computer_mouse_click",
-  description: "Click mouse button (left, right, middle) at current cursor position.",
-  parameters: { type: "object", properties: { button: { type: "string", enum: ["left", "right", "middle"], default: "left" } }, additionalProperties: false },
-  async execute(args) { const cu = await import("../computer-use.ts"); return cu.mouseClick((args as any).button || "left"); },
-});
+// NOTE: computer_screenshot, computer_mouse_move, computer_mouse_click
+// are registered in community-skills.ts (better implementations with
+// await, error handling, and more features). Do NOT re-add here.
 
 registerTool({
   name: "computer_type",

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
 
 export function AnalyticsPage() {
   const [stats, setStats] = useState<any>(null);
@@ -133,24 +134,58 @@ export function AnalyticsPage() {
             </div>
           )}
 
-          {/* Charts Placeholder */}
+          {/* Charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="glass-panel rounded-xl p-5">
               <h3 className="font-bold text-sm text-white mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <svg className="w-4 h-4 text-[#22c55e]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 Requests Over Time
               </h3>
-              <div className="h-48 flex items-center justify-center border border-dashed border-[rgba(255,255,255,0.06)] rounded-lg">
-                <span className="text-xs text-[#475569]">Chart coming soon</span>
+              <div className="h-48">
+                {stats?.dailyActivity?.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={stats.dailyActivity}>
+                      <defs>
+                        <linearGradient id="colorRequests" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#475569' }} stroke="rgba(255,255,255,0.06)" />
+                      <YAxis tick={{ fontSize: 10, fill: '#475569' }} stroke="rgba(255,255,255,0.06)" />
+                      <Tooltip contentStyle={{ background: '#12121a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.75rem', fontSize: 11 }} />
+                      <Area type="monotone" dataKey="count" stroke="#6366f1" fillOpacity={1} fill="url(#colorRequests)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center border border-dashed border-[rgba(255,255,255,0.06)] rounded-lg">
+                    <span className="text-xs text-[#475569]">No data yet — start using agents to see charts</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="glass-panel rounded-xl p-5">
               <h3 className="font-bold text-sm text-white mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Latency Trend
+                <svg className="w-4 h-4 text-[#f59e0b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Requests by Model
               </h3>
-              <div className="h-48 flex items-center justify-center border border-dashed border-[rgba(255,255,255,0.06)] rounded-lg">
-                <span className="text-xs text-[#475569]">Chart coming soon</span>
+              <div className="h-48">
+                {stats?.modelUsage?.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.modelUsage.slice(0, 8)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                      <XAxis dataKey="model" tick={{ fontSize: 9, fill: '#475569' }} stroke="rgba(255,255,255,0.06)" />
+                      <YAxis tick={{ fontSize: 10, fill: '#475569' }} stroke="rgba(255,255,255,0.06)" />
+                      <Tooltip contentStyle={{ background: '#12121a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '0.75rem', fontSize: 11 }} />
+                      <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center border border-dashed border-[rgba(255,255,255,0.06)] rounded-lg">
+                    <span className="text-xs text-[#475569]">No data yet</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -2335,5 +2335,195 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ results });
   });
 
+  // ─── DEX Trading Endpoints ───────────────────────────────
+  app.post("/api/dex/quote", async (c) => {
+    try {
+      const { jupiterClient } = await import("../crypto-hub/dex/jupiter");
+      const { findToken } = await import("../crypto-hub/dex/tokens");
+      const body = await c.req.json();
+      const inputToken = findToken(body.from);
+      const outputToken = findToken(body.to);
+      if (!inputToken || !outputToken) return c.json({ error: "Unknown token" }, 400);
+      const amount = Math.floor(parseFloat(body.amount) * Math.pow(10, inputToken.decimals));
+      const quote = await jupiterClient.getQuote({
+        inputMint: inputToken.mint, outputMint: outputToken.mint,
+        amount, slippageBps: body.slippage || 50,
+      });
+      return c.json(quote);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.post("/api/dex/swap", async (c) => {
+    try {
+      const { jupiterClient } = await import("../crypto-hub/dex/jupiter");
+      const { findToken } = await import("../crypto-hub/dex/tokens");
+      const { walletManager } = await import("../crypto-hub/dex/wallet");
+      walletManager.init();
+      if (!walletManager.isConnected()) return c.json({ error: "Wallet not configured" }, 400);
+      const body = await c.req.json();
+      const inputToken = findToken(body.from);
+      const outputToken = findToken(body.to);
+      if (!inputToken || !outputToken) return c.json({ error: "Unknown token" }, 400);
+      const amount = Math.floor(parseFloat(body.amount) * Math.pow(10, inputToken.decimals));
+      const quote = await jupiterClient.getQuote({
+        inputMint: inputToken.mint, outputMint: outputToken.mint, amount, slippageBps: 50,
+      });
+      const swap = await jupiterClient.getSwapTransaction({
+        quoteResponse: quote, userPublicKey: walletManager.getAddress()!,
+      });
+      return c.json(swap);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/dex/price/:tokens", async (c) => {
+    try {
+      const { jupiterClient } = await import("../crypto-hub/dex/jupiter");
+      const { findToken } = await import("../crypto-hub/dex/tokens");
+      const symbols = c.req.param("tokens").split(",");
+      const mints = symbols.map((s: string) => findToken(s.trim())?.mint).filter(Boolean);
+      const prices = await jupiterClient.getSimplePrice(mints);
+      return c.json(prices);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/dex/wallet", async (c) => {
+    try {
+      const { walletManager } = await import("../crypto-hub/dex/wallet");
+      walletManager.init();
+      const info = await walletManager.getInfo();
+      return c.json(info || { error: "No wallet" });
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/dex/tokens", (c) => {
+    const { SOLANA_TOKENS } = require("../crypto-hub/dex/tokens");
+    return c.json(SOLANA_TOKENS);
+  });
+
+  // ─── Polymarket Endpoints ────────────────────────────────
+  app.get("/api/polymarket/markets", async (c) => {
+    try {
+      const { polymarketClient } = await import("../crypto-hub/polymarket/client");
+      const limit = parseInt(c.req.query("limit") || "20");
+      const active = c.req.query("active") !== "false";
+      const markets = await polymarketClient.getMarkets({ limit, active, closed: false });
+      return c.json(markets);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/polymarket/markets/:id", async (c) => {
+    try {
+      const { polymarketClient } = await import("../crypto-hub/polymarket/client");
+      const market = await polymarketClient.getMarket(c.req.param("id"));
+      return c.json(market);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/polymarket/trending", async (c) => {
+    try {
+      const { polymarketClient } = await import("../crypto-hub/polymarket/client");
+      const limit = parseInt(c.req.query("limit") || "10");
+      const markets = await polymarketClient.getTrendingMarkets(limit);
+      return c.json(markets);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/polymarket/search", async (c) => {
+    try {
+      const { polymarketClient } = await import("../crypto-hub/polymarket/client");
+      const q = c.req.query("q") || "";
+      const markets = await polymarketClient.searchMarkets(q, 10);
+      return c.json(markets);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/polymarket/book/:tokenId", async (c) => {
+    try {
+      const { polymarketClient } = await import("../crypto-hub/polymarket/client");
+      const book = await polymarketClient.getOrderBook(c.req.param("tokenId"));
+      return c.json(book);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/polymarket/analyze/:id", async (c) => {
+    try {
+      const { polymarketAnalyzer } = await import("../crypto-hub/polymarket/analyzer");
+      const analysis = await polymarketAnalyzer.analyzeMarket(c.req.param("id"));
+      return c.json(analysis);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/polymarket/opportunities", async (c) => {
+    try {
+      const { polymarketAnalyzer } = await import("../crypto-hub/polymarket/analyzer");
+      const limit = parseInt(c.req.query("limit") || "5");
+      const opps = await polymarketAnalyzer.findOpportunities(limit);
+      return c.json(opps);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  // ─── Strategy Endpoints ──────────────────────────────────
+  app.get("/api/strategies", (c) => {
+    const { strategyEngine } = require("../crypto-hub/strategies/engine");
+    return c.json(strategyEngine.listStrategies());
+  });
+
+  app.post("/api/strategies", async (c) => {
+    try {
+      const { strategyEngine } = await import("../crypto-hub/strategies/engine");
+      const body = await c.req.json();
+      const strategy = strategyEngine.createStrategy(body.type, body.name, body.config || {});
+      return c.json(strategy);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  app.get("/api/strategies/:id", (c) => {
+    const { strategyEngine } = require("../crypto-hub/strategies/engine");
+    const s = strategyEngine.getStrategy(c.req.param("id"));
+    return s ? c.json(s) : c.json({ error: "Not found" }, 404);
+  });
+
+  app.delete("/api/strategies/:id", (c) => {
+    const { strategyEngine } = require("../crypto-hub/strategies/engine");
+    strategyEngine.deleteStrategy(c.req.param("id"));
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/strategies/:id/start", (c) => {
+    const { strategyEngine } = require("../crypto-hub/strategies/engine");
+    strategyEngine.startStrategy(c.req.param("id"));
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/strategies/:id/pause", (c) => {
+    const { strategyEngine } = require("../crypto-hub/strategies/engine");
+    strategyEngine.pauseStrategy(c.req.param("id"));
+    return c.json({ ok: true });
+  });
+
+  app.get("/api/strategies/:id/history", (c) => {
+    const { strategyEngine } = require("../crypto-hub/strategies/engine");
+    return c.json(strategyEngine.getTradeHistory(c.req.param("id")));
+  });
+
+  // ─── Risk Endpoints ──────────────────────────────────────
+  app.post("/api/risk/score", async (c) => {
+    try {
+      const { riskScorer } = await import("../crypto-hub/risk/scorer");
+      const body = await c.req.json();
+      const result = await riskScorer.calculateRisk(body.positions || []);
+      return c.json(result);
+    } catch (e: any) { return c.json({ error: e.message }, 500); }
+  });
+
+  // ─── TradingView Widget Config ──────────────────────────
+  app.get("/api/tradingview/url", (c) => {
+    const { TradingViewConfig } = require("../crypto-hub/charts/tradingview");
+    const symbol = c.req.query("symbol") || "BINANCE:BTCUSDT";
+    const preset = c.req.query("preset") || "tradingView";
+    const config = { ...TradingViewConfig.getPreset(preset), symbol };
+    return c.json({ url: TradingViewConfig.getWidgetUrl(config) });
+  });
+
   return app;
 }

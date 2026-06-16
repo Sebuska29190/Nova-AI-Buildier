@@ -201,12 +201,6 @@ export async function wait(ms = 1000): Promise<string> {
 export async function listTabs(): Promise<TabInfo[]> {
   if (!_context) return [];
   const pages = _context.pages();
-  return pages.map((p, i) => ({
-    id: i,
-    url: p.url(),
-    title: p.video()?.path() || "(no video)",
-  }));
-  // Fix: get title via evaluate
   const result: TabInfo[] = [];
   for (let i = 0; i < pages.length; i++) {
     try {

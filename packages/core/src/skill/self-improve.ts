@@ -59,7 +59,7 @@ If YES, output a JSON object:
   "name": "hyphenated-skill-name",
   "description": "Short one-line description",
   "triggers": ["trigger phrase 1", "trigger phrase 2"],
-  "instructions": "## Steps\\n1. XXX\\n2. YYY\\n\\n## Notes\\n- Important caveat",
+  "instructions": "## Steps\\n1. Describe the first step\\n2. Describe the second step\\n\\n## Notes\\n- Add any important caveats or tips",
   "confidence": 0.8
 }
 

@@ -121,12 +121,12 @@ export function ShoppingPage() {
       {/* Tabs */}
       <div className="flex gap-1 mb-5">
         <button onClick={() => setActiveTab("search")}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === "search" ? "bg-teal-500/10 text-teal-400 border border-teal-500/20" : "text-gray-500 hover:text-white border border-transparent"}`}>
+          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === "search" ? "bg-#6366f1/10 text-#818cf8 border border-#6366f1/20" : "text-gray-500 hover:text-white border border-transparent"}`}>
           <Search size={14} className="inline mr-1.5" />Search
         </button>
         <button onClick={() => setActiveTab("wishlist")}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === "wishlist" ? "bg-teal-500/10 text-teal-400 border border-teal-500/20" : "text-gray-500 hover:text-white border border-transparent"}`}>
-          <Heart size={14} className="inline mr-1.5" />Wishlist {wishlist.length > 0 && <span className="ml-1 text-teal-400">({wishlist.length})</span>}
+          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === "wishlist" ? "bg-#6366f1/10 text-#818cf8 border border-#6366f1/20" : "text-gray-500 hover:text-white border border-transparent"}`}>
+          <Heart size={14} className="inline mr-1.5" />Wishlist {wishlist.length > 0 && <span className="ml-1 text-#818cf8">({wishlist.length})</span>}
         </button>
       </div>
 
@@ -165,14 +165,14 @@ export function ShoppingPage() {
                 <Search size={16} className="absolute left-4 top-3 text-gray-500" />
                 <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={handleSearchKeydown}
                   placeholder="Search 11 marketplaces... e.g. wireless headphones, leather bag, running shoes"
-                  className="w-full bg-[#0a0c10] border border-gray-800 rounded-xl pl-11 pr-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-teal-500/50 transition-all" />
+                  className="w-full bg-[#0a0c10] border border-gray-800 rounded-xl pl-11 pr-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-#6366f1/50 transition-all" />
               </div>
               <button onClick={() => setShowFilters(!showFilters)}
-                className={`p-2.5 rounded-xl border transition-all ${showFilters ? "bg-teal-500/10 border-teal-500/30 text-teal-400" : "bg-[#0a0c10] border-gray-800 text-gray-500 hover:text-white"}`}>
+                className={`p-2.5 rounded-xl border transition-all ${showFilters ? "bg-#6366f1/10 border-#6366f1/30 text-#818cf8" : "bg-[#0a0c10] border-gray-800 text-gray-500 hover:text-white"}`}>
                 <SlidersHorizontal size={18} />
               </button>
               <button onClick={search} disabled={loading || !query.trim()}
-                className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40">
+                className="bg-#6366f1 hover:bg-#6366f1 text-white px-6 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40">
                 {loading ? "Searching..." : "Search"}
               </button>
             </div>
@@ -183,31 +183,31 @@ export function ShoppingPage() {
                 <div>
                   <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Min Price (€)</label>
                   <input type="number" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0"
-                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50" />
+                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-#6366f1/50" />
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Max Price (€)</label>
                   <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="999"
-                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50" />
+                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-#6366f1/50" />
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Site</label>
                   <select value={selectedSite} onChange={(e) => setSelectedSite(e.target.value)}
-                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50">
+                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-#6366f1/50">
                     {SITES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Category</label>
                   <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50">
+                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-#6366f1/50">
                     {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Sort</label>
                   <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50">
+                    className="w-full bg-[#0a0c10] border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-#6366f1/50">
                     {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
@@ -232,7 +232,7 @@ export function ShoppingPage() {
           <div className="flex-1 flex flex-col min-h-0">
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <div className="animate-spin w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full" />
+                <div className="animate-spin w-6 h-6 border-2 border-#6366f1 border-t-transparent rounded-full" />
                 <span className="text-xs text-gray-500 ml-3">Searching {selectedSite || "all marketplaces"}...</span>
               </div>
             ) : error ? (
@@ -245,10 +245,10 @@ export function ShoppingPage() {
                   <span className="text-xs text-gray-500"><strong className="text-white">{totalResults}</strong> results found ({products.length} shown)</span>
                   <div className="flex items-center gap-3">
                     <select value={limit} onChange={(e) => setLimit(Number(e.target.value))}
-                      className="bg-[#0a0c10] border border-gray-800 rounded-lg px-2 py-1 text-[10px] text-gray-400 focus:outline-none focus:border-teal-500/50">
+                      className="bg-[#0a0c10] border border-gray-800 rounded-lg px-2 py-1 text-[10px] text-gray-400 focus:outline-none focus:border-#6366f1/50">
                       <option value={10}>10/page</option><option value={20}>20/page</option><option value={50}>50/page</option>
                     </select>
-                    <button onClick={resetFilters} className="text-[10px] text-teal-500 hover:underline">New Search</button>
+                    <button onClick={resetFilters} className="text-[10px] text-#6366f1 hover:underline">New Search</button>
                   </div>
                 </div>
 
@@ -283,7 +283,7 @@ export function ShoppingPage() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#161b22] border border-gray-800 rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3">
           <span className="text-xs text-gray-400">{compareList.length} selected for comparison</span>
           {compareList.length >= 2 && (
-            <button onClick={clearCompare} className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-4 py-1.5 rounded-lg font-semibold transition-all">
+            <button onClick={clearCompare} className="text-xs bg-#6366f1 hover:bg-#6366f1 text-white px-4 py-1.5 rounded-lg font-semibold transition-all">
               Compare
             </button>
           )}
@@ -310,7 +310,7 @@ export function ShoppingPage() {
             <div className="p-5">
               <h3 className="text-base font-bold text-white mb-1">{quickView.title}</h3>
               <div className="flex items-center gap-3 mb-3">
-                <span className="text-lg font-bold text-teal-400">{quickView.price > 0 ? `${quickView.currency || "€"}${quickView.price.toFixed(2)}` : "See site"}</span>
+                <span className="text-lg font-bold text-#818cf8">{quickView.price > 0 ? `${quickView.currency || "€"}${quickView.price.toFixed(2)}` : "See site"}</span>
                 {quickView.rating && <span className="text-xs text-amber-400">⭐ {quickView.rating.toFixed(1)}</span>}
               </div>
               {quickView.description && <p className="text-xs text-gray-400 mb-4 leading-relaxed">{quickView.description}</p>}
@@ -319,7 +319,7 @@ export function ShoppingPage() {
                 {quickView.reviews && <span>{quickView.reviews} reviews</span>}
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { openProduct(quickView.url); }} className="flex-1 bg-teal-600 hover:bg-teal-500 text-white py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2">
+                <button onClick={() => { openProduct(quickView.url); }} className="flex-1 bg-#6366f1 hover:bg-#6366f1 text-white py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2">
                   <ExternalLink size={14} /> View Deal
                 </button>
                 <button onClick={() => { toggleWishlist(quickView.id); }}
@@ -395,10 +395,10 @@ function ProductCard({ product, wishlist, compareList, onWishlist, onCompare, on
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-1">
-          <h3 className="text-xs font-semibold text-white truncate flex-1 cursor-pointer hover:text-teal-400 transition-colors" onClick={() => onQuickView(product)}>
+          <h3 className="text-xs font-semibold text-white truncate flex-1 cursor-pointer hover:text-#818cf8 transition-colors" onClick={() => onQuickView(product)}>
             {product.title || "Untitled"}
           </h3>
-          <span className="text-xs font-bold text-teal-400 whitespace-nowrap">
+          <span className="text-xs font-bold text-#818cf8 whitespace-nowrap">
             {product.price > 0 ? `${product.currency || "€"}${product.price.toFixed(2)}` : "See site"}
           </span>
         </div>
@@ -410,10 +410,10 @@ function ProductCard({ product, wishlist, compareList, onWishlist, onCompare, on
           </div>
           <div className="flex gap-1">
             <button onClick={(e) => { e.stopPropagation(); onCompare(product.id); }}
-              className={`p-1 rounded text-[9px] transition-colors ${compareList.includes(product.id) ? "text-teal-400" : "text-gray-600 hover:text-teal-400"}`}>
+              className={`p-1 rounded text-[9px] transition-colors ${compareList.includes(product.id) ? "text-#818cf8" : "text-gray-600 hover:text-#818cf8"}`}>
               {compareList.includes(product.id) ? "✓ Added" : "+ Compare"}
             </button>
-            <button onClick={() => onOpen(product.url)} className="bg-teal-600 hover:bg-teal-500 text-white px-2.5 py-1 rounded-lg text-[9px] font-semibold transition-all flex items-center gap-1">
+            <button onClick={() => onOpen(product.url)} className="bg-#6366f1 hover:bg-#6366f1 text-white px-2.5 py-1 rounded-lg text-[9px] font-semibold transition-all flex items-center gap-1">
               <ExternalLink size={10} /> Deal
             </button>
           </div>

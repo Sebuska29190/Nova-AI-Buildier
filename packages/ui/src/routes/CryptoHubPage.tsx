@@ -1,328 +1,468 @@
 import { useState, useEffect } from "react";
+import { TrendingUp, TrendingDown, Search, ArrowUpDown, Wallet, BarChart3, Shield, Zap, AlertTriangle, RefreshCw, ExternalLink, ChevronRight, X } from "lucide-react";
+import { GlassCard } from "../lib/components/ui/GlassCard";
+import { GlassButton } from "../lib/components/ui/GlassButton";
+import { GlassInput } from "../lib/components/ui/GlassInput";
+import { GlassBadge } from "../lib/components/ui/GlassBadge";
+import { GlassTabs } from "../lib/components/ui/GlassTabs";
+import { MetricCard } from "../lib/components/ui/MetricCard";
 
+// ─── Types ─────────────────────────────────────────────
+interface DashboardData {
+  btcPrice: number; ethPrice: number; solPrice: number;
+  btcChange: number; ethChange: number; solChange: number;
+  marketCap: number; btcDominance: number;
+  gainers: CoinData[]; losers: CoinData[]; signals: SignalData[];
+}
+
+interface CoinData { symbol: string; name: string; price: number; change24h: number; marketCap: number; volume: number; image?: string; }
+interface SignalData { symbol: string; price: number; change24h: number; rsi: number; signal: string; score: number; }
+interface Strategy { id: string; name: string; type: string; status: string; config: any; stats: any; createdAt: string; lastRun?: string; }
+interface PolymarketMarket { id: string; conditionId: string; question: string; description: string; active: boolean; closed: boolean; volume: string; liquidity: string; outcomePrices: string; outcomes: string[]; endDate: string; image?: string; }
+
+// ─── TradingView Widget ────────────────────────────────
+function TradingViewWidget({ symbol = "BINANCE:BTCUSDT", height = 400 }: { symbol?: string; height?: number }) {
+  const url = `https://www.tradingview.com/widgetembed/?symbol=${symbol}&interval=D&theme=Dark&style=1&hidesidetoolbar=1&symboledit=0&saveimage=0&studies=["MASimple@tv-basicstudies","RSI@tv-basicstudies"]&timezone=exchange&locale=en`;
+  return (
+    <div className="glass-card overflow-hidden">
+      <iframe src={url} width="100%" height={height} frameBorder="0" allowFullScreen className="w-full" />
+    </div>
+  );
+}
+
+// ─── Risk Gauge ────────────────────────────────────────
+function RiskGauge({ score }: { score: number }) {
+  const color = score < 30 ? "#22c55e" : score < 60 ? "#f59e0b" : "#ef4444";
+  const label = score < 30 ? "Low Risk" : score < 60 ? "Medium Risk" : "High Risk";
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative w-28 h-14 overflow-hidden">
+        <div className="absolute inset-0 rounded-t-full border-4 border-[rgba(255,255,255,0.06)]" style={{ borderTopColor: color, borderLeftColor: color, borderRightColor: color }} />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+          <p className="text-2xl font-bold font-mono" style={{ color }}>{score}</p>
+        </div>
+      </div>
+      <p className="text-xs font-medium" style={{ color }}>{label}</p>
+    </div>
+  );
+}
+
+// ─── Main Component ────────────────────────────────────
 export function CryptoHubPage() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [tab, setTab] = useState("dashboard");
-  const [coinSearch, setCoinSearch] = useState("");
-  const [coinDetail, setCoinDetail] = useState<any>(null);
-  const [portfolio, setPortfolio] = useState<any>(null);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [showAddAlert, setShowAddAlert] = useState(false);
-  const [alertForm, setAlertForm] = useState({ symbol: "", type: "above", value: 0, message: "" });
-  const [showAddPosition, setShowAddPosition] = useState(false);
-  const [posForm, setPosForm] = useState({ symbol: "", amount: 0, buyPrice: 0, notes: "" });
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [polyMarkets, setPolyMarkets] = useState<PolymarketMarket[]>([]);
+  const [polySearch, setPolySearch] = useState("");
+  const [dexFrom, setDexFrom] = useState("SOL");
+  const [dexTo, setDexTo] = useState("USDC");
+  const [dexAmount, setDexAmount] = useState("1");
+  const [dexQuote, setDexQuote] = useState<any>(null);
+  const [riskScore, setRiskScore] = useState(45);
+  const [analysisSymbol, setAnalysisSymbol] = useState("");
+  const [coinAnalysis, setCoinAnalysis] = useState<any>(null);
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { loadDashboard(); loadStrategies(); loadPolymarket(); }, []);
 
-  async function refresh() {
-    setLoading(true); setError("");
-    try {
-      const [dRes, pRes, aRes] = await Promise.allSettled([
-        fetch("/api/crypto-hub/dashboard").then(r => r.ok ? r.json() : null),
-        fetch("/api/crypto-hub/portfolio").then(r => r.ok ? r.json() : null),
-        fetch("/api/crypto-hub/alerts").then(r => r.ok ? r.json() : null),
-      ]);
-      if (dRes.status === "fulfilled" && dRes.value) setData(dRes.value);
-      if (pRes.status === "fulfilled" && pRes.value) setPortfolio(pRes.value);
-      if (aRes.status === "fulfilled" && aRes.value) setAlerts(aRes.value.alerts || []);
-    } catch (e: any) { setError(e.message); }
-    setLoading(false);
-  }
-
-  async function searchCoin() {
-    if (!coinSearch.trim()) return;
+  async function loadDashboard() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/crypto-hub/coin/${coinSearch.trim().toUpperCase()}`);
-      if (res.ok) setCoinDetail(await res.json());
-    } catch {}
-    setLoading(false);
+      const res = await fetch("/api/crypto-hub/dashboard");
+      if (res.ok) {
+        const data = await res.json();
+        setDashboard({
+          btcPrice: data?.btcPrice ?? 0,
+          ethPrice: data?.ethPrice ?? 0,
+          solPrice: data?.solPrice ?? 0,
+          btcChange: data?.btcChange ?? 0,
+          ethChange: data?.ethChange ?? 0,
+          solChange: data?.solChange ?? 0,
+          marketCap: data?.marketCap ?? 0,
+          btcDominance: data?.btcDominance ?? 0,
+          gainers: data?.gainers ?? [],
+          losers: data?.losers ?? [],
+          signals: data?.signals ?? [],
+        });
+      }
+    } catch {} finally { setLoading(false); }
   }
 
-  async function addAlert() {
-    if (!alertForm.symbol.trim()) return;
+  async function loadStrategies() {
     try {
-      await fetch("/api/crypto-hub/alerts", {
+      const res = await fetch("/api/strategies");
+      if (res.ok) setStrategies(await res.json());
+    } catch {}
+  }
+
+  async function loadPolymarket() {
+    try {
+      const res = await fetch("/api/polymarket/trending?limit=15");
+      if (res.ok) setPolyMarkets(await res.json());
+    } catch {}
+  }
+
+  async function searchPolymarket() {
+    if (!polySearch.trim()) return loadPolymarket();
+    try {
+      const res = await fetch(`/api/polymarket/search?q=${encodeURIComponent(polySearch)}`);
+      if (res.ok) setPolyMarkets(await res.json());
+    } catch {}
+  }
+
+  async function getDexQuote() {
+    try {
+      const res = await fetch("/api/dex/quote", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(alertForm),
+        body: JSON.stringify({ from: dexFrom, to: dexTo, amount: dexAmount }),
       });
-      setShowAddAlert(false);
-      setAlertForm({ symbol: "", type: "above", value: 0, message: "" });
-      const r = await fetch("/api/crypto-hub/alerts");
-      if (r.ok) setAlerts((await r.json()).alerts || []);
+      if (res.ok) setDexQuote(await res.json());
     } catch {}
   }
 
-  async function removeAlert(id: string) {
-    if (!confirm("Delete this price alert?")) return;
-    try { await fetch(`/api/crypto-hub/alerts/${id}`, { method: "DELETE" }); setAlerts(alerts.filter(a => a.id !== id)); } catch {}
-  }
-
-  async function addPosition() {
-    if (!posForm.symbol.trim() || !posForm.amount || !posForm.buyPrice) return;
+  async function analyzeSymbol() {
+    if (!analysisSymbol.trim()) return;
     try {
-      await fetch("/api/crypto-hub/portfolio", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(posForm),
-      });
-      setShowAddPosition(false);
-      setPosForm({ symbol: "", amount: 0, buyPrice: 0, notes: "" });
-      const r = await fetch("/api/crypto-hub/portfolio");
-      if (r.ok) setPortfolio(await r.json());
+      const res = await fetch(`/api/crypto-hub/coin/${analysisSymbol}`);
+      if (res.ok) setCoinAnalysis(await res.json());
     } catch {}
   }
 
-  async function removePosition(id: string) {
-    if (!confirm("Remove this portfolio position?")) return;
-    try {
-      await fetch(`/api/crypto-hub/portfolio/${id}`, { method: "DELETE" });
-      const r = await fetch("/api/crypto-hub/portfolio");
-      if (r.ok) setPortfolio(await r.json());
-    } catch {}
-  }
-
-  function signalBadge(signal: string) {
-    if (signal === "BUY") return "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
-    if (signal === "SELL") return "bg-red-500/20 text-red-400 border border-red-500/30";
-    if (signal === "WEAK_BUY") return "bg-emerald-500/10 text-emerald-400/70 border border-emerald-500/20";
-    if (signal === "WEAK_SELL") return "bg-red-500/10 text-red-400/70 border border-red-500/20";
-    return "bg-slate-500/10 text-[#94a3b8] border border-slate-500/20";
-  }
+  const tabs = [
+    { id: "dashboard", label: "Dashboard", icon: <BarChart3 size={12} /> },
+    { id: "markets", label: "Markets", icon: <TrendingUp size={12} /> },
+    { id: "dex", label: "DEX", icon: <ArrowUpDown size={12} /> },
+    { id: "polymarket", label: "Polymarket", icon: <Zap size={12} /> },
+    { id: "strategies", label: "Strategies", icon: <RefreshCw size={12} /> },
+    { id: "risk", label: "Risk", icon: <Shield size={12} /> },
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto w-full">
+    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in-up">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
-            <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f59e0b] to-[#ef4444] flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+            <TrendingUp size={20} className="text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">Crypto Hub V2</h2>
-            <p className="text-[10px] text-[#475569]">Real-time dashboard, trading signals, alerts & portfolio</p>
+            <h1 className="text-xl font-bold text-white">Crypto Hub</h1>
+            <p className="text-xs text-[#475569]">Markets, DEX, Predictions, Strategies</p>
           </div>
         </div>
-        <button onClick={refresh} className="text-[10px] text-[#6366f1] hover:underline">Refresh</button>
+        <GlassButton variant="ghost" size="sm" icon={<RefreshCw size={14} />} onClick={() => { loadDashboard(); loadStrategies(); loadPolymarket(); }}>
+          Refresh
+        </GlassButton>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-4">
-        {["dashboard", "analysis", "alerts", "portfolio"].map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`text-[10px] px-3 py-1.5 rounded-lg border capitalize ${tab === t ? "border-[#6366f1] bg-[#6366f1]/10 text-[#6366f1]" : "border-[rgba(255,255,255,0.06)] bg-slate-900/60 text-[#94a3b8]"}`}>
-            {t === "dashboard" ? "🔥 Dashboard" : t === "analysis" ? "📊 Analysis" : t === "alerts" ? "🔔 Alerts" : "💼 Portfolio"}
-          </button>
-        ))}
-      </div>
+      <GlassTabs tabs={tabs} activeTab={tab} onChange={setTab} />
 
-      {loading && <div className="text-center py-12"><span className="w-5 h-5 border-2 border-[#6366f1] border-t-transparent rounded-full animate-spin inline-block"></span></div>}
-
-      {/* ═══ DASHBOARD ═══ */}
-      {tab === "dashboard" && data && (
-        <div className="space-y-4">
-          {/* BTC Overview */}
-          <div className="glass-panel rounded-xl p-4 border border-[rgba(255,255,255,0.06)]/60">
-            <div className="grid grid-cols-4 gap-4">
-              <div><p className="text-[9px] text-[#475569] uppercase">BTC</p><p className="text-sm font-bold text-white">${(data.btcPrice || 0).toLocaleString()}</p></div>
-              <div><p className="text-[9px] text-[#475569] uppercase">ETH</p><p className="text-sm font-bold text-white">${(data.ethPrice || 0).toLocaleString()}</p></div>
-              <div><p className="text-[9px] text-[#475569] uppercase">BTC Dominance</p><p className="text-sm font-bold text-white">{data.btcDominance}%</p></div>
-              <div><p className="text-[9px] text-[#475569] uppercase">Total Market Cap</p><p className="text-sm font-bold text-white">${(data.totalMarketCap ? data.totalMarketCap / 1e12 : 0).toFixed(2)}T</p></div>
-            </div>
+      {/* ═══ DASHBOARD TAB ═══ */}
+      {tab === "dashboard" && (
+        <div className="space-y-4 animate-fade-in-up">
+          {loading ? (
+            <GlassCard padding="lg" className="text-center">
+              <p className="text-xs text-[#475569]">Loading market data...</p>
+            </GlassCard>
+          ) : !dashboard ? (
+            <GlassCard padding="lg" className="text-center">
+              <p className="text-xs text-[#475569]">Failed to load dashboard data</p>
+              <GlassButton variant="ghost" size="sm" onClick={loadDashboard} className="mt-2">Retry</GlassButton>
+            </GlassCard>
+          ) : (
+        <div className="space-y-4 animate-fade-in-up">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MetricCard label="Bitcoin" value={`${(dashboard.btcPrice || 0).toLocaleString()}`} change={`${(dashboard.btcChange || 0) > 0 ? "+" : ""}${(dashboard.btcChange || 0).toFixed(2)}%`} changeType={(dashboard.btcChange || 0) > 0 ? "up" : "down"} />
+            <MetricCard label="Ethereum" value={`${(dashboard.ethPrice || 0).toLocaleString()}`} change={`${(dashboard.ethChange || 0) > 0 ? "+" : ""}${(dashboard.ethChange || 0).toFixed(2)}%`} changeType={(dashboard.ethChange || 0) > 0 ? "up" : "down"} />
+            <MetricCard label="Solana" value={`${(dashboard.solPrice || 0).toFixed(2)}`} change={`${(dashboard.solChange || 0) > 0 ? "+" : ""}${(dashboard.solChange || 0).toFixed(2)}%`} changeType={(dashboard.solChange || 0) > 0 ? "up" : "down"} />
+            <MetricCard label="BTC Dominance" value={`${typeof dashboard.btcDominance === 'string' ? dashboard.btcDominance : (dashboard.btcDominance || 0).toFixed(1)}%`} />
           </div>
+
+          {/* TradingView Mini */}
+          <TradingViewWidget symbol="BINANCE:BTCUSDT" height={350} />
 
           {/* Signals Table */}
-          <div className="glass-panel rounded-xl p-4 border border-[rgba(255,255,255,0.06)]/60">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[10px] text-[#94a3b8] uppercase tracking-wider">Trading Signals</h3>
-              <div className="flex gap-2 text-[9px]">
-                <span className="text-emerald-400">🟢 BUY</span>
-                <span className="text-amber-400">🟡 HOLD</span>
-                <span className="text-red-400">🔴 SELL</span>
+          {dashboard.signals?.length > 0 && (
+            <GlassCard padding="md">
+              <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-3">Trading Signals</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[rgba(255,255,255,0.06)]">
+                      <th className="text-left py-2 text-[#475569]">Symbol</th>
+                      <th className="text-right py-2 text-[#475569]">Price</th>
+                      <th className="text-right py-2 text-[#475569]">24h</th>
+                      <th className="text-right py-2 text-[#475569]">RSI</th>
+                      <th className="text-right py-2 text-[#475569]">Signal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.signals.map(s => (
+                      <tr key={s.symbol} className="border-b border-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.02)]">
+                        <td className="py-2 text-white font-medium">{s.symbol}</td>
+                        <td className="py-2 text-right text-[#94a3b8]">${(s.price || 0) < 1 ? (s.price || 0).toFixed(6) : (s.price || 0).toLocaleString()}</td>
+                        <td className={`py-2 text-right ${(s.change24h || 0) > 0 ? "text-[#22c55e]" : "text-[#ef4444]"}`}>{(s.change24h || 0) > 0 ? "+" : ""}{(s.change24h || 0).toFixed(2)}%</td>
+                        <td className="py-2 text-right text-[#94a3b8]">{(s.rsi || 0).toFixed(0) || "-"}</td>
+                        <td className="py-2 text-right">
+                          <GlassBadge variant={s.signal === "STRONG_BUY" ? "success" : s.signal === "BUY" ? "success" : s.signal === "SELL" ? "error" : "default"}>
+                            {s.signal?.replace("_", " ") || "HOLD"}
+                          </GlassBadge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <div className="space-y-1">
-              {data.signals?.map((s: any) => (
-                <div key={s.symbol} className="flex items-center gap-3 py-1.5 border-b border-[rgba(255,255,255,0.06)]/40 last:border-0">
-                  {s.image && <img src={s.image} className="w-5 h-5 rounded-full" alt={s.symbol} />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] text-white font-medium">{s.symbol} <span className="text-[9px] text-[#475569]">{s.name}</span></p>
-                  </div>
-                  <span className="text-[10px] text-white font-mono w-20 text-right">${(s.price || 0).toLocaleString()}</span>
-                  <span className={`text-[9px] font-mono w-14 text-right ${s.change24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {s.change24h >= 0 ? "+" : ""}{s.change24h?.toFixed(1)}%
-                  </span>
-                  <span className="text-[9px] text-[#94a3b8] w-8 text-right">RSI:{s.rsi}</span>
-                  <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${signalBadge(s.signal)}`}>
-                    {s.signal === "BUY" ? "🟢 BUY" : s.signal === "SELL" ? "🔴 SELL" : s.signal === "WEAK_BUY" ? "🟢" : s.signal === "WEAK_SELL" ? "🔴" : "⚪ HOLD"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Gainers / Losers */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="glass-panel rounded-xl p-4 border border-[rgba(255,255,255,0.06)]/60">
-              <h3 className="text-[10px] text-[#94a3b8] uppercase tracking-wider mb-2">🚀 Top Gainers</h3>
-              {data.gainers?.map((c: any) => (
-                <div key={c.id} className="flex justify-between py-1 text-[10px]">
-                  <span className="text-white">{c.symbol?.toUpperCase()}</span>
-                  <span className="text-emerald-400">+{c.price_change_percentage_24h?.toFixed(1)}%</span>
-                </div>
-              ))}
-            </div>
-            <div className="glass-panel rounded-xl p-4 border border-[rgba(255,255,255,0.06)]/60">
-              <h3 className="text-[10px] text-[#94a3b8] uppercase tracking-wider mb-2">📉 Top Losers</h3>
-              {data.losers?.map((c: any) => (
-                <div key={c.id} className="flex justify-between py-1 text-[10px]">
-                  <span className="text-white">{c.symbol?.toUpperCase()}</span>
-                  <span className="text-red-400">{c.price_change_percentage_24h?.toFixed(1)}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ ANALYSIS ═══ */}
-      {tab === "analysis" && (
-        <div className="space-y-4">
-          <div className="glass-panel rounded-xl p-4 border border-[rgba(255,255,255,0.06)]/60">
-            <div className="flex gap-2">
-              <input type="text" value={coinSearch} onChange={(e) => setCoinSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && searchCoin()}
-                placeholder="Search coin (e.g. BTC, ETH, SOL)..."
-                className="flex-1 bg-slate-900/60 border border-[rgba(255,255,255,0.06)] rounded-lg px-3 py-2 text-xs text-white" />
-              <button onClick={searchCoin} className="btn-nova px-4 py-2 rounded-lg text-xs">Search</button>
-            </div>
-          </div>
-          {coinDetail && !coinDetail.error && (
-            <div className="glass-panel rounded-xl p-4 border border-[rgba(255,255,255,0.06)]/60">
-              <div className="flex items-center gap-3 mb-4">
-                {coinDetail.image && <img src={coinDetail.image} className="w-8 h-8 rounded-full" alt={coinDetail.symbol} />}
-                <div>
-                  <h3 className="text-sm font-bold text-white">{coinDetail.name} <span className="text-[10px] text-[#94a3b8]">${coinDetail.symbol}</span></h3>
-                  <p className="text-lg font-bold text-white">${(coinDetail.price || 0).toLocaleString()}</p>
-                </div>
-                <span className={`ml-auto text-[11px] px-2 py-1 rounded-lg font-bold ${signalBadge(coinDetail.signal)}`}>
-                  {coinDetail.signal === "BUY" ? "🟢 BUY" : coinDetail.signal === "SELL" ? "🔴 SELL" : "⚪ HOLD"}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-4 text-[10px]">
-                <div><span className="text-[#475569]">24h Change</span><p className={`font-medium ${coinDetail.change24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>{coinDetail.change24h?.toFixed(2)}%</p></div>
-                <div><span className="text-[#475569]">RSI (14)</span><p className="text-white font-medium">{coinDetail.rsi}</p></div>
-                <div><span className="text-[#475569]">Signal</span><p className="text-white font-medium capitalize">{coinDetail.signal?.replace("_", " ")}</p></div>
-                <div><span className="text-[#475569]">SMA 7</span><p className="text-white">${coinDetail.sma7?.toLocaleString() || "—"}</p></div>
-                <div><span className="text-[#475569]">SMA 25</span><p className="text-white">${coinDetail.sma25?.toLocaleString() || "—"}</p></div>
-                <div><span className="text-[#475569]">MACD</span><p className={`font-medium ${(coinDetail.macd || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{coinDetail.macd?.toFixed(2) || "—"}</p></div>
-              </div>
-            </div>
+            </GlassCard>
           )}
-          {coinDetail?.error && <p className="text-xs text-red-400 text-center py-4">{coinDetail.error}</p>}
-        </div>
-      )}
 
-      {/* ═══ ALERTS ═══ */}
-      {tab === "alerts" && (
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <h3 className="text-[10px] text-[#94a3b8] uppercase tracking-wider">Price Alerts</h3>
-            <button onClick={() => setShowAddAlert(!showAddAlert)} className="btn-nova px-3 py-1 rounded-lg text-[10px]">+ Add Alert</button>
-          </div>
-          {showAddAlert && (
-            <div className="glass-panel rounded-xl p-4 border border-[#6366f1]/20 space-y-2">
-              <div className="grid grid-cols-4 gap-2">
-                <input type="text" placeholder="Symbol (BTC)" value={alertForm.symbol} onChange={(e) => setAlertForm({...alertForm, symbol: e.target.value})}
-                  className="bg-slate-900/60 border border-[rgba(255,255,255,0.06)] rounded-lg px-2 py-1.5 text-[10px] text-white" />
-                <select value={alertForm.type} onChange={(e) => setAlertForm({...alertForm, type: e.target.value})}
-                  className="bg-slate-900/60 border border-[rgba(255,255,255,0.06)] rounded-lg px-2 py-1.5 text-[10px] text-white">
-                  <option value="above">Price Above</option>
-                  <option value="below">Price Below</option>
-                  <option value="rsi_above">RSI Above</option>
-                  <option value="rsi_below">RSI Below</option>
-                </select>
-                <input type="number" placeholder="Value" value={alertForm.value} onChange={(e) => setAlertForm({...alertForm, value: Number(e.target.value)})}
-                  className="bg-slate-900/60 border border-[rgba(255,255,255,0.06)] rounded-lg px-2 py-1.5 text-[10px] text-white" />
-                <button onClick={addAlert} className="btn-nova px-3 py-1.5 rounded-lg text-[10px]">Create</button>
+          {/* Active Strategies Summary */}
+          {strategies.filter(s => s.status === "active").length > 0 && (
+            <GlassCard padding="md">
+              <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-3">Active Strategies</h3>
+              <div className="flex flex-wrap gap-2">
+                {strategies.filter(s => s.status === "active").map(s => (
+                  <GlassBadge key={s.id} variant="accent">{s.name} ({s.type})</GlassBadge>
+                ))}
               </div>
-            </div>
+            </GlassCard>
           )}
-          {alerts.length === 0 ? (
-            <p className="text-[11px] text-[#475569] text-center py-8">No alerts. Create one to get notified when price hits your target.</p>
-          ) : (
-            alerts.map((a: any) => (
-              <div key={a.id} className="glass-panel rounded-xl p-3 border border-[rgba(255,255,255,0.06)]/60 flex items-center justify-between">
+        </div>
+        )}
+      </div>
+    )}
+
+      {/* ═══ MARKETS TAB ═══ */}
+      {tab === "markets" && (
+        <div className="space-y-4 animate-fade-in-up">
+          <div className="flex gap-2">
+            <GlassInput value={analysisSymbol} onChange={e => setAnalysisSymbol(e.target.value)} placeholder="Search coin (e.g. SOL, BTC, JUP)..." icon={<Search size={14} />} onKeyDown={e => e.key === "Enter" && analyzeSymbol()} />
+            <GlassButton variant="primary" onClick={analyzeSymbol}>Analyze</GlassButton>
+          </div>
+
+          {coinAnalysis && (
+            <GlassCard padding="lg">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-lg">🔔</span>
+                  <div className="w-10 h-10 rounded-full bg-[rgba(99,102,241,0.1)] flex items-center justify-center text-lg">📊</div>
                   <div>
-                    <p className="text-[11px] text-white font-medium">{a.symbol} {a.type === "above" ? ">=" : a.type === "below" ? "<=" : a.type === "rsi_above" ? "RSI >=" : "RSI <="} {a.value}</p>
-                    <p className="text-[9px] text-[#475569]">{a.message || "No message"} · Triggered: {a.triggered || 0}x</p>
+                    <h3 className="text-sm font-bold text-white">{coinAnalysis.symbol || analysisSymbol}</h3>
+                    <p className="text-xs text-[#475569]">${coinAnalysis.price?.toLocaleString()}</p>
                   </div>
                 </div>
-                <button onClick={() => removeAlert(a.id)} className="text-[#475569] hover:text-red-400 text-[9px]">✕</button>
+                <GlassBadge variant={coinAnalysis.signal?.includes("BUY") ? "success" : coinAnalysis.signal?.includes("SELL") ? "error" : "default"}>
+                  {coinAnalysis.signal || "HOLD"}
+                </GlassBadge>
               </div>
-            ))
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div><span className="text-[#475569]">RSI:</span> <span className="text-white">{(coinAnalysis.rsi || 0).toFixed(1)}</span></div>
+                <div><span className="text-[#475569]">SMA7:</span> <span className="text-white">${(coinAnalysis.sma7 || 0).toFixed(2)}</span></div>
+                <div><span className="text-[#475569]">MACD:</span> <span className="text-white">{(coinAnalysis.macd || 0).toFixed(4)}</span></div>
+              </div>
+            </GlassCard>
+          )}
+
+          <TradingViewWidget symbol={analysisSymbol ? `BINANCE:${analysisSymbol.toUpperCase()}USDT` : "BINANCE:BTCUSDT"} height={450} />
+
+          {/* Top Gainers/Losers */}
+          {dashboard && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <GlassCard padding="md">
+                <h3 className="text-xs font-bold text-[#22c55e] uppercase tracking-wider mb-3 flex items-center gap-1"><TrendingUp size={12} /> Top Gainers</h3>
+                {dashboard.gainers?.slice(0, 5).map(c => (
+                  <div key={c.symbol} className="flex items-center justify-between py-1.5 text-xs">
+                    <span className="text-white">{c.symbol}</span>
+                    <span className="text-[#22c55e]">+{(c.change24h || 0).toFixed(2)}%</span>
+                  </div>
+                ))}
+              </GlassCard>
+              <GlassCard padding="md">
+                <h3 className="text-xs font-bold text-[#ef4444] uppercase tracking-wider mb-3 flex items-center gap-1"><TrendingDown size={12} /> Top Losers</h3>
+                {dashboard.losers?.slice(0, 5).map(c => (
+                  <div key={c.symbol} className="flex items-center justify-between py-1.5 text-xs">
+                    <span className="text-white">{c.symbol}</span>
+                    <span className="text-[#ef4444]">{(c.change24h || 0).toFixed(2)}%</span>
+                  </div>
+                ))}
+              </GlassCard>
+            </div>
           )}
         </div>
       )}
 
-      {/* ═══ PORTFOLIO ═══ */}
-      {tab === "portfolio" && (
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <h3 className="text-[10px] text-[#94a3b8] uppercase tracking-wider">Portfolio</h3>
-            <button onClick={() => setShowAddPosition(!showAddPosition)} className="btn-nova px-3 py-1 rounded-lg text-[10px]">+ Add Position</button>
-          </div>
-          {portfolio && (
-            <div className="glass-panel rounded-xl p-4 border border-[rgba(255,255,255,0.06)]/60">
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div><p className="text-[9px] text-[#475569]">Total Invested</p><p className="text-sm font-bold text-white">${(portfolio.totalInvested || 0).toLocaleString()}</p></div>
-                <div><p className="text-[9px] text-[#475569]">Current Value</p><p className="text-sm font-bold text-white">${(portfolio.totalValue || 0).toLocaleString()}</p></div>
-                <div><p className="text-[9px] text-[#475569]">P&L</p><p className={`text-sm font-bold ${(portfolio.totalPnl || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                  {(portfolio.totalPnl || 0) >= 0 ? "+" : ""}${(portfolio.totalPnl || 0).toLocaleString()} ({(portfolio.totalPnlPercent || 0) >= 0 ? "+" : ""}{portfolio.totalPnlPercent}%)
-                </p></div>
-              </div>
-            </div>
-          )}
-          {showAddPosition && (
-            <div className="glass-panel rounded-xl p-4 border border-[#6366f1]/20 space-y-2">
-              <div className="grid grid-cols-4 gap-2">
-                <input type="text" placeholder="Symbol (BTC)" value={posForm.symbol} onChange={(e) => setPosForm({...posForm, symbol: e.target.value})}
-                  className="bg-slate-900/60 border border-[rgba(255,255,255,0.06)] rounded-lg px-2 py-1.5 text-[10px] text-white" />
-                <input type="number" placeholder="Amount" value={posForm.amount} onChange={(e) => setPosForm({...posForm, amount: Number(e.target.value)})}
-                  className="bg-slate-900/60 border border-[rgba(255,255,255,0.06)] rounded-lg px-2 py-1.5 text-[10px] text-white" />
-                <input type="number" placeholder="Buy Price $" value={posForm.buyPrice} onChange={(e) => setPosForm({...posForm, buyPrice: Number(e.target.value)})}
-                  className="bg-slate-900/60 border border-[rgba(255,255,255,0.06)] rounded-lg px-2 py-1.5 text-[10px] text-white" />
-                <button onClick={addPosition} className="btn-nova px-3 py-1.5 rounded-lg text-[10px]">Add</button>
-              </div>
-            </div>
-          )}
-          {portfolio?.entries?.length > 0 ? (
-            <div className="space-y-1.5">
-              {portfolio.entries.map((e: any) => (
-                <div key={e.id} className="glass-panel rounded-xl p-3 border border-[rgba(255,255,255,0.06)]/60 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{e.symbol === "BTC" ? "₿" : "🪙"}</span>
-                    <div>
-                      <p className="text-[11px] text-white font-medium">{e.symbol} · {e.amount} coins</p>
-                      <p className="text-[9px] text-[#475569]">Buy: ${e.buy_price} · Current: ${(e.currentPrice || 0).toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-[10px] font-medium ${e.pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                      {e.pnl >= 0 ? "+" : ""}${(e.pnl || 0).toLocaleString()}
-                    </p>
-                    <p className={`text-[9px] ${e.pnlPercent >= 0 ? "text-emerald-400/70" : "text-red-400/70"}`}>({e.pnlPercent}%)</p>
-                  </div>
-                  <button onClick={() => removePosition(e.id)} className="text-[#475569] hover:text-red-400 text-[9px] ml-2">✕</button>
+      {/* ═══ DEX TAB ═══ */}
+      {tab === "dex" && (
+        <div className="space-y-4 animate-fade-in-up max-w-lg mx-auto">
+          <GlassCard padding="lg">
+            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><ArrowUpDown size={16} className="text-[#6366f1]" /> Token Swap</h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] text-[#475569] uppercase tracking-wider mb-1 block">From</label>
+                <div className="flex gap-2">
+                  <input value={dexFrom} onChange={e => setDexFrom(e.target.value.toUpperCase())}
+                    className="glass-input w-24 px-3 py-2 text-sm font-mono text-center" placeholder="SOL" />
+                  <input value={dexAmount} onChange={e => setDexAmount(e.target.value)}
+                    className="glass-input flex-1 px-3 py-2 text-sm text-right" placeholder="1.0" type="number" step="0.01" />
                 </div>
-              ))}
+              </div>
+
+              <div className="flex justify-center">
+                <button onClick={() => { const t = dexFrom; setDexFrom(dexTo); setDexTo(t); }}
+                  className="w-8 h-8 rounded-full bg-[rgba(99,102,241,0.1)] border border-[rgba(99,102,241,0.2)] flex items-center justify-center text-[#818cf8] hover:bg-[rgba(99,102,241,0.2)] transition-all">
+                  <ArrowUpDown size={14} />
+                </button>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-[#475569] uppercase tracking-wider mb-1 block">To</label>
+                <input value={dexTo} onChange={e => setDexTo(e.target.value.toUpperCase())}
+                  className="glass-input w-full px-3 py-2 text-sm font-mono" placeholder="USDC" />
+              </div>
+
+              <GlassButton variant="primary" className="w-full" onClick={getDexQuote}>Get Quote</GlassButton>
             </div>
-          ) : (
-            <p className="text-[11px] text-[#475569] text-center py-8">No positions. Add your crypto holdings to track P&L.</p>
+
+            {dexQuote && (
+              <div className="mt-4 p-3 rounded-xl bg-[rgba(99,102,241,0.05)] border border-[rgba(99,102,241,0.1)]">
+                <p className="text-sm text-white font-medium">
+                  {dexAmount} {dexFrom} → {(parseFloat(dexQuote.outAmount || "0") / 1e6).toFixed(4)} {dexTo}
+                </p>
+                <p className="text-[10px] text-[#475569] mt-1">
+                  Impact: {parseFloat(dexQuote.priceImpactPct || "0").toFixed(4)}% | Routes: {Array.isArray(dexQuote.routePlan) ? dexQuote.routePlan.length : 0}
+                </p>
+                <GlassButton variant="primary" className="w-full mt-2" size="sm">Execute Swap</GlassButton>
+              </div>
+            )}
+          </GlassCard>
+
+          <GlassCard padding="md">
+            <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-2">Wallet</h3>
+            <p className="text-xs text-[#94a3b8]">Connect your Solana wallet to trade</p>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* ═══ POLYMARKET TAB ═══ */}
+      {tab === "polymarket" && (
+        <div className="space-y-4 animate-fade-in-up">
+          <div className="flex gap-2">
+            <GlassInput value={polySearch} onChange={e => setPolySearch(e.target.value)} placeholder="Search predictions (e.g. Trump, Bitcoin, election)..." icon={<Search size={14} />} onKeyDown={e => e.key === "Enter" && searchPolymarket()} />
+            <GlassButton variant="primary" onClick={searchPolymarket}>Search</GlassButton>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {polyMarkets.map(m => {
+              const prices = JSON.parse(m.outcomePrices || "[]");
+              const yesPrice = (parseFloat(prices[0] || "0") * 100 || 0).toFixed(1);
+              return (
+                <GlassCard key={m.id || m.conditionId} padding="md" className="cursor-pointer hover:border-[rgba(245,158,11,0.2)] transition-all">
+                  <p className="text-xs text-white font-medium line-clamp-2 mb-2">{m.question}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="text-lg font-bold text-white">{yesPrice}%</span>
+                      <span className="text-[10px] text-[#475569] ml-1">YES</span>
+                    </div>
+                    <GlassBadge variant={(parseFloat(yesPrice) || 0) > 70 ? "success" : (parseFloat(yesPrice) || 0) < 30 ? "error" : "default"}>
+                      {(parseFloat(yesPrice) || 0) > 70 ? "Likely" : (parseFloat(yesPrice) || 0) < 30 ? "Unlikely" : "Toss-up"}
+                    </GlassBadge>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-[#475569]">
+                    <span>Vol: ${parseInt(m.volume || "0").toLocaleString()}</span>
+                    <span>Liq: ${parseInt(m.liquidity || "0").toLocaleString()}</span>
+                  </div>
+                </GlassCard>
+              );
+            })}
+          </div>
+
+          {polyMarkets.length === 0 && (
+            <GlassCard padding="lg" className="text-center">
+              <Zap size={24} className="mx-auto mb-2 text-[#475569]" />
+              <p className="text-xs text-[#475569]">Search for prediction markets or view trending</p>
+            </GlassCard>
           )}
+        </div>
+      )}
+
+      {/* ═══ STRATEGIES TAB ═══ */}
+      {tab === "strategies" && (
+        <div className="space-y-4 animate-fade-in-up">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {strategies.map(s => (
+              <GlassCard key={s.id} padding="md">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-white font-medium">{s.name}</p>
+                  <GlassBadge variant={s.status === "active" ? "success" : s.status === "paused" ? "default" : "warning"}>
+                    {s.status}
+                  </GlassBadge>
+                </div>
+                <p className="text-[10px] text-[#475569] mb-2">{s.type} — {JSON.stringify(s.config).slice(0, 60)}...</p>
+                <div className="flex gap-2">
+                  {s.status === "paused" ? (
+                    <GlassButton variant="ghost" size="sm" onClick={async () => { await fetch(`/api/strategies/${s.id}/start`, { method: "POST" }); loadStrategies(); }}>Start</GlassButton>
+                  ) : (
+                    <GlassButton variant="ghost" size="sm" onClick={async () => { await fetch(`/api/strategies/${s.id}/pause`, { method: "POST" }); loadStrategies(); }}>Pause</GlassButton>
+                  )}
+                  <GlassButton variant="ghost" size="sm" onClick={async () => { await fetch(`/api/strategies/${s.id}`, { method: "DELETE" }); loadStrategies(); }}>Delete</GlassButton>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+
+          {strategies.length === 0 && (
+            <GlassCard padding="lg" className="text-center">
+              <RefreshCw size={24} className="mx-auto mb-2 text-[#475569]" />
+              <p className="text-xs text-[#475569] mb-3">No strategies yet</p>
+              <GlassButton variant="primary" size="sm" onClick={async () => {
+                await fetch("/api/strategies", {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ type: "dca", name: "SOL Daily DCA", config: { token: "SOL", usdAmount: 25, frequency: "1d" } }),
+                });
+                loadStrategies();
+              }}>Create SOL DCA</GlassButton>
+            </GlassCard>
+          )}
+        </div>
+      )}
+
+      {/* ═══ RISK TAB ═══ */}
+      {tab === "risk" && (
+        <div className="space-y-4 animate-fade-in-up">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <GlassCard padding="lg" className="flex flex-col items-center justify-center">
+              <RiskGauge score={riskScore} />
+              <p className="text-xs text-[#475569] mt-2">Portfolio Risk Score</p>
+            </GlassCard>
+            <GlassCard padding="md" className="md:col-span-2">
+              <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-3">Risk Factors</h3>
+              <div className="space-y-2">
+                {[
+                  { name: "Concentration", score: 25, desc: "Max position: 35%" },
+                  { name: "Diversification", score: 40, desc: "5 positions" },
+                  { name: "Volatility", score: 55, desc: "Avg volatility: 45%" },
+                  { name: "Stablecoin Buffer", score: 60, desc: "8% in stablecoins" },
+                ].map(f => (
+                  <div key={f.name} className="flex items-center gap-3 text-xs">
+                    <span className="w-28 text-[#94a3b8]">{f.name}</span>
+                    <div className="flex-1 h-2 rounded-full bg-[rgba(255,255,255,0.04)]">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${f.score}%`, backgroundColor: f.score < 30 ? "#22c55e" : f.score < 60 ? "#f59e0b" : "#ef4444" }} />
+                    </div>
+                    <span className="w-10 text-right text-[#475569]">{f.score}</span>
+                  </div>
+                ))}
+              </div>
+            </GlassCard>
+          </div>
+
+          <GlassCard padding="md">
+            <h3 className="text-xs font-bold text-[#475569] uppercase tracking-wider mb-3 flex items-center gap-1"><AlertTriangle size={12} /> Recommendations</h3>
+            <ul className="space-y-1.5 text-xs text-[#94a3b8]">
+              <li>• Consider adding stablecoin buffer (10-20%)</li>
+              <li>• Diversify across more asset categories</li>
+              <li>• Monitor high-volatility positions</li>
+            </ul>
+          </GlassCard>
         </div>
       )}
     </div>

@@ -488,7 +488,7 @@ export function ChatPage({
           {messages.length === 0 ? (
             /* Welcome screen */
             <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
-              <div className="w-16 h-16 rounded-2xl bg-[#6366f1]/10 border border-[#6366f1]/20 flex items-center justify-center mb-6 shadow-lg shadow-teal-500/5">
+              <div className="w-16 h-16 rounded-2xl bg-[#6366f1]/10 border border-[#6366f1]/20 flex items-center justify-center mb-6 shadow-lg shadow-#6366f1/5">
                 <Sparkles size={32} className="text-[#818cf8]" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight text-white mb-2">How can we empower your build today?</h2>
@@ -496,13 +496,13 @@ export function ChatPage({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-lg w-full mb-8">
                 {AT_COMMANDS.slice(0, 9).map((cmd) => (
                   <button key={cmd} onClick={() => { setInput(cmd + " "); inputRef.current?.focus(); }}
-                    className="custom-badge bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] hover:border-teal-500/30 hover:bg-[#1c2333] text-[#94a3b8] hover:text-white transition-all text-left truncate">
+                    className="custom-badge bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] hover:border-#6366f1/30 hover:bg-[#1c2333] text-[#94a3b8] hover:text-white transition-all text-left truncate">
                     <span className="text-[#6366f1] mr-1 opacity-70">~</span>{cmd}
                   </button>
                 ))}
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
-                <span className="text-[10px] bg-teal-500/5 border border-[#6366f1]/20 text-[#818cf8] px-2 py-1 rounded-full">
+                <span className="text-[10px] bg-#6366f1/5 border border-[#6366f1]/20 text-[#818cf8] px-2 py-1 rounded-full">
                   <Command size={10} className="inline mr-1" />/help — lista komend
                 </span>
               </div>
@@ -553,7 +553,7 @@ export function ChatPage({
                   </div>
                   <div className="max-w-[75%] p-4 rounded-2xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)]">
                     <div className="text-sm text-[#cbd5e1] whitespace-pre-wrap">{streamContent}</div>
-                    <span className="inline-block w-1.5 h-4 bg-teal-400 animate-pulse ml-0.5" />
+                    <span className="inline-block w-1.5 h-4 bg-#818cf8 animate-pulse ml-0.5" />
                   </div>
                 </div>
               )}
@@ -566,7 +566,7 @@ export function ChatPage({
                   </div>
                   <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-2xl p-4 flex items-center gap-3">
                     <div className="flex items-center gap-2 text-sm text-[#475569]">
-                      <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+                      <span className="w-2 h-2 rounded-full bg-#818cf8 animate-pulse" />
                       Nova is thinking...
                     </div>
                     <button onClick={cancelStream} className="text-[10px] px-2 py-1 rounded bg-red-950/40 hover:bg-red-900/40 text-red-400 border border-red-900/30 transition-all">
@@ -612,7 +612,7 @@ export function ChatPage({
                       key={c.cmd}
                       className={`w-full flex items-center gap-3 px-3 py-2 text-left text-xs transition-all ${
                         i === selectedSuggestion
-                          ? "bg-[#6366f1]/10 text-white border-l-2 border-teal-500"
+                          ? "bg-[#6366f1]/10 text-white border-l-2 border-#6366f1"
                           : "text-[#94a3b8] hover:bg-[rgba(255,255,255,0.06)]/50 hover:text-white"
                       }`}
                       onMouseDown={(e) => { e.preventDefault(); setInput(c.cmd.split(" ")[0] + " "); setShowSuggestions(false); }}
@@ -695,7 +695,7 @@ export function ChatPage({
             <div>
               <label className="block text-xs text-[#475569] mb-2">Agent & Model</label>
               <select
-                className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg p-2 text-sm text-[#cbd5e1] outline-none focus:border-teal-500"
+                className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg p-2 text-sm text-[#cbd5e1] outline-none focus:border-[#6366f1]"
                 value={settings.agent}
                 onChange={(e) => setSettings({ ...settings, agent: e.target.value })}
               >
@@ -719,7 +719,7 @@ export function ChatPage({
                   {agents.slice(0, 8).map((a: any) => (
                     <button
                       key={a.id}
-                      className="bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] hover:border-teal-500/30 rounded-lg px-2.5 py-1.5 text-xs text-[#94a3b8] hover:text-white transition-all"
+                      className="bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] hover:border-#6366f1/30 rounded-lg px-2.5 py-1.5 text-xs text-[#94a3b8] hover:text-white transition-all"
                       onClick={() => { setInput(`/agent ${a.name} `); inputRef.current?.focus(); }}
                     >
                       {a.emoji || "🤖"} {a.name}
@@ -734,13 +734,13 @@ export function ChatPage({
                 <span className="text-sm text-[#94a3b8]">Auto Approve</span>
                 <input type="checkbox" checked={settings.autoApprove}
                   onChange={() => setSettings({ ...settings, autoApprove: !settings.autoApprove })}
-                  className="accent-teal-500 w-4 h-4" />
+                  className="accent-#6366f1 w-4 h-4" />
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-[#94a3b8]">Auto Allowance</span>
                 <input type="checkbox" checked={settings.autoAllowance}
                   onChange={() => setSettings({ ...settings, autoAllowance: !settings.autoAllowance })}
-                  className="accent-teal-500 w-4 h-4" />
+                  className="accent-#6366f1 w-4 h-4" />
               </div>
             </div>
 
@@ -748,7 +748,7 @@ export function ChatPage({
               <h4 className="text-xs text-[#475569] mb-3 uppercase tracking-wider">Aktywne skille</h4>
               <div className="flex flex-wrap gap-1.5">
                 {skills.filter((s: any) => s.enabled !== false).slice(0, 8).map((skill: any) => (
-                  <span key={skill.name || skill.id} className="custom-badge bg-teal-500/5 border border-[#6366f1]/20 text-[#818cf8] text-[10px]">
+                  <span key={skill.name || skill.id} className="custom-badge bg-#6366f1/5 border border-[#6366f1]/20 text-[#818cf8] text-[10px]">
                     <Puzzle size={10} className="mr-1 inline" />
                     {skill.name || skill.id}
                   </span>
@@ -762,7 +762,7 @@ export function ChatPage({
               <div className="flex gap-2">
                 <input value={workspacePath} onChange={(e) => setWorkspacePath(e.target.value)}
                   placeholder="e.g. C:\Projects\my-app"
-                  className="flex-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-teal-500 font-mono" />
+                  className="flex-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#6366f1] font-mono" />
                 <button onClick={async () => {
                   try {
                     const res = await fetch("/api/workspace/browse", { method: "POST" });

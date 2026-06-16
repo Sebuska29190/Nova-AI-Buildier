@@ -51,6 +51,10 @@ import "./git/tools.ts"; // registers 11 git tools
 import "./memory/knowledge-graph.ts"; // registers 6 knowledge graph tools
 import "./agent/goal-decomposition.ts"; // registers 4 goal decomposition tools
 import "./analytics/dashboard.ts"; // registers 4 analytics tools
+import "./crypto-hub/dex/tools.ts"; // registers 5 DEX trading tools
+import "./crypto-hub/polymarket/tools.ts"; // registers 3 prediction tools
+import "./crypto-hub/strategies/engine.ts"; // registers 5 strategy tools
+import "./crypto-hub/risk/scorer.ts"; // registers 2 risk tools
 import deepseekPlugin from "../../provider-deepseek/src/index.ts";
 import anthropicProvider from "../../provider-anthropic/src/index.ts";
 import openaiProvider from "../../provider-openai/src/index.ts";
