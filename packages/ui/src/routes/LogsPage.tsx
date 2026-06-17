@@ -107,7 +107,7 @@ export function LogsPage() {
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-slate-500 font-medium">Level:</span>
             <select
-              className="bg-slate-900/50 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-[#00f2fe]"
+              className="bg-slate-900/50 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-[#6366f1]"
               value={filterLevel}
               onChange={(e) => setFilterLevel(e.target.value)}
             >
@@ -122,14 +122,14 @@ export function LogsPage() {
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-slate-500 font-medium">Component:</span>
             <input
-              className="bg-slate-900/50 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-300 w-40 placeholder-slate-600 focus:outline-none focus:border-[#00f2fe]"
+              className="bg-slate-900/50 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-300 w-40 placeholder-slate-600 focus:outline-none focus:border-[#6366f1]"
               placeholder="Filter component..."
               value={filterComponent}
               onChange={(e) => setFilterComponent(e.target.value)}
             />
           </div>
           <label className="flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer ml-auto">
-            <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} className="accent-[#00f2fe]" />
+            <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} className="accent-[#6366f1]" />
             Auto-scroll
           </label>
         </div>

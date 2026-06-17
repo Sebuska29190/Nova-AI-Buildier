@@ -76,7 +76,7 @@ export function ChambersPage() {
     <div className="max-w-6xl mx-auto w-full">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#00f2fe]/20 to-[#4facfe]/20 border border-[#00f2fe]/30 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#6366f1]/20 to-[#4facfe]/20 border border-[#6366f1]/30 flex items-center justify-center">
             <span className="text-sm">🏛️</span>
           </div>
           <div>
@@ -95,7 +95,7 @@ export function ChambersPage() {
             {chambers.length === 0 && <p className="text-xs text-slate-500">No chambers yet. Create one to start.</p>}
             {chambers.map((c) => (
               <div key={c.id} onClick={() => viewDetails(c.id)}
-                className={`glass-panel rounded-xl p-3 border cursor-pointer transition-all ${selected?.chamber.id === c.id ? "border-[#00f2fe]/40" : "border-slate-800/40 hover:border-slate-700"}`}>
+                className={`glass-panel rounded-xl p-3 border cursor-pointer transition-all ${selected?.chamber.id === c.id ? "border-[#6366f1]/40" : "border-slate-800/40 hover:border-slate-700"}`}>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-white font-medium">{c.name}</p>
                   <span className={`text-[9px] px-1.5 py-0.5 rounded ${c.status === "running" ? "bg-emerald-500/20 text-emerald-400" : c.status === "completed" ? "bg-blue-500/20 text-blue-400" : "bg-slate-700/40 text-slate-400"}`}>{c.status}</span>
@@ -128,7 +128,7 @@ export function ChambersPage() {
                   {selected.messages.map((m) => (
                     <div key={m.id} className="bg-slate-900/60 rounded-xl p-3 border border-slate-800/40">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[9px] font-medium ${m.type === "delegation" ? "text-amber-400" : m.type === "decision" ? "text-emerald-400" : "text-[#00f2fe]"}`}>
+                        <span className={`text-[9px] font-medium ${m.type === "delegation" ? "text-amber-400" : m.type === "decision" ? "text-emerald-400" : "text-[#6366f1]"}`}>
                           [{m.role}] {m.agentName}
                         </span>
                         <span className="text-[8px] text-slate-600">R{m.round}</span>
@@ -176,7 +176,7 @@ export function ChambersPage() {
                         <input type="checkbox" checked={isSelected} onChange={(e) => {
                           if (e.target.checked) setSelectedAgents([...selectedAgents, { agentId: a.id, role: "" }]);
                           else setSelectedAgents(selectedAgents.filter((sa) => sa.agentId !== a.id));
-                        }} className="accent-[#00f2fe]" />
+                        }} className="accent-[#6366f1]" />
                         <span className="text-[10px] text-white flex-1">{a.emoji || "🤖"} {a.name}</span>
                         {isSelected && (
                           <input type="text" value={role} onChange={(e) => setSelectedAgents(selectedAgents.map((sa) => sa.agentId === a.id ? { ...sa, role: e.target.value } : sa))}

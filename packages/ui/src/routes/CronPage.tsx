@@ -187,8 +187,8 @@ export function CronPage() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#00f2fe]/20 to-[#4facfe]/20 border border-[#00f2fe]/30 flex items-center justify-center">
-              <svg className="w-4 h-4 text-[#00f2fe]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#6366f1]/20 to-[#4facfe]/20 border border-[#6366f1]/30 flex items-center justify-center">
+              <svg className="w-4 h-4 text-[#6366f1]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
             </div>
@@ -223,12 +223,12 @@ export function CronPage() {
 
       {/* Create Form */}
       {showForm && (
-        <div className="glass-panel rounded-xl p-5 mb-6 border border-[#00f2fe]/20 animate-fadeIn">
+        <div className="glass-panel rounded-xl p-5 mb-6 border border-[#6366f1]/20 animate-fadeIn">
           <div className="space-y-3">
             <div>
               <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Task Description</label>
               <textarea
-                className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800 text-xs text-white placeholder-slate-600 mt-1 resize-none focus:border-[#00f2fe]/40 focus:outline-none transition-all"
+                className="w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800 text-xs text-white placeholder-slate-600 mt-1 resize-none focus:border-[#6366f1]/40 focus:outline-none transition-all"
                 rows={2}
                 placeholder='e.g. "check weather every day at 8am" or "summarize news every 6 hours"'
                 value={formDescription}
@@ -238,7 +238,7 @@ export function CronPage() {
             <div>
               <label className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Cron Expression (optional)</label>
               <input
-                className="w-full px-3 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs text-white placeholder-slate-600 mt-1 focus:border-[#00f2fe]/40 focus:outline-none transition-all"
+                className="w-full px-3 py-1.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs text-white placeholder-slate-600 mt-1 focus:border-[#6366f1]/40 focus:outline-none transition-all"
                 placeholder="0 */2 * * * (leave empty for auto-detect)"
                 value={formSchedule}
                 onChange={(e) => setFormSchedule(e.target.value)}
@@ -252,7 +252,7 @@ export function CronPage() {
                 { emoji: "💰", text: "send crypto digest daily at 9am" },
               ].map((ex) => (
                 <button key={ex.text}
-                  className="text-[9px] bg-slate-950/60 border border-slate-800 rounded-lg px-2 py-1 text-slate-500 hover:border-[#00f2fe]/30 hover:text-slate-300 transition-all"
+                  className="text-[9px] bg-slate-950/60 border border-slate-800 rounded-lg px-2 py-1 text-slate-500 hover:border-[#6366f1]/30 hover:text-slate-300 transition-all"
                   onClick={() => { setFormDescription(ex.text); setShowForm(true); }}
                 >{ex.emoji} {ex.text}</button>
               ))}
@@ -268,7 +268,7 @@ export function CronPage() {
       {/* Job List */}
       {loading ? (
         <div className="glass-panel rounded-xl p-12 flex flex-col items-center justify-center gap-3">
-          <span className="w-5 h-5 border-2 border-[#00f2fe] border-t-transparent rounded-full animate-spin"></span>
+          <span className="w-5 h-5 border-2 border-[#6366f1] border-t-transparent rounded-full animate-spin"></span>
           <span className="text-[11px] text-slate-500">Loading cron jobs...</span>
         </div>
       ) : jobs.length === 0 ? (
@@ -293,7 +293,7 @@ export function CronPage() {
                         {editingJob === job.id ? (
                           <div className="flex items-center gap-2 flex-1">
                             <textarea
-                              className="flex-1 px-2 py-1 rounded bg-slate-900/80 border border-[#00f2fe]/30 text-xs text-white resize-none"
+                              className="flex-1 px-2 py-1 rounded bg-slate-900/80 border border-[#6366f1]/30 text-xs text-white resize-none"
                               rows={1}
                               value={editDescription}
                               onChange={(e) => setEditDescription(e.target.value)}
@@ -348,13 +348,13 @@ export function CronPage() {
                         )}
                       </button>
                       <button
-                        className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#00f2fe]/10 text-[#00f2fe]/70 hover:bg-[#00f2fe]/20 hover:text-[#00f2fe] border border-[#00f2fe]/20 transition-all disabled:opacity-40"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#6366f1]/10 text-[#6366f1]/70 hover:bg-[#6366f1]/20 hover:text-[#6366f1] border border-[#6366f1]/20 transition-all disabled:opacity-40"
                         onClick={() => runNow(job.id)}
                         disabled={runningJobs.has(job.id)}
                         title="Run now"
                       >
                         {runningJobs.has(job.id) ? (
-                          <span className="w-3.5 h-3.5 border-2 border-[#00f2fe] border-t-transparent rounded-full animate-spin"></span>
+                          <span className="w-3.5 h-3.5 border-2 border-[#6366f1] border-t-transparent rounded-full animate-spin"></span>
                         ) : (
                           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                         )}
@@ -376,7 +376,7 @@ export function CronPage() {
                       <button
                         className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                           expandedJob === job.id
-                            ? "bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30"
+                            ? "bg-[#6366f1]/15 text-[#6366f1] border border-[#6366f1]/30"
                             : "bg-slate-800/40 text-slate-500 hover:bg-slate-700/40 hover:text-slate-300 border border-slate-800"
                         }`}
                         onClick={() => toggleExpand(job.id)}
@@ -391,7 +391,7 @@ export function CronPage() {
 
               {/* Expanded: Run History */}
               {expandedJob === job.id && (
-                <div className="glass-panel rounded-xl mt-1 mb-2 p-3 border border-[#00f2fe]/10 ml-4 animate-fadeIn">
+                <div className="glass-panel rounded-xl mt-1 mb-2 p-3 border border-[#6366f1]/10 ml-4 animate-fadeIn">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Run History</span>
                     <button className="text-[9px] text-slate-600 hover:text-slate-400" onClick={() => loadRuns(job.id)}>refresh</button>

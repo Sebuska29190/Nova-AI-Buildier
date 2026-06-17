@@ -10,8 +10,8 @@ function renderMarkdown(text: string): string {
     // Headers
     .replace(/^###### (.*$)/gm, '<h6 class="text-xs font-bold text-white mt-3 mb-1">$1</h6>')
     .replace(/^##### (.*$)/gm, '<h5 class="text-sm font-bold text-white mt-3 mb-1">$1</h5>')
-    .replace(/^#### (.*$)/gm, '<h4 class="text-sm font-bold text-[#00f2fe] mt-4 mb-1">$1</h4>')
-    .replace(/^### (.*$)/gm, '<h3 class="text-base font-bold text-[#00f2fe] mt-4 mb-2">$1</h3>')
+    .replace(/^#### (.*$)/gm, '<h4 class="text-sm font-bold text-[#6366f1] mt-4 mb-1">$1</h4>')
+    .replace(/^### (.*$)/gm, '<h3 class="text-base font-bold text-[#6366f1] mt-4 mb-2">$1</h3>')
     .replace(/^## (.*$)/gm, '<h2 class="text-lg font-bold text-white mt-5 mb-2 border-b border-slate-800/50 pb-1">$1</h2>')
     .replace(/^# (.*$)/gm, '<h1 class="text-xl font-bold text-white mt-5 mb-3">$1</h1>')
     // Bold & Italic
@@ -41,7 +41,7 @@ function renderMarkdown(text: string): string {
     .replace(/^\s*[-*]\s+(.*)/gm, '<li class="text-slate-400 text-[11px] ml-4 list-disc">$1</li>')
     .replace(/^\s*\d+\.\s+(.*)/gm, '<li class="text-slate-400 text-[11px] ml-4 list-decimal">$1</li>')
     // Blockquotes
-    .replace(/^>\s+(.*)/gm, '<blockquote class="border-l-2 border-[#00f2fe]/30 pl-3 text-slate-400 text-[11px] italic my-2">$1</blockquote>')
+    .replace(/^>\s+(.*)/gm, '<blockquote class="border-l-2 border-[#6366f1]/30 pl-3 text-slate-400 text-[11px] italic my-2">$1</blockquote>')
     // Horizontal rule
     .replace(/^---$/gm, '<hr class="border-slate-800 my-3" />')
     // Paragraphs (double newlines)
@@ -124,11 +124,11 @@ function AgentReportCard({ memory, onDelete }: { memory: any; onDelete: (id: str
   const meta = extractReportMeta(memory.content || "");
 
   return (
-    <div className="glass-panel rounded-xl p-5 transition-all border border-[#00f2fe]/10 hover:border-[#00f2fe]/20">
+    <div className="glass-panel rounded-xl p-5 transition-all border border-[#6366f1]/10 hover:border-[#6366f1]/20">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="w-6 h-6 rounded-full bg-gradient-to-br from-[#00f2fe] to-[#4facfe] flex items-center justify-center text-[10px] font-bold text-black shrink-0">
+          <span className="w-6 h-6 rounded-full bg-gradient-to-br from-[#6366f1] to-[#4facfe] flex items-center justify-center text-[10px] font-bold text-black shrink-0">
             {meta.agent.charAt(0).toUpperCase()}
           </span>
           <div className="min-w-0">
@@ -206,7 +206,7 @@ function AgentReportCard({ memory, onDelete }: { memory: any; onDelete: (id: str
       {expanded && (
         <div className="mt-4 pt-4 border-t border-slate-800/50">
           <div
-            className="prose prose-invert max-w-none text-[11px] leading-relaxed [&_p]:text-slate-400 [&_h2]:text-white [&_h3]:text-[#00f2fe] [&_strong]:text-white [&_code]:text-cyan-300 [&_code]:bg-[#020408]/60 [&_pre]:bg-[#020408]/80 [&_pre]:border [&_pre]:border-slate-800 [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:overflow-x-auto [&_th]:text-slate-300 [&_th]:border-b [&_th]:border-slate-700 [&_td]:text-slate-400 [&_td]:border-b [&_td]:border-slate-800/50 [&_hr]:border-slate-800"
+            className="prose prose-invert max-w-none text-[11px] leading-relaxed [&_p]:text-slate-400 [&_h2]:text-white [&_h3]:text-[#6366f1] [&_strong]:text-white [&_code]:text-cyan-300 [&_code]:bg-[#020408]/60 [&_pre]:bg-[#020408]/80 [&_pre]:border [&_pre]:border-slate-800 [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:overflow-x-auto [&_th]:text-slate-300 [&_th]:border-b [&_th]:border-slate-700 [&_td]:text-slate-400 [&_td]:border-b [&_td]:border-slate-800/50 [&_hr]:border-slate-800"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(memory.content || "") }}
           />
         </div>
@@ -414,7 +414,7 @@ export function MemoryPage() {
             <button key={f.key}
               className={`text-[10px] px-3 py-1 rounded-full transition-all border ${
                 filter === f.key
-                  ? "bg-[#00f2fe]/10 text-[#00f2fe] border-[#00f2fe]/30"
+                  ? "bg-[#6366f1]/10 text-[#6366f1] border-[#6366f1]/30"
                   : "text-slate-500 border-slate-800 hover:border-slate-600"
               }`}
               onClick={() => setFilter(f.key)}>
@@ -427,7 +427,7 @@ export function MemoryPage() {
       {loading ? (
         <div className="glass-panel rounded-xl p-8 flex items-center justify-center">
           <div className="flex items-center gap-3">
-            <span className="w-4 h-4 border-2 border-[#00f2fe] border-t-transparent rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-[#6366f1] border-t-transparent rounded-full animate-spin" />
             <span className="text-xs text-slate-400">Loading...</span>
           </div>
         </div>

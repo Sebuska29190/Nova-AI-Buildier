@@ -127,7 +127,7 @@ export function WorkspacePage() {
           }`}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
         >
-          <svg className={`w-4 h-4 ${n.type === "directory" ? "text-[#00f2fe]" : "text-amber-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className={`w-4 h-4 ${n.type === "directory" ? "text-[#6366f1]" : "text-amber-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             {n.type === "directory" ? (
               <><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><circle cx="12" cy="13" r="2"/><path d="M12 11v-2"/><path d="M10 13H8"/><path d="M16 13h-2"/></>
             ) : (
@@ -226,7 +226,7 @@ export function WorkspacePage() {
           <div className="bg-[#0b0f19] border border-slate-800 max-w-md w-full rounded-xl overflow-hidden shadow-2xl">
             <div className="bg-[#05080f] px-4 py-3 border-b border-slate-850 flex items-center justify-between">
               <div className="flex items-center gap-2 text-white">
-                <svg className="w-4 h-4 text-[#00f2fe]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                <svg className="w-4 h-4 text-[#6366f1]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 <span className="text-xs font-bold tracking-wide uppercase font-mono">System Directory Picker</span>
               </div>
               <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-white transition-all">
@@ -241,7 +241,7 @@ export function WorkspacePage() {
                   placeholder="/path/to/project"
                   value={rootDir}
                   onChange={(e) => setRootDir(e.target.value)}
-                  className="flex-1 bg-[#020408]/60 border border-slate-800 rounded px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#00f2fe] font-mono"
+                  className="flex-1 bg-[#020408]/60 border border-slate-800 rounded px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#6366f1] font-mono"
                 />
                 <button onClick={async () => { await setWorkspace(rootDir); setShowModal(false); }} className="btn-premium px-4 py-2 rounded-lg text-xs font-semibold">Set Path</button>
               </div>

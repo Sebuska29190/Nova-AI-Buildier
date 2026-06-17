@@ -72,7 +72,7 @@ export function EditorPage() {
           <div className="space-y-4">
             <div>
               <label className="text-[9px] text-slate-400 uppercase tracking-wider block mb-1">Source Video (MP4)</label>
-              <label className={`flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-lg cursor-pointer transition-all ${videoFileName ? "border-[#00f2fe]/50 bg-[#00f2fe]/5" : "border-slate-700 bg-[#020408]/40 hover:border-slate-500"}`}>
+              <label className={`flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-lg cursor-pointer transition-all ${videoFileName ? "border-[#6366f1]/50 bg-[#6366f1]/5" : "border-slate-700 bg-[#020408]/40 hover:border-slate-500"}`}>
                 {videoFileName ? (
                   <div className="text-center">
                     <span className="text-sm text-white">\uD83C\uDFAC {videoFileName}</span>
@@ -159,7 +159,7 @@ export function EditorPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-white">Dubbing Jobs</h3>
-          <button onClick={loadJobs} className="text-[10px] text-[#00f2fe] hover:underline">Refresh</button>
+          <button onClick={loadJobs} className="text-[10px] text-[#6366f1] hover:underline">Refresh</button>
         </div>
         {jobs.length === 0 ? (
           <p className="text-xs text-slate-500 text-center py-8">No dubbing jobs yet.</p>

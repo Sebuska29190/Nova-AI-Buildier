@@ -143,17 +143,17 @@ class StrategyEngine {
   private async executeDCA(strategy: Strategy): Promise<string> {
     const config = strategy.config;
     // DCA: Buy fixed amount at each interval
-    return `[DCA] Would buy ${config.amount || 0} ${config.token || "SOL"} for ~$${config.usdAmount || 0} USDC`;
+    return `[DCA SIMULATION] Would buy ${config.amount || 0} ${config.token || "SOL"} for ~${config.usdAmount || 0} USDC. Connect a wallet and enable live trading to execute.`;
   }
 
   private async executeGrid(strategy: Strategy): Promise<string> {
     const config = strategy.config;
-    return `[Grid] Would check price levels for ${config.token || "SOL"} between $${config.lowerPrice || 0} - $${config.upperPrice || 0}`;
+    return `[GRID SIMULATION] Would check price levels for ${config.token || "SOL"} between ${config.lowerPrice || 0} - ${config.upperPrice || 0}. Connect a wallet and enable live trading to execute.`;
   }
 
   private async executeThreshold(strategy: Strategy): Promise<string> {
     const config = strategy.config;
-    return `[${strategy.type}] Monitoring ${config.token || "SOL"} at threshold $${config.threshold || 0}`;
+    return `[${strategy.type.toUpperCase()} SIMULATION] Monitoring ${config.token || "SOL"} at threshold ${config.threshold || 0}. Connect a wallet and enable live trading to execute.`;
   }
 
   private getIntervalMs(frequency: string): number {

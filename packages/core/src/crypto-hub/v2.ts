@@ -254,7 +254,7 @@ export async function checkAlerts(): Promise<string[]> {
               signal: AbortSignal.timeout(5000),
             });
           }
-        } catch {}
+        } catch (e) { console.error(`[crypto-hub] Alert notification failed for ${alert.id}:`, e); }
       }
 
       db.run("UPDATE crypto_alerts SET triggered = triggered + 1, last_triggered = ? WHERE id = ?", [new Date().toISOString(), alert.id]);

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import {
   MessageSquare, Users, Zap, PlusCircle, History, Radio, Brain,
-  FolderGit2, Video, FileCode, Cpu, Coins, ShoppingBag, Terminal,
+  FolderGit2, FileCode, Cpu, Terminal,
   Settings, KeyRound, ScrollText, UserCog, ToyBrick, Calendar,
-  BarChart3, BookOpen, Search, Sliders, Orbit, Globe2, Plug,
-  GitBranch, Building2, Activity, Menu, X, FlaskConical, GitCommitHorizontal
+  BarChart3, BookOpen, Search, Sliders, Orbit, Plug,
+  GitBranch, Building2, Activity, Menu, X, FlaskConical, GitCommitHorizontal, Code, Network
 } from "lucide-react";
 
 interface SidebarProps {
@@ -23,32 +23,31 @@ interface NavItem {
 }
 
 const navGroups: { label: string; items: NavItem[] }[] = [
-  { label: "Main", items: [
+  { label: "AI Agents", items: [
     { id: "chat", icon: MessageSquare, label: "Chat Assistant" },
-    { id: "playground", icon: FlaskConical, label: "Prompt Playground", badge: "NEW" },
     { id: "agents", icon: Users, label: "Agents", badge: "16" },
-    { id: "skills", icon: Zap, label: "Skills", badge: "46" },
-    { id: "plugins", icon: PlusCircle, label: "Add Tools / Plugins" },
-    { id: "integrations", icon: Plug, label: "Integrations", badge: "30+" },
-    { id: "rag", icon: BookOpen, label: "Knowledge Base" },
     { id: "chambers", icon: Building2, label: "Agent Chambers", badge: "NEW" },
+    { id: "knowledge", icon: Network, label: "Knowledge Graph", badge: "NEW" },
+    { id: "rag", icon: BookOpen, label: "Knowledge Base (RAG)" },
+  ]},
+  { label: "Development", items: [
+    { id: "code-editor", icon: Code, label: "Code Editor" },
+    { id: "git", icon: GitCommitHorizontal, label: "Git Automation" },
+    { id: "terminal", icon: Terminal, label: "Terminal" },
+    { id: "workspace", icon: FolderGit2, label: "Workspace" },
+    { id: "workflows", icon: GitBranch, label: "Workflows", badge: "NEW" },
+  ]},
+  { label: "Tools & Skills", items: [
+    { id: "skills", icon: Zap, label: "Skills", badge: "46" },
+    { id: "plugins", icon: PlusCircle, label: "Plugins" },
+    { id: "integrations", icon: Plug, label: "Integrations" },
+    { id: "worker", icon: Cpu, label: "Worker Nodes" },
+    { id: "playground", icon: FlaskConical, label: "Prompt Playground" },
   ]},
   { label: "Data", items: [
     { id: "sessions", icon: History, label: "Sessions" },
     { id: "channels", icon: Radio, label: "Channels", dot: "emerald" },
     { id: "memory", icon: Brain, label: "Memory DB" },
-  ]},
-  { label: "Tools", items: [
-    { id: "workspace", icon: FolderGit2, label: "Workspace" },
-    { id: "video", icon: Video, label: "Video Gen" },
-    { id: "editor", icon: FileCode, label: "Video Editor" },
-    { id: "social", icon: Globe2, label: "Social Media" },
-    { id: "worker", icon: Cpu, label: "Worker Nodes" },
-    { id: "workflows", icon: GitBranch, label: "Workflows", badge: "NEW" },
-    { id: "crypto-hub", icon: Coins, label: "Crypto & Trading" },
-    { id: "shopping", icon: ShoppingBag, label: "Smart Shopping" },
-    { id: "git", icon: GitCommitHorizontal, label: "Git Automation", badge: "NEW" },
-    { id: "terminal", icon: Terminal, label: "Terminal" },
   ]},
   { label: "Configuration", items: [
     { id: "settings", icon: Settings, label: "Settings" },
@@ -58,7 +57,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     { id: "aimodels", icon: ToyBrick, label: "AI Models" },
     { id: "schedule", icon: Calendar, label: "Cron Schedule" },
     { id: "analytics", icon: BarChart3, label: "Analytics" },
-    { id: "tools-analytics", icon: Activity, label: "Tool Analytics", badge: "NEW" },
+    { id: "tools-analytics", icon: Activity, label: "Tool Analytics" },
     { id: "docs", icon: BookOpen, label: "Documentation" },
   ]},
 ];

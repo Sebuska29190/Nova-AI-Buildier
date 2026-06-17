@@ -146,7 +146,7 @@ export function VideoEditorPage() {
             onChange={(e) => setCmdText(e.target.value)}
             onKeyDown={handleCmdKeydown}
             placeholder="Type a command (e.g. /help, /open project, /render timeline)"
-            className="flex-1 bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#00f2fe]"
+            className="flex-1 bg-[#020408]/60 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366f1]"
           />
           <button
             onClick={sendCommand}

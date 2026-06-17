@@ -161,7 +161,7 @@ export function ToolsAnalyticsPage() {
                   </div>
                   <div className="flex-1 bg-slate-800/50 rounded-full h-2">
                     <div
-                      className="h-2 rounded-full bg-gradient-to-r from-[#00f2fe] to-[#4facfe]"
+                      className="h-2 rounded-full bg-gradient-to-r from-[#6366f1] to-[#4facfe]"
                       style={{ width: `${Math.min(100, (tool.count / maxToolCount) * 100)}%` }}
                     />
                   </div>

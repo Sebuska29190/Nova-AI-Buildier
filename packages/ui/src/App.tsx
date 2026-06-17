@@ -5,8 +5,7 @@ import { StatusBar } from "./lib/components/StatusBar";
 import { ToastProvider, useToast } from "./lib/components/ui/Toast";
 import { ErrorBoundary } from "./lib/ErrorBoundary";
 import { MobileNav } from "./lib/components/MobileNav";
-
-// Pages
+// Pages — Agent-focused
 import { ChatPage } from "./routes/ChatPage";
 import { AgentsPage } from "./routes/AgentsPage";
 import { SkillsPage } from "./routes/SkillsPage";
@@ -22,15 +21,9 @@ import { ModelsPage } from "./routes/ModelsPage";
 import { CronPage } from "./routes/CronPage";
 import { ProfilesPage } from "./routes/ProfilesPage";
 import { DocsPage } from "./routes/DocsPage";
-import { VideoPage } from "./routes/VideoPage";
-import { VideoEditorPage } from "./routes/VideoEditorPage";
 import { WorkerPage } from "./routes/WorkerPage";
 import { TerminalPage } from "./routes/TerminalPage";
 import { WorkspacePage } from "./routes/WorkspacePage";
-import { CryptoHubPage } from "./routes/CryptoHubPage";
-import { ShoppingPage } from "./routes/ShoppingPage";
-import { EditorPage } from "./routes/EditorPage";
-import { SocialPage } from "./routes/SocialPage";
 import { IntegrationsPage } from "./routes/IntegrationsPage";
 import { RagPage } from "./routes/RagPage";
 import { ChambersPage } from "./routes/ChambersPage";
@@ -38,11 +31,12 @@ import { WorkflowsPage } from "./routes/WorkflowsPage";
 import { ToolsAnalyticsPage } from "./routes/ToolsAnalyticsPage";
 import { PromptPlaygroundPage } from "./routes/PromptPlaygroundPage";
 import { GitAutomationPage } from "./routes/GitAutomationPage";
+import { CodeEditorPage } from "./routes/CodeEditorPage";
+import { KnowledgeGraphPage } from "./routes/KnowledgeGraphPage";
 
 // Page component map
 const pages: Record<string, React.ComponentType<any>> = {
   chat: ChatPage,
-  playground: PromptPlaygroundPage,
   agents: AgentsPage,
   skills: SkillsPage,
   plugins: PluginsPage,
@@ -59,21 +53,18 @@ const pages: Record<string, React.ComponentType<any>> = {
   schedule: CronPage,
   profiles: ProfilesPage,
   docs: DocsPage,
-  video: VideoPage,
-  editor: VideoEditorPage,
-  "video-editor": VideoEditorPage,
   worker: WorkerPage,
   terminal: TerminalPage,
   workspace: WorkspacePage,
-  "crypto-hub": CryptoHubPage,
-  shopping: ShoppingPage,
-  "social": SocialPage,
-  "integrations": IntegrationsPage,
-  "rag": RagPage,
-  "chambers": ChambersPage,
-  "workflows": WorkflowsPage,
+  integrations: IntegrationsPage,
+  rag: RagPage,
+  chambers: ChambersPage,
+  workflows: WorkflowsPage,
   "tools-analytics": ToolsAnalyticsPage,
-  "git": GitAutomationPage,
+  git: GitAutomationPage,
+  playground: PromptPlaygroundPage,
+  "code-editor": CodeEditorPage,
+  knowledge: KnowledgeGraphPage,
 };
 
 function AppContent() {
