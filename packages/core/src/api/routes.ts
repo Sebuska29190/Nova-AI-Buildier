@@ -12,8 +12,6 @@ import { listTools } from "../plugin/tools.ts";
 import { channelManager } from "../channel/manager.ts";
 import { memoryStore } from "../memory/store.ts";
 import { onEvent } from "../event-bus/index.ts";
-import type { VideoParams } from "../video/types.ts";
-import { getVideoJobs, getVideoJob, startVideoGeneration, cancelVideoJob, deleteVideoJob } from "../video/pipeline.ts";
 import { getWorkJobs, getWorkJob, createWorkJob, cancelWorkJob, deleteWorkJob, subscribeSSE } from "../worker/manager.ts";
 import { createTask, listTasks, updateTask, deleteTask } from "../task/store.ts";
 import { loadSkills } from "../skill/loader.ts";
@@ -40,7 +38,7 @@ import { getAllProviderConfigs, saveProviderConfig, deleteProviderConfig, testPr
 import { logStore } from "../log/capture.ts";
 import { cronManager } from "../cron/manager.ts";
 
-// Auth middleware — bypass for /health, /api/auth, /v1, and /api/sessions
+  // Auth middleware — bypass for /health, /api/auth, /v1, and /api/sessions
 const PUBLIC_PATHS = ["/health", "/api/auth", "/", "/assets"];
 
 function authMiddleware(c: any, next: any) {
@@ -80,6 +78,21 @@ export function createRouter(): Hono {
   app.use("*", cors({
     origin: process.env.NOVA_CORS_ORIGIN || "http://localhost:4123",
   }));
+
+  // Security headers
+  app.use("*", async (c, next) => {
+    await next();
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("X-Frame-Options", "DENY");
+    c.header("X-XSS-Protection", "1; mode=block");
+    c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    const path = c.req.path;
+    if (!path.startsWith("/v1/") && !path.includes("/stream") && !path.includes("/events")) {
+      c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:; frame-src https://www.tradingview.com");
+    }
+  });
+
   app.use("*", authMiddleware);
 
   // Auth (rate limited: 10 requests per minute per IP)
@@ -112,6 +125,30 @@ export function createRouter(): Hono {
   // Models
   app.get("/v1/models", (c) => c.json({ object: "list", data: registry.listModels().map((m) => ({ id: m.ref, object: "model", owned_by: m.providerId })) }));
 
+  // Grouped models — filtered by configured providers only
+  app.get("/api/models/grouped", (c) => {
+    const providerConfigsList = getAllProviderConfigs();
+    const configuredMap = new Map<string, any>();
+    for (const p of providerConfigsList) configuredMap.set(p.providerId, p);
+
+    const grouped: Record<string, { name: string; hasApiKey: boolean; models: { id: string; name: string }[] }> = {};
+    for (const [id, provider] of registry.providers) {
+      const configEntry = configuredMap.get(id);
+      const hasApiKey = configEntry?.hasApiKey === true;
+      const enabled = configEntry?.enabled !== false;
+
+      if (!hasApiKey && id !== "ollama" && id !== "lmstudio" && id !== "custom") continue;
+      if (!enabled) continue;
+
+      grouped[id] = {
+        name: provider.name,
+        hasApiKey,
+        models: provider.models.map(m => ({ id: `${id}/${m.id}`, name: m.name || m.id })),
+      };
+    }
+    return c.json({ grouped });
+  });
+
   // Chat completions (OpenAI-compat)
   app.post("/v1/chat/completions", async (c) => {
     const body = await c.req.json<{ model: string; messages: Array<{ role: string; content: string }>; stream?: boolean; tools?: unknown[]; }>();
@@ -133,35 +170,32 @@ export function createRouter(): Hono {
           const sendSSE = (d: string) => ctrl.enqueue(enc.encode(`data: ${d}\n\n`));
           const runId = `run_${Date.now()}`;
 
-          // Subscribe to streaming text events only
-          // Do NOT subscribe to "done" events — tool loops may fire multiple "done" events
-          // (one per iteration), which would cause premature stream closure. Instead,
-          // we send the final [DONE] after runAgent completes.
+          // Premium: Forward ALL event types for real-time visibility
           const unsubAssistant = onEvent("event", (e: any) => {
-            if (e.kind === "assistant" && e.runId === runId && e.data?.text) {
-              sendSSE(JSON.stringify({
-                id: `chatcmpl-${session.id}`,
-                object: "chat.completion.chunk",
-                created: Math.floor(Date.now() / 1000),
-                model: body.model,
-                choices: [{ index: 0, delta: { content: e.data.text }, finish_reason: null }],
-              }));
+            // Forward events for this session (match by sessionId)
+            if (e.sessionId !== session.id) return;
+
+            if (e.kind === "assistant" && e.data?.text) {
+              sendSSE(JSON.stringify({ type: "text", content: e.data.text }));
+            }
+            else if (e.kind === "thinking" && e.data?.text) {
+              sendSSE(JSON.stringify({ type: "thinking", content: e.data.text }));
+            }
+            else if (e.kind === "tool_call" && e.data) {
+              sendSSE(JSON.stringify({ type: "tool_call", tool: e.data.name || e.data.toolName || "unknown", args: e.data.arguments || e.data.args }));
+            }
+            else if (e.kind === "tool_result" && e.data) {
+              sendSSE(JSON.stringify({ type: "tool_result", tool: e.data.toolName || e.data.name || "unknown", success: e.data.success !== false, duration: e.data.durationMs }));
             }
           });
 
           try {
             const result = await runAgent({ sessionId: session.id, message: lastMsg?.content ?? "", modelRef: body.model, tools: true, runId });
-            // Send final result and close stream
-            sendSSE(JSON.stringify({
-              id: `chatcmpl-${session.id}`,
-              object: "chat.completion.chunk",
-              created: Math.floor(Date.now() / 1000),
-              model: body.model,
-              choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
-            }));
+            sendSSE(JSON.stringify({ type: "done", text: result.text }));
             sendSSE("[DONE]");
           } catch (e: unknown) {
-            sendSSE(JSON.stringify({ error: { message: safeMessage(e) } }));
+            sendSSE(JSON.stringify({ type: "error", message: safeMessage(e) }));
+            sendSSE("[DONE]");
           } finally {
             unsubAssistant();
             ctrl.close();
@@ -223,6 +257,11 @@ export function createRouter(): Hono {
     const s = sessionManager.getSession(c.req.param("id"));
     if (!s) return c.json({ error: "Not found" }, 404);
     return c.json({ session: s, messages: sessionManager.getTranscript(s.id) });
+  });
+
+  app.delete("/api/sessions/:id", (c) => {
+    const ok = sessionManager.deleteSession(c.req.param("id"));
+    return c.json({ deleted: ok });
   });
 
   // Tools
@@ -402,9 +441,11 @@ Return valid JSON only (no markdown, no code fences):
 
   app.post("/api/chambers", async (c) => {
     try {
-      const body = await c.req.json<{ name: string; task: string; agents: { agentId: string; role: string; order: number }[]; maxRounds?: number }>();
+      const body = await c.req.json<{ name: string; task: string; agents: { agentId: string; role: string; order: number }[]; maxRounds?: number; executionMode?: string; workspace?: string }>();
       if (!body.name || !body.task || !body.agents?.length) return c.json({ error: "name, task, and agents required" }, 400);
-      const chamber = chamberManager.create(body.name, body.task, body.agents, body.maxRounds);
+      const validAgents = body.agents.filter(a => a.agentId && a.agentId.trim()).map((a, i) => ({ ...a, order: i }));
+      if (validAgents.length === 0) return c.json({ error: "No valid agents selected" }, 400);
+      const chamber = chamberManager.create(body.name, body.task, validAgents, body.maxRounds, body.executionMode, body.workspace);
       return c.json({ chamber }, 201);
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
   });
@@ -426,6 +467,65 @@ Return valid JSON only (no markdown, no code fences):
     try {
       return c.json({ deleted: chamberManager.delete(c.req.param("id")) });
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.put("/api/chambers/:id", async (c) => {
+    try {
+      const body = await c.req.json();
+      const ok = chamberManager.update(c.req.param("id"), body);
+      return ok ? c.json({ ok: true }) : c.json({ error: "Cannot update (running or not found)" }, 400);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/chambers/:id/restart", (c) => {
+    try {
+      const ok = chamberManager.restart(c.req.param("id"));
+      return c.json({ restarted: ok });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.get("/api/chambers/:id/analytics", (c) => {
+    try {
+      const analytics = chamberManager.getAnalytics(c.req.param("id"));
+      return analytics ? c.json(analytics) : c.json({ error: "Not found" }, 404);
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // ─── Chambers SSE (real-time updates) ─────────────────
+  app.get("/api/chambers/:id/events", (c) => {
+    const chamberId = c.req.param("id");
+    const stream = new TransformStream();
+    const writer = stream.writable.getWriter();
+    const encoder = new TextEncoder();
+
+    c.header("Content-Type", "text/event-stream");
+    c.header("Cache-Control", "no-cache");
+    c.header("Connection", "keep-alive");
+
+    // Poll for new messages every 2 seconds
+    let lastMsgCount = 0;
+    const interval = setInterval(async () => {
+      try {
+        const chamber = chamberManager.get(chamberId);
+        if (!chamber) { clearInterval(interval); return; }
+        const messages = chamberManager.getMessages(chamberId, 500);
+        if (messages.length > lastMsgCount) {
+          const newMsgs = messages.slice(lastMsgCount);
+          lastMsgCount = messages.length;
+          await writer.write(encoder.encode(`data: ${JSON.stringify({ type: "messages", messages: newMsgs, round: chamber.status === "running" ? messages.filter((m: any) => m.type === "message").length : -1 })}\n\n`));
+        }
+        if (chamber.status !== "running") {
+          await writer.write(encoder.encode(`data: ${JSON.stringify({ type: "status", status: chamber.status })}\n\n`));
+          clearInterval(interval);
+          await writer.close();
+        }
+      } catch { clearInterval(interval); }
+    }, 2000);
+
+    // Cleanup on disconnect
+    c.req.raw.signal?.addEventListener("abort", () => { clearInterval(interval); writer.close(); });
+
+    return new Response(stream.readable, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
   });
 
   // ─── Workflows ──────────────────────────────────────────────
@@ -667,178 +767,6 @@ Return valid JSON only (no markdown, no code fences):
   app.delete("/api/memory/:id", (c) => {
     if (!memoryStore.delete(c.req.param("id"))) return c.json({ error: "Not found" }, 404);
     return c.json({ status: "deleted" });
-  });
-
-  // Video
-  app.get("/api/video/jobs", (c) => c.json({ jobs: getVideoJobs() }));
-  app.get("/api/video/jobs/:id", (c) => {
-    const job = getVideoJob(c.req.param("id"));
-    if (!job) return c.json({ error: "Job not found" }, 404);
-    return c.json({ job });
-  });
-  app.post("/api/video/generate", async (c) => {
-    const ct = c.req.header("content-type") || "";
-    // FormData (audio upload) path
-    if (ct.includes("multipart/form-data")) {
-      const fd = await c.req.parseBody();
-      const audioFile = fd.audio as File;
-      if (!audioFile) return c.json({ error: "audio file is required" }, 400);
-      const lang = (fd.language as string) || "en";
-      const duration = parseInt((fd.duration as string) || "1", 10);
-      const imageEngine = (fd.imageEngine as string) || "auto";
-      const quality = (fd.quality as string) || "medium";
-      const subtitleMode = (fd.subtitleMode as string) || "auto";
-      const nicheName = fd.nicheName as string | undefined;
-      const imageCount = parseInt((fd.imageCount as string) || "6", 10);
-      const animationStyle = fd.animationStyle as string | undefined;
-      const imageStyle = fd.imageStyle as string | undefined;
-      const effects = fd.effects as string | undefined;
-      const model = fd.model as string | undefined;
-      const ttsEngine = fd.ttsEngine as string | undefined;
-      // Transcribe audio using Whisper
-      const buffer = Buffer.from(await audioFile.arrayBuffer());
-      const tmpDir = join(process.cwd(), "data", "audio_uploads");
-      mkdirSync(tmpDir, { recursive: true });
-      const audioPath = join(tmpDir, `upload_${Date.now()}_${Math.random().toString(36).slice(2,8)}.mp3`);
-      writeFileSync(audioPath, buffer);
-      // Get actual audio duration from file
-      let audioDurSec = 60;
-      try {
-        const { spawn } = await import("node:child_process");
-        const { ffmpegPath } = await import("../video/assembly.ts");
-        const ff = ffmpegPath();
-        const result = await new Promise<string>((resolve) => {
-          const proc = spawn(ff, ["-i", audioPath, "-f", "null", "-"], { stdio: ["ignore", "pipe", "pipe"] });
-          let err = "";
-          proc.stderr?.on("data", (d: Buffer) => { err += d.toString(); });
-          proc.on("close", () => resolve(err));
-          proc.on("error", () => resolve(""));
-          setTimeout(() => { try { proc.kill(); } catch {}; resolve(err) }, 5000);
-        });
-        const m = result.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/);
-        if (m) audioDurSec = parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseInt(m[3]) + parseInt(m[4]) / 100;
-      } catch {}
-      const durationMin = Math.max(1, Math.ceil(audioDurSec / 60));
-      let transcribedText = "";
-      let transcriptionSegments: Array<{ text: string; start: number; end: number }> = [];
-      try {
-        const { transcribeAudioWithTimestamps } = await import("../voice/stt.ts");
-        console.log(`[video] transcribing audio with timestamps: ${audioPath}`);
-        const result = await transcribeAudioWithTimestamps(audioPath);
-        transcribedText = result.text;
-        transcriptionSegments = result.segments;
-        console.log(`[video] transcription result (${transcribedText.length} chars, ${transcriptionSegments.length} segments)`);
-      } catch (e: any) {
-        console.error(`[video] transcription error:`, e?.message || String(e));
-        transcribedText = `Audio narration ${Date.now()}`;
-      }
-      const mediaType = (fd.mediaType as string) || "images";
-      let stockVideos: string[] | undefined;
-      if (fd.stockVideos) {
-        try { stockVideos = JSON.parse(fd.stockVideos as string); } catch {}
-      }
-      const params: VideoParams = {
-        topic: transcribedText.slice(0, 120) || "Audio narration",
-        scriptText: transcribedText,
-        duration: durationMin,
-        language: lang,
-        imageEngine: imageEngine as any,
-        quality: quality as any,
-        subtitleMode: subtitleMode as any,
-        nicheName,
-        imageCount,
-        animationStyle,
-        imageStyle,
-        effects,
-        model,
-        ttsEngine: ttsEngine as any,
-        isShort: false,
-        audioPath,
-        useAudioEffects: false,
-        transcriptionSegments,
-        transition: fd.transition as string | undefined,
-        transitionDuration: fd.transitionDuration ? parseFloat(fd.transitionDuration as string) : undefined,
-        subtitleAnimation: fd.subtitleAnimation as string | undefined,
-        composition: fd.composition as string | undefined,
-        mediaType: mediaType as "images" | "videos",
-        stockVideos,
-        musicVideoMode: fd.musicVideoMode === "true",
-      };
-      const job = await startVideoGeneration(params);
-      return c.json({ job, transcribed: transcribedText.slice(0, 200) }, 201);
-    }
-    const body = await c.req.json<VideoParams>();
-    if (!body.topic) return c.json({ error: "topic is required" }, 400);
-    const job = await startVideoGeneration(body);
-    return c.json({ job }, 201);
-  });
-  app.post("/api/video/jobs/:id/cancel", (c) => {
-    const ok = cancelVideoJob(c.req.param("id"));
-    if (!ok) return c.json({ error: "Job not found or not running" }, 404);
-    return c.json({ status: "cancelled" });
-  });
-  app.delete("/api/video/jobs/:id", (c) => {
-    const ok = deleteVideoJob(c.req.param("id"));
-    if (!ok) return c.json({ error: "Job not found" }, 404);
-    return c.json({ status: "deleted" });
-  });
-  // Dubbing service API
-  app.post("/api/dub/start", async (c) => {
-    try {
-      const fd = await c.req.parseBody();
-      const videoFile = fd.video as File;
-      if (!videoFile) return c.json({ error: "video file required" }, 400);
-      const lang = (fd.language as string) || "en";
-      const sourceLang = (fd.sourceLanguage as string) || "auto";
-      const ttsEngine = fd.ttsEngine as string | undefined;
-      const subtitleMode = fd.subtitleMode as string | undefined;
-
-      const buffer = Buffer.from(await videoFile.arrayBuffer());
-      console.log(`[dub] Upload: ${videoFile.name}, size=${buffer.length}, type=${videoFile.type}`);
-
-      const tmpDir = join(process.cwd(), "data", "dubbing");
-      mkdirSync(tmpDir, { recursive: true });
-      const videoPath = join(tmpDir, `input_${Date.now()}.mp4`);
-      writeFileSync(videoPath, buffer);
-      console.log(`[dub] Saved to: ${videoPath} (${existsSync(videoPath) ? statSync(videoPath).size : 0} bytes on disk)`);
-
-      const { startDubbing } = await import("../dubbing-service.ts");
-      const job = startDubbing({ inputPath: videoPath, sourceLanguage: sourceLang, targetLanguage: lang, ttsEngine, subtitleMode });
-      return c.json({ job }, 201);
-    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
-  });
-  app.get("/api/dub/jobs", async (c) => {
-    const { getDubJobs } = await import("../dubbing-service.ts");
-    return c.json({ jobs: getDubJobs() });
-  });
-  app.get("/api/dub/jobs/:id", async (c) => {
-    const { getDubJob } = await import("../dubbing-service.ts");
-    const job = getDubJob(c.req.param("id"));
-    if (!job) return c.json({ error: "Not found" }, 404);
-    return c.json({ job });
-  });
-  app.get("/api/dub/download/:id", async (c) => {
-    const { getDubJob } = await import("../dubbing-service.ts");
-    const job = getDubJob(c.req.param("id"));
-    if (!job?.outputPath || !existsSync(job.outputPath)) return c.json({ error: "Not found" }, 404);
-    const file = readFileSync(job.outputPath);
-    const filename = job.outputPath.split(/[/\\]/).pop() || "dubbed.mp4";
-    return new Response(file, { headers: { "Content-Type": "video/mp4", "Content-Disposition": `attachment; filename="${filename}"` } });
-  });
-  app.get("/api/video/jobs/:id/download", (c) => {
-    const job = getVideoJob(c.req.param("id"));
-    if (!job || !job.outputPath) return c.json({ error: "No output file" }, 404);
-    if (!existsSync(job.outputPath)) return c.json({ error: "File not found on disk" }, 404);
-    const filename = job.outputPath.split(/[/\\]/).pop() || "video.mp4";
-    const file = readFileSync(job.outputPath);
-    return c.newResponse(file, {
-      status: 200,
-      headers: {
-        "Content-Type": "video/mp4",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "Content-Length": String(file.length),
-      },
-    });
   });
 
   // Worker
@@ -1389,14 +1317,14 @@ Return valid JSON only (no markdown, no code fences):
   // ─── MCP Management ───────────────────────────────────────────────────────────
   app.get("/api/mcp/servers", async (c) => {
     try {
-      const { listServers } = await import("../mcp-client.ts");
+      const { listServers } = await import("../mcp/client.ts");
       return c.json({ servers: listServers() });
     } catch { return c.json({ servers: [] }); }
   });
 
   app.post("/api/mcp/restart", async (c) => {
     try {
-      const mcp = await import("../mcp-client.ts");
+      const mcp = await import("../mcp/client.ts");
       await mcp.stopAll();
       await mcp.initMCPServers();
       return c.json({ status: "restarted", servers: mcp.listServers() });
@@ -1459,74 +1387,6 @@ Return valid JSON only (no markdown, no code fences):
       const result = await getCoinDetail(body.symbol);
       return c.json({ analysis: result });
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
-  });
-
-  // ─── Kimu Video Editor Bridge ────────────────────────────────────────────────
-  app.get("/api/video-editor/status", async (c) => {
-    try {
-      const { getServices } = await import("../launcher.ts");
-      const services = getServices();
-      const kimu = services.find((s) => s.name === "kimu") || { running: false, label: "🎬 Video Editor", url: "http://localhost:3457" };
-      return c.json(kimu);
-    } catch { return c.json({ running: false, error: "Launcher not available" }); }
-  });
-
-  app.post("/api/video-editor/start", async (c) => {
-    try {
-      const { execSync } = await import("node:child_process");
-      execSync('docker compose -f "' + import.meta.resolve("../../infra/kimu.yml") + '" up -d', { stdio: "pipe", timeout: 60000 });
-      return c.json({ status: "starting", message: "Kimu is starting..." });
-    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
-  });
-
-  app.post("/api/video-editor/ai", async (c) => {
-    try {
-      const body = await c.req.json();
-      const res = await fetch("http://localhost:3456/api/ai", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30000),
-      });
-      if (!res.ok) return c.json({ error: "Kimu AI error" }, 502);
-      return c.json(await res.json());
-    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 502); }
-  });
-
-  app.get("/api/video-editor/projects", async (c) => {
-    try {
-      const res = await fetch("http://localhost:3456/api/projects", { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) return c.json({ error: "Kimu unavailable" }, 502);
-      return c.json(await res.json());
-    } catch { return c.json({ error: "Kimu unavailable" }, 502); }
-  });
-
-  app.post("/api/video-editor/import", async (c) => {
-    try {
-      const body = await c.req.json<{ filePath: string }>();
-      const { existsSync, readFileSync } = await import("node:fs");
-      if (!existsSync(body.filePath)) return c.json({ error: "File not found" }, 404);
-      const fileBuffer = readFileSync(body.filePath);
-      const form = new FormData();
-      form.append("file", new Blob([fileBuffer]), body.filePath.split(/[\\/]/).pop() || "asset.mp4");
-      const res = await fetch("http://localhost:3456/api/assets", {
-        method: "POST", body: form, signal: AbortSignal.timeout(30000),
-      });
-      if (!res.ok) return c.json({ error: "Kimu import failed" }, 502);
-      return c.json(await res.json());
-    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 502); }
-  });
-
-  app.post("/api/video-editor/export", async (c) => {
-    try {
-      const body = await c.req.json<{ projectId: string; format?: string }>();
-      const res = await fetch("http://localhost:3456/api/exports", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: body.projectId, format: body.format || "mp4" }),
-        signal: AbortSignal.timeout(120000),
-      });
-      if (!res.ok) return c.json({ error: "Kimu export failed" }, 502);
-      return c.json(await res.json());
-    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 502); }
   });
 
   // ─── Shopping Agent ──────────────────────────────────────────────────────────

@@ -171,7 +171,7 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
       }
 
       // ─── Auto-create skill from complex tasks ────────────────
-      maybeCreateSkill(params.sessionId, params.modelRef).catch(() => {});
+      // maybeCreateSkill(params.sessionId, params.modelRef).catch(() => {});
 
       // Cleanup sessionAgentMap on success
       if (params.agentId) {
@@ -197,11 +197,7 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
   throw new Error("All models failed");
 }
 
-function thisRole(role: string, content: string, toolCallId?: string): AgentMessage {
-  if (role === "tool") return { role: "tool", content, tool_call_id: toolCallId || "", name: "" };
-  if (role === "assistant") return { role: "assistant", content };
-  return { role: "user", content };
-}
+// thisRole() removed — was dead code, all callers use direct object construction
 
 async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: AgentMessage[]; signal?: AbortSignal; thinkingLevel?: string; tools: { type: "function"; function: { name: string; description?: string; parameters: Record<string, unknown> } }[] }): Promise<RunResult> {
   // ─── Safety Middleware initialization ──────────────────────────
@@ -305,6 +301,13 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
       };
       toolBreaker.beforeCall(callCtx);
 
+      // Premium: Emit tool_call event BEFORE execution (shows what agent is doing)
+      emitEvent({ type: "event", kind: "tool_call", sessionId: params.sessionId, runId: params.runId, data: {
+        name: tc.function.name,
+        arguments: parsedArgs,
+        iteration,
+      } });
+
       // Execute tool with timeout
       const toolStartTime = Date.now();
       try {
@@ -335,7 +338,14 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
 
         ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: resultText.slice(0, 10000), name: tc.function.name });
         sessionManager.append(params.sessionId, "tool", resultText.slice(0, 10000), tc.id, tc.function.name);
-        emitEvent({ type: "event", kind: "tool_result", sessionId: params.sessionId, data: { toolCallId: tc.id } });
+        // Premium: Emit rich tool_result event
+        emitEvent({ type: "event", kind: "tool_result", sessionId: params.sessionId, runId: params.runId, data: {
+          toolCallId: tc.id,
+          toolName: tc.function.name,
+          success: true,
+          durationMs: toolDurationMs,
+          resultPreview: resultText.slice(0, 200),
+        } });
 
         // ─── Audit & Usage Logging ──────────────────────────────
         const auditAgentId = sessionAgentMap.get(params.sessionId) || agentId;
@@ -365,12 +375,17 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
         console.error(`[toolLoop] Tool execution error: ${errMsg}`);
         ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: errMsg, name: tc.function.name });
         sessionManager.append(params.sessionId, "tool", errMsg, tc.id, tc.function.name);
+        // Premium: Emit tool_result for failed tool
+        emitEvent({ type: "event", kind: "tool_result", sessionId: params.sessionId, runId: params.runId, data: {
+          toolCallId: tc.id, toolName: tc.function.name, success: false,
+          durationMs: toolDurationMs, error: safeMessage(e),
+        } });
 
         // ─── Audit Failure ──────────────────────────────────────
-        const agentId = sessionAgentMap.get(params.sessionId);
+        const failAgentId = sessionAgentMap.get(params.sessionId);
         toolAudit.record({
           taskId: params.runId || params.sessionId,
-          agentId: auditAgentId || "unknown",
+          agentId: failAgentId || "unknown",
           toolName: tc.function.name,
           paramsHash: toolAudit.hashParams(parsedArgs as Record<string, unknown>),
           resultPreview: errMsg.slice(0, 200),

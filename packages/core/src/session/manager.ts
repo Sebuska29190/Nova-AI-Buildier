@@ -127,7 +127,23 @@ class SessionManager {
   }
 
   listSessions(limit = 50): SessionRow[] {
-    return this.db.query("SELECT * FROM sessions ORDER BY updated_at DESC LIMIT ?").all(limit) as SessionRow[];
+    return this.db.query(`
+      SELECT s.*, 
+        (SELECT COUNT(*) FROM transcripts WHERE session_id = s.id) as message_count
+      FROM sessions s 
+      ORDER BY updated_at DESC LIMIT ?
+    `).all(limit).map((r: any) => ({
+      id: r.id,
+      modelRef: r.model_ref,
+      agentId: r.agent_id,
+      thinkingLevel: r.thinking_level,
+      systemPrompt: r.system_prompt,
+      usageInput: r.usage_input,
+      usageOutput: r.usage_output,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      messageCount: r.message_count || 0,
+    }));
   }
 
   deleteSession(id: string): boolean {

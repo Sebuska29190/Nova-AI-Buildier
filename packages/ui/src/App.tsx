@@ -93,7 +93,22 @@ function AppContent() {
       setConnected(false);
       return;
     }
-    try { setModels(await api.models()); } catch {}
+    try {
+      // Fetch grouped models (only providers with API keys)
+      const groupedRes = await fetch("/api/models/grouped");
+      if (groupedRes.ok) {
+        const data = await groupedRes.json();
+        const flatModels: { id: string }[] = [];
+        for (const provider of Object.values(data.grouped || {})) {
+          for (const m of (provider as any).models || []) {
+            flatModels.push({ id: m.id });
+          }
+        }
+        setModels(flatModels);
+      } else {
+        setModels(await api.models());
+      }
+    } catch { setModels([]); }
     try { setSessions(await api.sessions()); } catch {}
     try { setSkills(await api.skills()); } catch {}
     try { setAgents(await api.agents()); } catch {}

@@ -1,40 +1,6 @@
 ﻿import type { ToolPlugin, ToolContext } from "@nova/sdk";
-import { execSync } from "node:child_process";
 import { bskyTools } from "../bsky/tools.ts";
 import { socialTools } from "../social/tools.ts";
-
-// ─── Dangerous Command Patterns (safety guard) ──────────────────
-const DANGEROUS_PATTERNS: { pattern: RegExp; reason: string }[] = [
-  // Windows system destruction
-  { pattern: /\brm\s+-rf\s+(~?\s*\\|\/\s*$|\.)|\brmdir\s+\/s\s+(c:|d:)/i, reason: "Recursive delete of root/system drive is blocked" },
-  { pattern: /\bformat\s+(c:|d:|e:)\b/i, reason: "Format of system drives is blocked" },
-  { pattern: /\bdiskpart\b/i, reason: "diskpart (disk partitioning) is blocked" },
-  { pattern: /\breg\s+(delete|add|import)\b/i, reason: "Registry modification is blocked" },
-  { pattern: /\bshutdown\s+.*-s\b|\brestart-computer\b|\bstop-computer\b/i, reason: "System shutdown/restart is blocked" },
-  { pattern: /\bdel\s+\/f\s+\/s\s+(c:|d:|\\|\/)/i, reason: "Force recursive delete of system drive is blocked" },
-
-  // Cross-platform destruction
-  { pattern: /\brm\s+-rf\s+(?:\/|\/\*)\b/, reason: "Recursive delete of root (/) is blocked" },
-  { pattern: /\bchmod\s+777\s+\//, reason: "Changing permissions on root (/) is blocked" },
-  { pattern: /\bchown\s+-R\s+\/\b/, reason: "Recursive chown on root (/) is blocked" },
-  { pattern: /\bdd\s+if=\/dev\/zero\b|\bdd\s+if=\/dev\/random\b|\bdd\s+of=\/dev\/sda\b/i, reason: "Low-level disk write (dd) is blocked" },
-  { pattern: /\bmkfs\b|\bfdisk\b|\bmkswap\b/i, reason: "Filesystem creation/partitioning is blocked" },
-  { pattern: /\b:\(\)\s*\{.*:\s*\|.*:\s*&\s*\};\s*:/, reason: "Fork bomb detected and blocked" },
-  { pattern: /\b>\/dev\/sda\b|\bmv\s+\/\s+\/dev\/null\b/i, reason: "Dangerous system manipulation blocked" },
-
-  // Network abuse
-  { pattern: /\b(?:ping|hping3|nping|slowloris)\s+-f\s+/i, reason: "Flooding network tools blocked" },
-
-  // Crypto mining / malware signs
-  { pattern: /\b(?:curl|wget)\s+.*(?:miner|cryptonight|xmrig)\b/i, reason: "Crypto miner download blocked" },
-];
-
-function checkDangerousCommand(cmd: string): string | null {
-  for (const { pattern, reason } of DANGEROUS_PATTERNS) {
-    if (pattern.test(cmd)) return reason;
-  }
-  return null;
-}
 
 const tools = new Map<string, ToolPlugin>();
 

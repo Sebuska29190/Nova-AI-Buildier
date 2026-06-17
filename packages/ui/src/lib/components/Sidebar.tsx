@@ -72,7 +72,7 @@ export function Sidebar({ route, onRoute, version, sessions = [] }: SidebarProps
   }
 
   const recentSessions = [...sessions]
-    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .sort((a, b) => new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime())
     .slice(0, 5);
 
   // Collapsed sidebar — icon only
@@ -211,8 +211,8 @@ export function Sidebar({ route, onRoute, version, sessions = [] }: SidebarProps
                     className="flex items-center gap-2 w-full px-3 py-1.5 rounded-xl text-[11px] font-mono text-[#475569] hover:text-[#f1f5f9] hover:bg-[rgba(255,255,255,0.04)] transition-all duration-200 truncate text-left"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-[rgba(99,102,241,0.4)] shrink-0" />
-                    <span className="truncate">{s.model || s.id?.slice(0, 12)}</span>
-                    <span className="text-[9px] text-[#475569] ml-auto shrink-0">{(s.messages?.length || 0)}msgs</span>
+                    <span className="truncate">{s.modelRef || s.model || s.id?.slice(0, 12)}</span>
+                    <span className="text-[9px] text-[#475569] ml-auto shrink-0">{s.messageCount || s.messages?.length || 0}msgs</span>
                   </button>
                 ))}
               </div>

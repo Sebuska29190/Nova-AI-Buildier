@@ -42,7 +42,7 @@ export const api = {
     post("/api/agent/send", { message, model, agentId }),
 
   // SSE streaming chat with session persistence
-  chatSend: async (message: string, model: string, sessionKey?: string, onChunk?: (text: string) => void, signal?: AbortSignal): Promise<{ text: string; sessionKey: string }> => {
+  chatSend: async (message: string, model: string, sessionKey?: string, onChunk?: (text: string) => void, signal?: AbortSignal, onEvent?: (event: any) => void): Promise<{ text: string; sessionKey: string }> => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (sessionKey) headers["x-nova-session-key"] = sessionKey;
 
@@ -75,7 +75,24 @@ export const api = {
         if (t.startsWith("data: ") && t !== "data: [DONE]") {
           try {
             const j = JSON.parse(t.slice(6));
-            if (j.choices?.[0]?.delta?.content) {
+            // Premium: Handle all event types
+            if (j.type === "text" && j.content) {
+              fullText += j.content;
+              onChunk?.(fullText);
+            } else if (j.type === "thinking" && j.content) {
+              onEvent?.({ type: "thinking", content: j.content });
+            } else if (j.type === "tool_call") {
+              onEvent?.({ type: "tool_call", tool: j.tool, args: j.args });
+            } else if (j.type === "tool_result") {
+              onEvent?.({ type: "tool_result", tool: j.tool, success: j.success, duration: j.duration });
+            } else if (j.type === "done" && j.text) {
+              fullText = j.text;
+              onEvent?.({ type: "done", text: j.text });
+            } else if (j.type === "error") {
+              onEvent?.({ type: "error", message: j.message });
+            }
+            // Legacy format fallback
+            else if (j.choices?.[0]?.delta?.content) {
               fullText += j.choices[0].delta.content;
               onChunk?.(fullText);
             }

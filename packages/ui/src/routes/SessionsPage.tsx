@@ -144,10 +144,10 @@ export function SessionsPage() {
                   <svg className="w-4 h-4 text-[#6366f1] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
-                  <h3 className="font-bold text-sm text-white truncate">{session.model || "Unknown Model"}</h3>
+                  <h3 className="font-bold text-sm text-white truncate">{session.modelRef || session.model || "Unknown Model"}</h3>
                 </div>
-                <span className="text-[9px] bg-slate-900 text-[#475569] px-2 py-0.5 rounded font-mono shrink-0">
-                  {session.messages?.length || 0} msgs
+                <span className="text-[9px] bg-[rgba(255,255,255,0.04)] text-[#475569] px-2 py-0.5 rounded font-mono shrink-0 border border-[rgba(255,255,255,0.06)]">
+                  {session.messageCount || session.messages?.length || 0} msgs
                 </span>
               </div>
 

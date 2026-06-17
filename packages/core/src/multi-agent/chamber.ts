@@ -26,7 +26,9 @@ interface ChamberConfig {
   agents: ChamberAgent[];
   maxRounds: number;
   task: string;
+  workspace: string;
   status: ChamberStatus;
+  executionMode: "sequential" | "parallel" | "debate";
   createdAt: string;
   completedAt?: string;
 }
@@ -63,10 +65,12 @@ class ChamberManager {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT DEFAULT '',
-      agents TEXT NOT NULL,       -- JSON array of {agentId, role, order}
+      agents TEXT NOT NULL,
       max_rounds INTEGER NOT NULL DEFAULT 3,
       task TEXT NOT NULL,
+      workspace TEXT DEFAULT 'D:\\nova',
       status TEXT NOT NULL DEFAULT 'idle',
+      execution_mode TEXT NOT NULL DEFAULT 'sequential',
       created_at TEXT NOT NULL,
       completed_at TEXT
     )`);
@@ -82,6 +86,11 @@ class ChamberManager {
       created_at TEXT NOT NULL
     )`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_chamber_msgs ON chamber_messages(chamber_id, round ASC)`);
+
+    // Migrate: add missing columns if they don't exist
+    try { this.db.run("ALTER TABLE agent_chambers ADD COLUMN execution_mode TEXT DEFAULT 'sequential'"); } catch {}
+    try { this.db.run("ALTER TABLE agent_chambers ADD COLUMN workspace TEXT DEFAULT 'D:\\nova'"); } catch {}
+
     this.initialized = true;
     // Reset stale "running" chambers from previous sessions
     this.db.run("UPDATE agent_chambers SET status = 'idle' WHERE status = 'running'");
@@ -90,12 +99,12 @@ class ChamberManager {
 
   // ─── CRUD ────────────────────────────────────────────────────
 
-  create(name: string, task: string, agents: { agentId: string; role: string; order: number }[], maxRounds = 3): ChamberConfig {
+  create(name: string, task: string, agents: { agentId: string; role: string; order: number }[], maxRounds = 3, executionMode = "sequential", workspace = "D:\\nova"): ChamberConfig {
     const id = name.toLowerCase().replace(/[^a-z0-9-]/g, "-") || randomUUID().slice(0, 8);
     const now = new Date().toISOString();
     this.db.run(
-      "INSERT INTO agent_chambers (id, name, description, agents, max_rounds, task, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
-      [id, name, "", JSON.stringify(agents), maxRounds, task, "idle", now],
+      "INSERT INTO agent_chambers (id, name, description, agents, max_rounds, task, workspace, status, execution_mode, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      [id, name, "", JSON.stringify(agents), maxRounds, task, workspace, "idle", executionMode, now],
     );
     return this.get(id)!;
   }
@@ -106,8 +115,9 @@ class ChamberManager {
     return {
       id: r.id, name: r.name, description: r.description || undefined,
       agents: JSON.parse(r.agents), maxRounds: r.max_rounds,
-      task: r.task, status: r.status, createdAt: r.created_at,
-      completedAt: r.completed_at || undefined,
+      task: r.task, workspace: r.workspace || "D:\\nova",
+      status: r.status, executionMode: r.execution_mode || "sequential",
+      createdAt: r.created_at, completedAt: r.completed_at || undefined,
     };
   }
 
@@ -115,8 +125,9 @@ class ChamberManager {
     return this.db.query("SELECT * FROM agent_chambers ORDER BY created_at DESC").all().map((r: any) => ({
       id: r.id, name: r.name, description: r.description || undefined,
       agents: JSON.parse(r.agents), maxRounds: r.max_rounds,
-      task: r.task, status: r.status, createdAt: r.created_at,
-      completedAt: r.completed_at || undefined,
+      task: r.task, workspace: r.workspace || "D:\\nova",
+      status: r.status, executionMode: r.execution_mode || "sequential",
+      createdAt: r.created_at, completedAt: r.completed_at || undefined,
     }));
   }
 
@@ -124,6 +135,48 @@ class ChamberManager {
     this.db.run("DELETE FROM chamber_messages WHERE chamber_id = ?", [id]);
     const result = this.db.run("DELETE FROM agent_chambers WHERE id = ?", [id]);
     return (result.changes ?? 0) > 0;
+  }
+
+  update(id: string, updates: { name?: string; task?: string; agents?: { agentId: string; role: string; order: number }[]; maxRounds?: number; executionMode?: string }): boolean {
+    const chamber = this.get(id);
+    if (!chamber || chamber.status === "running") return false;
+    const fields: string[] = [];
+    const values: any[] = [];
+    if (updates.name) { fields.push("name = ?"); values.push(updates.name); }
+    if (updates.task) { fields.push("task = ?"); values.push(updates.task); }
+    if (updates.agents) { fields.push("agents = ?"); values.push(JSON.stringify(updates.agents)); }
+    if (updates.maxRounds) { fields.push("max_rounds = ?"); values.push(updates.maxRounds); }
+    if (updates.executionMode) { fields.push("execution_mode = ?"); values.push(updates.executionMode); }
+    if (fields.length === 0) return false;
+    values.push(id);
+    this.db.run(`UPDATE agent_chambers SET ${fields.join(", ")} WHERE id = ?`, values);
+    return true;
+  }
+
+  restart(id: string): boolean {
+    const chamber = this.get(id);
+    if (!chamber) return false;
+    // Clear messages and reset status
+    this.db.run("DELETE FROM chamber_messages WHERE chamber_id = ?", [id]);
+    this.db.run("UPDATE agent_chambers SET status = 'idle', completed_at = NULL WHERE id = ?", [id]);
+    return true;
+  }
+
+  getAnalytics(id: string): { totalMessages: number; messagesPerAgent: Record<string, number>; roundsUsed: number; delegations: number; decisions: number } | null {
+    const chamber = this.get(id);
+    if (!chamber) return null;
+    const msgs = this.getMessages(id, 1000);
+    const messagesPerAgent: Record<string, number> = {};
+    let delegations = 0;
+    let decisions = 0;
+    let maxRound = 0;
+    for (const m of msgs) {
+      messagesPerAgent[m.agentName] = (messagesPerAgent[m.agentName] || 0) + 1;
+      if (m.type === "delegation") delegations++;
+      if (m.type === "decision") decisions++;
+      if (m.round > maxRound) maxRound = m.round;
+    }
+    return { totalMessages: msgs.length, messagesPerAgent, roundsUsed: maxRound, delegations, decisions };
   }
 
   getMessages(chamberId: string, limit = 50): ChamberMessage[] {
@@ -139,11 +192,14 @@ class ChamberManager {
   private addMessage(chamberId: string, agentId: string, agentName: string, role: string, round: number, content: string, type: string = "message"): ChamberMessage {
     const id = randomUUID().slice(0, 12);
     const now = new Date().toISOString();
+    const safeAgentId = agentId || "system";
+    const safeAgentName = agentName || "unknown";
+    const safeRole = role || "worker";
     this.db.run(
       "INSERT INTO chamber_messages (id, chamber_id, agent_id, agent_name, role, round, content, type, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-      [id, chamberId, agentId, agentName, role, round, content, type, now],
+      [id, chamberId, safeAgentId, safeAgentName, safeRole, round, content, type, now],
     );
-    return { id, chamberId, agentId, agentName, role, round, content, type, createdAt: now };
+    return { id, chamberId, agentId: safeAgentId, agentName: safeAgentName, role: safeRole, round, content, type, createdAt: now };
   }
 
   /** Get shared transcript for agent context injection */
@@ -169,7 +225,10 @@ class ChamberManager {
       chamber.status = "idle";
     }
 
-    const sortedAgents = [...chamber.agents].sort((a, b) => a.order - b.order);
+    const sortedAgents = [...chamber.agents].filter(a => a.agentId && a.agentId.trim()).sort((a, b) => a.order - b.order);
+    if (sortedAgents.length === 0) {
+      return { success: false, error: "No valid agents in chamber" };
+    }
     const abortCtrl = new AbortController();
     this.activeRuns.set(id, abortCtrl);
 
@@ -190,7 +249,8 @@ class ChamberManager {
             }
 
             const transcript = this.buildTranscript(id, round - 1);
-            const wsNote = "\n\n## Workspace\nYour workspace is the project root (D:\\nova). You can use workspace tools like `workspace_list_files`, `workspace_read_file`, and `workspace_write_file` to access files.";
+            const workspacePath = chamber.workspace || "D:\\nova";
+            const wsNote = `\n\n## Workspace\nYour workspace is: ${workspacePath}. You can use workspace tools like \`workspace_list_files\`, \`workspace_read_file\`, and \`workspace_write_file\` to access files.`;
 
             const roleStr = chAgent.role ? ` (${chAgent.role})` : "";
             const roleContext = chAgent.role ? `\nYour assigned role: **${chAgent.role}**` : "";

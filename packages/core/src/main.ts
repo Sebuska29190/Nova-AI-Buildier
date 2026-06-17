@@ -285,7 +285,7 @@ async function tryStart(port: number): Promise<import("node:http").Server | null
   });
 
   // Initialize MCP servers
-  import("./mcp-client.ts").then(async (mcp) => {
+  import("./mcp/client.ts").then(async (mcp) => {
     await mcp.initMCPServers();
     const servers = mcp.listServers();
     if (servers.length > 0) {

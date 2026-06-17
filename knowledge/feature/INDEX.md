@@ -53,3 +53,4 @@
 - [File Created: packages/core/src/agent/runner.ts](2026-05-28-File Created_ packages_core_src_agent_runner.ts.md) — 2026-05-28 `[workspace, file-created, ts]`
 - [File Created: packages/core/src/agent/runner.ts](2026-05-28-File Created_ packages_core_src_agent_runner.ts.md) — 2026-05-28 `[workspace, file-created, ts]`
 - [File Created: packages/core/src/agent/runner.ts](2026-05-28-File Created_ packages_core_src_agent_runner.ts.md) — 2026-05-28 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/agent/runner.ts](2026-06-17-File Created_ packages_core_src_agent_runner.ts.md) — 2026-06-17 `[workspace, file-created, ts]`
