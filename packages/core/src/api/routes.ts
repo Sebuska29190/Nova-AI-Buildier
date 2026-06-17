@@ -1052,8 +1052,8 @@ Return valid JSON only (no markdown, no code fences):
   });
   app.get("/api/workspace/tree", (c) => {
     if (!workspaceManager.isActive()) return c.json({ error: "No workspace set" }, 400);
-    const tree = workspaceManager.getTree(c.req.query("dir") || "", parseInt(c.req.query("depth") || "2"));
-    return c.json({ tree });
+    const files = workspaceManager.listFiles(c.req.query("dir") || "", { maxDepth: parseInt(c.req.query("depth") || "3") });
+    return c.json({ files: files.map((f: any) => f.path) });
   });
   app.post("/api/workspace/clear", (c) => {
     workspaceManager.clear();
