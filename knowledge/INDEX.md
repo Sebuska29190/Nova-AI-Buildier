@@ -1,7 +1,7 @@
 # Knowledge Base Index
 
 Auto-generated index of all knowledge entries grouped by category.
-Last updated: 2026-06-18T01:27:23.114Z
+Last updated: 2026-06-18T13:27:14.679Z
 
 ## Categories
 
@@ -11,7 +11,7 @@ Last updated: 2026-06-18T01:27:23.114Z
 - [session](session/INDEX.md) — 0 entries
 - [decision](decision/INDEX.md) — 0 entries
 - [learning](learning/INDEX.md) — 0 entries
-- [config](config/INDEX.md) — 14 entries
+- [config](config/INDEX.md) — 15 entries
 - [trading](trading/INDEX.md) — 0 entries
 - [video](video/INDEX.md) — 0 entries
 - [agent](agent/INDEX.md) — 0 entries

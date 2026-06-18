@@ -208,6 +208,20 @@ registerTool({
   parameters: { type: "object", properties: { path: { type: "string", description: "Absolute path to the workspace root folder" } }, required: ["path"], additionalProperties: false },
   async execute(args) {
     const { path } = args as { path: string };
+    // ─── Security validation ──────────────────────────────────
+    const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
+    // Block dangerous system paths
+    const BLOCKED = ["/windows", "/windows/system32", "/etc", "/root", "/boot", "/sys", "/proc", "/dev", "/bin", "/sbin", "/usr/lib", "/var/run"];
+    const lower = normalized.toLowerCase();
+    for (const blocked of BLOCKED) {
+      if (lower === blocked || lower.startsWith(blocked + "/")) {
+        return `❌ Security: Cannot set workspace to system path "${path}". Choose a project or home directory.`;
+      }
+    }
+    // Block path traversal
+    if (normalized.includes("/../") || normalized.includes("/./") || normalized.endsWith("/..")) {
+      return `❌ Security: Path traversal detected in "${path}"`;
+    }
     workspaceManager.setRoot(path);
     return `✅ Workspace root set to: ${path}`;
   },

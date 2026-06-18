@@ -151,6 +151,10 @@ seedAutoBugFixer();
 import { seedCommunityAgents } from "./agent/community-agents.ts";
 seedCommunityAgents();
 
+// Seed VoltAgent community agents (112 imported subagents)
+import { seedVoltAgentAgents } from "./agent/community-agents-voltagent.ts";
+seedVoltAgentAgents(agentStore);
+
 // Init MCP servers from .mcp.json / mcp.json
 mcpManager.loadConfigs();
 

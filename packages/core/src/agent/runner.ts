@@ -16,6 +16,10 @@ import { toolBreaker } from "../safety/circuit-breaker-tools.ts";
 import { toolAudit } from "../safety/tool-audit.ts";
 import { usageTracker } from "../monitor/usage.ts";
 import { workspaceManager } from "../workspace/manager.ts";
+import { ledger } from "../kernel/ledger.ts";
+import { EVIDENCE_PROTOCOL_PROMPT, validateReport, strikeTracker } from "./validator.ts";
+import { qualityScorer } from "./scoring.ts";
+import { learningLoop } from "./learning.ts";
 
 // Session → Agent mapping for memory tools
 export const sessionAgentMap = new Map<string, string>();
@@ -95,6 +99,16 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
   if (globalRules) {
     finalSystemPrompt = `${globalRules}\n\n${finalSystemPrompt}`;
   }
+  
+  // ─── Evidence Protocol — mandatory for all agents ──────────
+  finalSystemPrompt += EVIDENCE_PROTOCOL_PROMPT;
+  
+  // ─── Strike feedback — if agent has prior strikes ──────────
+  if (params.agentId) {
+    const feedback = strikeTracker.getFeedback(params.agentId);
+    if (feedback) finalSystemPrompt += feedback;
+  }
+  
   if (finalSystemPrompt) {
     messages.push({ role: "system", content: finalSystemPrompt });
   }
@@ -162,12 +176,29 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
     await piHarness.start(ctx);
 
     try {
-      const result = await toolLoop(params, ctx);
+      let result = await toolLoop(params, ctx);
       breaker.recordSuccess();
 
       // ─── Post-run memory consolidation ────────────────────────
       if (params.agentId) {
         agentMemory.consolidateRun(params.agentId, result.text, params.runId || result.sessionId).catch(() => {});
+      }
+
+      // ─── Evidence Protocol Validation ──────────────────────────
+      if (params.agentId) {
+        const validation = validateReport(result.text);
+        if (!validation.passed) {
+          strikeTracker.addStrike(params.agentId, validation.reason);
+          qualityScorer.recordFail(params.agentId, validation.evidenceRate, validation.reason);
+          
+          // ─── Learning Loop: auto-remediate degraded agents ───
+          learningLoop.apply(params.agentId);
+          
+          result = { ...result, text: `⚠️ REPORT REJECTED BY VALIDATOR\n${validation.reason}\n\n---\n${result.text.slice(0, 2000)}` };
+          emitEvent({ type: "event", kind: "message", sessionId: params.sessionId, runId: params.runId, data: { text: `Validator: ${validation.reason}` } });
+        } else {
+          qualityScorer.recordPass(params.agentId, validation.evidenceRate, validation.claims.length);
+        }
       }
 
       // ─── Self-learning: Auto-create skill from complex tasks ───
@@ -251,6 +282,7 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
     if (!toolCalls.length) {
       const finalText = text || "(completed)";
       sessionManager.append(params.sessionId, "assistant", finalText);
+      try { toolBreaker.resetTask(params.sessionId); } catch {}
       return { sessionId: params.sessionId, text: finalText, modelRef: params.modelRef, usage: { input: 0, output: 0 } };
     }
 
@@ -371,6 +403,19 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
           durationMs: toolDurationMs,
         });
 
+        // ─── Kernel Ledger — immutable audit trail ──────────────
+        try {
+          ledger.append({
+            agentId: auditAgentId || "unknown",
+            sessionId: params.sessionId,
+            runId: params.runId,
+            action: tc.function.name,
+            status: "success",
+            detail: resultText.slice(0, 500),
+            durationMs: toolDurationMs,
+          } as any);
+        } catch {}
+
         // ─── Safety Middleware: afterCall unwind ──────────────
         toolBreaker.afterCall({ taskId: params.runId || params.sessionId, toolName: tc.function.name });
       } catch (e: unknown) {
@@ -400,6 +445,19 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
 
         // ─── Safety Middleware: afterCall unwind (failure) ────
         toolBreaker.afterCall({ taskId: params.runId || params.sessionId, toolName: tc.function.name });
+
+        // ─── Kernel Ledger — audit failure ────────────────────
+        try {
+          ledger.append({
+            agentId: failAgentId || "unknown",
+            sessionId: params.sessionId,
+            runId: params.runId,
+            action: tc.function.name,
+            status: "error",
+            detail: errMsg.slice(0, 500),
+            durationMs: toolDurationMs,
+          } as any);
+        } catch {}
       }
     }
 
@@ -410,6 +468,7 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
     if (toolNames.length >= 8 && new Set(toolNames).size <= 1) {
       const summary = `[Loop detected — same tool "${toolNames[0]}" called ${toolNames.length} times]`;
       sessionManager.append(params.sessionId, "assistant", summary);
+      try { toolBreaker.resetTask(params.sessionId); } catch {}
       return { sessionId: params.sessionId, text: summary + buildMutationFooter(), modelRef: params.modelRef, usage: { input: 0, output: 0 } };
     }
   }
@@ -428,6 +487,9 @@ async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: Ag
     const { maybeCompressSession } = await import("../trajectory-compression.ts");
     maybeCompressSession(params.sessionId, params.modelRef).catch(() => {});
   } catch {}
+
+  // ─── Cleanup: reset circuit breaker state ───────────────────
+  try { toolBreaker.resetTask(params.sessionId); } catch {}
 
   return { sessionId: params.sessionId, text: fullText, modelRef: params.modelRef, usage: { input: 0, output: 0 } };
 }

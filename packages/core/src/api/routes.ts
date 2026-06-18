@@ -27,6 +27,9 @@ import { brainstorm } from "../brainstorm/engine.ts";
 import { verifyToken, registerUser, loginUser } from "../auth/jwt.ts";
 import { runTerminal } from "../gateway/routes-terminal.ts";
 import { knowledgeBase } from "../knowledge/store.ts";
+import { qualityScorer } from "../agent/scoring.ts";
+import { capabilityRegistry } from "../agent/router.ts";
+import { learningLoop } from "../agent/learning.ts";
 import { runAutoBugFixer } from "../agent/auto-bug-fixer.ts";
 import { workspaceManager } from "../workspace/manager.ts";
 import { kernel, agentFS, ledger } from "../kernel/index.ts";
@@ -527,6 +530,45 @@ Return valid JSON only (no markdown, no code fences):
       const jobs = agentScheduler.listJobs();
       return c.json({ runs: jobs });
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // ─── Agent Quality Scoring ────────────────────────────────────
+  app.get("/api/agents/:id/score", (c) => {
+    const score = qualityScorer.get(c.req.param("id"));
+    const badge = qualityScorer.getTrustBadge(c.req.param("id"));
+    return c.json({ score, badge });
+  });
+
+  app.get("/api/agents/scores", (c) => {
+    const scores = qualityScorer.listByTrust();
+    return c.json({ scores });
+  });
+
+  // ─── Smart Agent Router — auto-select best agent for task ─────
+  app.post("/api/agents/match", async (c) => {
+    try {
+      const body = await c.req.json<{ task: string; topK?: number }>();
+      if (!body.task?.trim()) return c.json({ error: "task required" }, 400);
+      capabilityRegistry.build(); // Refresh index
+      const matches = capabilityRegistry.match(body.task, body.topK || 5);
+      return c.json({ matches });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.get("/api/agents/capabilities", (c) => {
+    capabilityRegistry.build();
+    return c.json({ capabilities: capabilityRegistry.list() });
+  });
+
+  // ─── Learning Loop — remediation history ────────────────────
+  app.get("/api/agents/:id/learning", (c) => {
+    const history = learningLoop.getHistory(c.req.param("id"));
+    return c.json({ agentId: c.req.param("id"), corrections: history });
+  });
+
+  app.post("/api/agents/:id/remediate", async (c) => {
+    learningLoop.apply(c.req.param("id"));
+    return c.json({ status: "remediated", agentId: c.req.param("id") });
   });
 
   // Agent background jobs

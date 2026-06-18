@@ -1,17 +1,27 @@
 # Agent Memory
 
-Last consolidated: 2026-05-28T17:41:38.302Z
-Total memories: 10
+Last consolidated: 2026-06-18T13:30:49.093Z
+Total memories: 43
 
 ## Key Learnings
 
-- ★★★★★ 🔴 CRITICAL — Brak `beforeCall` w plugin/tools.
-- ★★★★★ Let me know if you want me to implement the two critical fixes directly.
-- ★★★★★ If someone changes `maxToolCallsPerTask` to 100 but the loop bound stays at 50, the breaker never fires.
-- ★★★★★ runRoom()` and `spawnSubAgent()` call `runAgent()` directly — but they **never initialize or check** the `toolBreaker`.
-- ★★★★★ record()` **never calls `ledger.
-- ★★★★★ #### 🔴 **CRITICAL #2: Loop detection in runner.
-- ★★★★★ #### 🔴 **CRITICAL #1: `toolBreaker.
-- ★★★★★ ts` `toolLoop()` never calls it.
-- ★★★★★ beforeCall(ctx)` but never calls `toolAudit.
-- ★★★★★ **🔴 CRITICAL — Issue #1: `toolAudit.
+- ★★★★★ record()` never called from runner | 🟡 Medium | `runner.
+- ★★★★★ | 3 | `maybeCreateSkill()` undefined — crash on success | 🔴 Critical | `runner.
+- ★★★★★ append()` never called | 🔴 Critical | `runner.
+- ★★★★★ | 1 | `toolLoop()` body truncated — safety layer dead | 🔴 Critical | `runner.
+- ★★★★★ **Impact:** Tool audit logging (hash-based loop detection, call logging, event emission) is fully implemented but **never wired into the tool execution loop**.
+- ★★★★★ ts:16` | `workspace_read_file` | `toolAudit` imported but NEVER called | `import { toolAudit } from ".
+- ★★★★★ ts:15` | `workspace_read_file` | `workspaceManager` imported but NEVER called | `import { workspaceManager } from ".
+- ★★★★★ ts:14` | `workspace_read_file` | `usageTracker` imported but NEVER called | `import { usageTracker } from ".
+- ★★★★★ But even more concerning: the function might have been planned but never implemented.
+- ★★★★★ | 2 | Entire project | `workspace_search_files("maybeCreateSkill")` | Function `maybeCreateSkill` is NEVER defined | **0 results** — not in `runner.
+- ★★★★★ — is **never invoked**.
+- ★★★★★ ts:17` | `workspace_read_file` | `toolBreaker` IS imported but NEVER called | `import { toolBreaker } from ".
+- ★★★★★ This is the most critical finding — the entire safety layer is **dead code**.
+- ★★★★★ The imports exist, the classes are defined, but `beforeCall`, `initTask`, `record()`, and `append()` are never invoked.
+- ★★★★★ recordFailure()` but never `toolBreaker.
+- ★★★★★ **Detail:** The config default says `maxToolCallsPerTask: 50` but since `beforeCall` is never invoked, this value is purely decorative.
+- ★★★★★ ts:67` | `workspace_read_file` | `maxToolCallsPerTask: 50` defined but bound never checked | `maxToolCallsPerTask: 50` — no loop in runner.
+- ★★★★★ **Detail:** The multi-agent chamber system (`runRoom` and `spawnSubAgent` patterns) call `runAgent()` but never pass or initialize `toolBreaker` context.
+- ★★★★★ ts` but never invoked.
+- ★★★★★ record()` is never called.

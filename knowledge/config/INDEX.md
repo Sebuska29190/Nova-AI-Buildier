@@ -43,3 +43,4 @@
 - [Workspace Set: D:\nova](2026-05-28-Workspace Set_ D__nova.md) — 2026-05-28 `[workspace, filesystem]`
 - [Workspace Set: D:\nova](2026-05-28-Workspace Set_ D__nova.md) — 2026-05-28 `[workspace, filesystem]`
 - [Workspace Set: D:\nova](2026-05-28-Workspace Set_ D__nova.md) — 2026-05-28 `[workspace, filesystem]`
+- [Workspace Set: D:\nova](2026-06-18-Workspace Set_ D__nova.md) — 2026-06-18 `[workspace, filesystem]`

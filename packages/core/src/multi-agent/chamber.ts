@@ -145,7 +145,7 @@ class ChamberManager {
     if (updates.name) { fields.push("name = ?"); values.push(updates.name); }
     if (updates.task) { fields.push("task = ?"); values.push(updates.task); }
     if (updates.agents) { fields.push("agents = ?"); values.push(JSON.stringify(updates.agents)); }
-    if (updates.maxRounds) { fields.push("max_rounds = ?"); values.push(updates.maxRounds); }
+    if (updates.maxRounds !== undefined) { fields.push("max_rounds = ?"); values.push(updates.maxRounds); }
     if (updates.executionMode) { fields.push("execution_mode = ?"); values.push(updates.executionMode); }
     if (fields.length === 0) return false;
     values.push(id);

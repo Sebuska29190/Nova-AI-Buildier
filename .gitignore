@@ -1,100 +1,86 @@
+# ─── Dependencies ──────────────────────────────────────────
 node_modules/
 node_modules_bak/
 dist/
+bun.lockb
+
+# ─── Environment & Secrets ──────────────────────────────────
 .env
+.env.local
+.env.production
+*.env.backup
+data/provider-config.json
+data/uploads/
+!packages/*/.env.example
+
+# ─── Databases & Runtime Data ───────────────────────────────
 *.db
 *.db-shm
 *.db-wal
 *.sqlite
-
-# Runtime data (may contain cached API keys)
+*.sqlite3
 data/
-skills/
+
+# ─── Knowledge Base (personal/private) ──────────────────────
+knowledge/
+
+# ─── Development Artifacts ──────────────────────────────────
 logs/
-.cheetahclaws/
-
-# Third-party plugin assets (binary files, not part of core project)
-plugins/
-
-# Dev logs and runtime artifacts
 *.log
 server*.log
 startup*.log
 *_err*.log
+*.tmp
+*.bak
+tmp_*
+tmp_test_*
 
-# Temporary test files
-tmp_test_*.ts
-
-# Video output artifacts
-video_output/
-
-# Checkpoint snapshots
-checkpoints/
-
-# Test knowledge entries
-test_knowledge/
-
-# Agent memory files
-memory/
-
-# Binary tools
+# ─── Binary Tools ───────────────────────────────────────────
 bin/
 
-# Config files (local)
+# ─── Personal Workspace State ───────────────────────────────
+.nova/
+.hermes/
+.cheetahclaws/
+HEARTBEAT.md
+IDENTITY.md
+USER.md
+BOOTSTRAP.md
+MEMORY.md
+
+# ─── Evolution & Plans (personal) ───────────────────────────
+plans/
+evolution-drafts/
+
+# ─── Demo Files (not production) ────────────────────────────
+demos/
+
+# ─── Local Config (rules, tokens) ───────────────────────────
 config/
 
-# Hermes workspace config
-.hermes/
+# ─── Runtime Generated ──────────────────────────────────────
+memory/
+skills/
+test_knowledge/
+checkpoints/
+plugins/
 
-# Sensitive uploads (API keys, OAuth secrets)
-data/uploads/
-knowledge/feature/*File Created_ .env*
-knowledge/feature/2026-05-26-File Created_ orzecznictwo_SN_cywilna_051-150_orzeczenia_SN_cywilna.txt.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_aktach_stanu_cywilnego.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_kodeksy_KRO.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_kodeksy_KPC.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_kodeksy_KC.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_orzecznictwo_zrodla_baz.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_README_02_PRAWO_RODZINNE.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_rozporzadzenia_UE_Bruksela_I_bis_1215_2012.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_README_00_SPIS_TRESCI.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_zmianie_imienia_nazwiska.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_README_01_KODYFIKACJA_CYWILNA.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_prawo_prywatne_miedzynarodowe.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_rozporzadzenia_UE_Bruksela_II_ter_2019_1111.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_rozporzadzenia_UE_Rozporzadzenie_spadkowe_650_2012..md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_rozporzadzenia_UE_Rozporzadzenie_alimentacyjne_4_20.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_rozporzadzenia_UE_Rzym_I_593_2008.md.md
-knowledge/feature/2026-05-26-File Created_ orzecznictwo_SN_cywilna_001-050_orzeczenia_SN_cywilna.txt.md
-knowledge/feature/2026-05-26-File Created_ pobieracz_saos.py.md
-knowledge/feature/2026-05-26-File Created_ polskie_kodeksy_Kodeks_rodzinny_opiekunczy.txt.md
-knowledge/feature/2026-05-26-File Created_ polskie_kodeksy_opis_KC.txt.md
-knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_agent_runner.ts.md
-knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety___tests___circuit-breaker-tools.test.md
-knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety___tests___tool-audit.test.ts.md
-knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety_circuit-breaker-tools.ts.md
-knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety_index.ts.md
-knowledge/feature/2026-05-25-File Created_ nova_packages_core_src_safety_tool-audit.ts.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_dyrektywy_UE_dyrektywy_konsumenckie.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_orzecznictwo_SN_izba_cywilna.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_orzecznictwo_TSUE_wyroki.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_kosztach_sadowych_cywilnych.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_kredycie_hipotecznym.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_ksiegach_wieczystych.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_ochronie_praw_lokatorow.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_postepowaniu_nieletnich.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_prawach_konsumenta.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_przeciwdzialaniu_przemocy_domowej..md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_wlasnosci_lokali.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_polskie_ustawy_o_wspieraniu_rodziny.md.md
-knowledge/feature/2026-05-26-File Created_ baza_prawnicza_rozporzadzenia_UE_Rzym_III_1259_2010.md.md
-knowledge/feature/2026-05-26-File Created_ extract_kro.py.md
-knowledge/feature/2026-05-26-File Created_ polskie_kodeksy_KC_pelny_tekst.txt.md
-knowledge/feature/2026-05-26-File Created_ README_SPIS_TRESCI.md.md
-knowledge/feature/2026-05-28-File Created_ packages_core_src_agent_runner.ts.md
-knowledge/feature/2026-05-28-File Created_ packages_core_src_safety___tests___circuit-breaker-tools.test.ts.md
-knowledge/feature/2026-05-28-File Created_ packages_core_src_skill_self-improve.ts.md
-knowledge/feature/2026-05-28-File Created_ packages_ui_src_routes_MemoryPage.tsx.md
-plans/FINAL_REPORT.md
-plans/FINAL_REPORT.md
-plans/CRYPTO_HUB_V2_REPORT.md
+# ─── Desktop Screenshots ────────────────────────────────────
+data/desktop/*.png
+*.png.tmp
+
+# ─── Deprecated Output Dirs ─────────────────────────────────
+video_output/
+
+# ─── IDE & OS ───────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Provider Secrets ───────────────────────────────────────
+packages/provider-*/.env
