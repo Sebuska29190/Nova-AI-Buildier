@@ -14,6 +14,7 @@ import { ToolCallCard } from "../lib/components/chat/ToolCallCard";
 import { ThinkingPanel } from "../lib/components/chat/ThinkingPanel";
 import { WelcomeScreen } from "../lib/components/chat/WelcomeScreen";
 import { ChatInput } from "../lib/components/chat/ChatInput";
+import { AgentActivityPanel } from "../lib/components/chat/AgentActivityPanel";
 import { useToast } from "../lib/components/ui/Toast";
 
 // Configure marked
@@ -100,6 +101,7 @@ export function ChatPage({ models = [], skills = [], agents = [], sessions = [],
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   // ─── Auto-scroll ───────────────────────────────────
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, streamContent, agentActivity]);
@@ -163,7 +165,7 @@ export function ChatPage({ models = [], skills = [], agents = [], sessions = [],
 
     const ac = new AbortController();
     abortRef.current = ac;
-    const startTime = Date.now();
+    startTimeRef.current = Date.now();
 
     // File context
     let fileContext = "";
@@ -191,12 +193,24 @@ export function ChatPage({ models = [], skills = [], agents = [], sessions = [],
       }, ac.signal, (event) => {
         if (event.type === "thinking") { setIsThinking(true); setCurrentThinking(event.content || ""); }
         else if (event.type === "tool_call") { setIsThinking(false); setCurrentThinking(""); setAgentActivity(prev => [...prev, { type: "tool_call", tool: event.tool, args: event.args, timestamp: Date.now() }]); }
-        else if (event.type === "tool_result") { setAgentActivity(prev => [...prev, { type: "tool_result", tool: event.tool, success: event.success, duration: event.duration, timestamp: Date.now() }]); }
+        else if (event.type === "tool_result") {
+          // Merge result into existing tool_call entry
+          setAgentActivity(prev => {
+            const updated = [...prev];
+            for (let i = updated.length - 1; i >= 0; i--) {
+              if (updated[i].type === "tool_call" && updated[i].tool === event.tool && !updated[i].duration) {
+                updated[i] = { ...updated[i], success: event.success, duration: event.duration };
+                break;
+              }
+            }
+            return updated;
+          });
+        }
         else if (event.type === "done") { setIsThinking(false); setCurrentThinking(""); }
         else if (event.type === "error") { setIsThinking(false); setCurrentThinking(""); }
       });
 
-      const duration = Date.now() - startTime;
+      const duration = Date.now() - startTimeRef.current;
       setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: result.text, timestamp: Date.now(), duration, toolCalls: agentActivity.map(a => ({ tool: a.tool || "", args: a.args, success: a.success, duration: a.duration })) }]);
       if (result.sessionKey) { setResumeSessionId(result.sessionKey); onSessionKeyChange?.(result.sessionKey); }
     } catch (e: any) {
@@ -473,6 +487,16 @@ export function ChatPage({ models = [], skills = [], agents = [], sessions = [],
             )}
           </div>
         </div>
+
+        {/* Agent Activity Panel — right sidebar (always visible during activity) */}
+        {(agentActivity.length > 0 || isThinking || streaming || loading) && !showSettings && (
+          <AgentActivityPanel
+            status={isThinking ? "thinking" : streaming ? "acting" : loading ? "acting" : "done"}
+            toolCalls={agentActivity.map(a => ({ tool: a.tool || "", args: a.args, success: a.success, duration: a.duration, timestamp: a.timestamp }))}
+            duration={startTimeRef.current ? Date.now() - startTimeRef.current : 0}
+            tokens={messages.length > 0 ? messages[messages.length - 1].tokens : undefined}
+          />
+        )}
 
         {/* Settings Panel (compact dropdown) */}
         {showSettings && (

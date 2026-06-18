@@ -3,3 +3,4 @@ export { ToolCallCard } from "./ToolCallCard";
 export { ThinkingPanel } from "./ThinkingPanel";
 export { WelcomeScreen } from "./WelcomeScreen";
 export { ChatInput } from "./ChatInput";
+export { AgentActivityPanel } from "./AgentActivityPanel";

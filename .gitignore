@@ -67,6 +67,7 @@ tasks.json
 extract_*.py
 test_big.txt
 test_upload.txt
+0
 
 # ─── Evolution & Plans (personal) ───────────────────────────
 plans/

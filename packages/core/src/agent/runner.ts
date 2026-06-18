@@ -10,7 +10,7 @@ import { classifyError } from "../error-classifier.ts";
 import { checkQuota } from "../quota.ts";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
-import { loadSkills } from "../skill/loader.ts";
+import { findSkillsForContext, buildSkillContext, loadSkillByName } from "../skill/loader.ts";
 import { agentMemory } from "./memory.ts";
 import { toolBreaker } from "../safety/circuit-breaker-tools.ts";
 import { toolAudit } from "../safety/tool-audit.ts";
@@ -22,14 +22,44 @@ import { qualityScorer } from "./scoring.ts";
 import { learningLoop } from "./learning.ts";
 
 // Session → Agent mapping for memory tools
+// TTL: entries older than 30 minutes are cleaned up
+const SESSION_AGENT_TTL_MS = 30 * 60 * 1000;
+const sessionAgentTimestamps = new Map<string, number>();
 export const sessionAgentMap = new Map<string, string>();
+
+/** Clean up stale session→agent mappings */
+function cleanupSessionAgentMap(): void {
+  const now = Date.now();
+  for (const [sid, ts] of sessionAgentTimestamps) {
+    if (now - ts > SESSION_AGENT_TTL_MS) {
+      sessionAgentMap.delete(sid);
+      sessionAgentTimestamps.delete(sid);
+    }
+  }
+}
 
 // Cache dla wydajności — TTL 30s
 let _rulesCache: string | null = null;
 let _rulesCacheTime = 0;
-let _skillsCache: any[] | null = null;
-let _skillsCacheTime = 0;
 const CACHE_TTL = 30000;
+
+/**
+ * Detect if a message is a task (needs tool use) vs simple chat (instant reply).
+ * Tasks contain action verbs, file references, code keywords.
+ * Chat is greetings, questions, opinions, small talk.
+ */
+function isTaskMessage(message: string): boolean {
+  const lower = message.toLowerCase().trim();
+  // Very short messages are always chat
+  if (lower.length < 15) return false;
+  // Task indicators — message requests concrete work
+  const taskPatterns = /\b(read|write|edit|create|fix|bug|error|test|build|deploy|refactor|implement|add|remove|delete|update|check|analyze|search|find|scan|audit|review|optimize|migrate|install|configure|setup|debug|trace|profile|benchmark|deploy|publish|commit|push|pull|merge|rebase|cherry-pick|squash|revert|rollback)\b/i;
+  // File/code references
+  const filePattern = /\b(src\/|lib\/|test\/|\.ts|\.js|\.py|\.rs|\.go|\.tsx|\.jsx|function |class |const |import |export |async |await |return )\b/i;
+  // Question words + long enough = likely needs investigation
+  const questionPattern = /^(what|how|why|where|when|who|which|can you|could you|please|help me|explain|describe|tell me about)\b/i;
+  return taskPatterns.test(lower) || filePattern.test(lower) || (questionPattern.test(lower) && lower.length > 30);
+}
 
 export interface RunParams {
   sessionId: string;
@@ -71,10 +101,8 @@ function loadGlobalRules(): string {
 }
 
 function loadCachedSkills(): any[] {
-  if (_skillsCache && Date.now() - _skillsCacheTime < CACHE_TTL) return _skillsCache;
-  _skillsCache = loadSkills();
-  _skillsCacheTime = Date.now();
-  return _skillsCache;
+  // Deprecated — use findSkillsForContext or buildSkillContext instead
+  return [];
 }
 
 export async function runAgent(params: RunParams): Promise<RunResult> {
@@ -86,14 +114,14 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
   const globalRules = loadGlobalRules();
   let finalSystemPrompt = basePrompt;
 
-  // Append skills reference so the agent knows what skills are available
-  const allSkills = loadCachedSkills();
-  if (allSkills.length > 0) {
-    const skillsRef = allSkills
-      .filter((s) => s.description)
-      .map((s) => `  skills/${s.filePath} — ${s.description}`)
-      .join("\n");
-    finalSystemPrompt += `\n\n## Available Skills (${allSkills.length} total)\nUse \`skills_list\` tool to see all. Key skills:\n${skillsRef}\n\nWhen a user request matches a skill's trigger, load that skill file and follow its instructions. Skills are located in the \`skills/\` directory.`;
+  // Context-aware skill injection: find skills matching the user's message
+  // Skip for simple chat messages — saves tokens and latency
+  if (messageIsTask) {
+    const matchingSkills = findSkillsForContext(params.message, params.agentId);
+    if (matchingSkills.length > 0) {
+      const skillContext = buildSkillContext(matchingSkills, 4000);
+      finalSystemPrompt += `\n\n${skillContext}\n\nThese skills are loaded based on your current task. Read the <instructions> of each matching skill and follow them. Use \`skills_list\` tool to see all available skills.`;
+    }
   }
 
   if (globalRules) {
@@ -113,6 +141,49 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
     messages.push({ role: "system", content: finalSystemPrompt });
   }
 
+  // ═══ EXECUTION PROTOCOL — mandatory agent behavior ═══
+  // Only inject for TASK messages. Simple chat/greetings get instant replies.
+  const messageIsTask = isTaskMessage(params.message);
+  if (params.agentId && params.tools !== false && messageIsTask) {
+    messages.push({
+      role: "system",
+      content: `## ⚠️ EXECUTION PROTOCOL — How You Must Behave
+
+### Core Principle
+You are an AGENT working in a project, not a chatbot answering questions.
+Your job is to COMPLETE TASKS, not to DISCUSS them.
+
+### Execution Bias
+- **Act in this turn.** Don't say "I'll check" — IMMEDIATELY call workspace_read_file, workspace_search_files, or workspace_run_command.
+- **Continue until done or genuinely blocked.** Don't finish with a "plan" when tools can move forward.
+- **Non-final turn: use tools to advance.** Every response WITHOUT tool calls = FINAL REPORT.
+- **Never give up early.** If the task needs 10+ tool calls, do them all.
+
+### Tool Call Rules
+- **Default: DO NOT narrate.** For routine calls (read, search, list) — just call them silently.
+- **Narrate ONLY when it helps:** complex decisions, unexpected results, strategy changes.
+- **One sentence max** for narration. No paragraphs.
+
+### Forbidden Responses (WILL BE REJECTED)
+- ❌ "Ok, let me check..." / "I'll look into that..." / "Rozumiem, zacznę od..."
+- ❌ "Here's my plan:" / "Plan działania:" / "Next steps:" / "First, I'll..."
+- ❌ Any response under 300 characters WITHOUT tool calls
+- ❌ Any response that's a "to-do list" instead of completed work
+
+### Required Behavior
+- ✅ Call tools IMMEDIATELY. Explore, read, analyze, execute.
+- ✅ When done with tools → COMPLETE report (300+ chars, concrete findings with file:line references).
+- ✅ Be resourceful: don't ask, don't plan — DO IT.
+- ✅ If you read a file in turn 1, REMEMBER what you found in turn 2.
+- ✅ If a tool call failed, try a DIFFERENT approach, not the same one.
+
+### Continuity Rules
+- Your response WITHOUT tool calls is your FINAL RESPONSE. No follow-ups allowed.
+- If you cannot complete the task, explain exactly WHAT is missing and WHY you're stuck.
+- Minimum 300 characters for any final report — be thorough, be specific.`,
+    });
+  }
+
   // ─── Current date/time injection ─────────────────────────────
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -125,6 +196,9 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
   // ─── Agent Persistent Memory ──────────────────────────────────
   if (params.agentId) {
     sessionAgentMap.set(params.sessionId, params.agentId);
+    sessionAgentTimestamps.set(params.sessionId, Date.now());
+    // Cleanup stale entries periodically
+    if (sessionAgentMap.size > 100) cleanupSessionAgentMap();
     const memoryBlock = agentMemory.injectMemory(params.agentId);
     if (memoryBlock) {
       messages.push({ role: "system", content: memoryBlock });
@@ -132,16 +206,29 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
   }
 
   // Rebuild transcript into API messages
-  // Skip tool-related entries (assistant with tool_calls and tool results) since
-  // they are ephemeral — already processed in previous requests. Only keep
-  // user messages and plain assistant text responses for conversation history.
+  // v2: Keep tool calls and results as context so the agent remembers what it already did.
+  // This prevents the agent from re-reading the same files or repeating failed approaches.
   const transcript = sessionManager.getTranscript(params.sessionId);
   for (const entry of transcript) {
     if (entry.role === "system") continue;
-    // Skip assistant messages that stored tool_calls (prefixed with __TOOL_CALLS__)
-    if (entry.role === "assistant" && entry.content.startsWith("__TOOL_CALLS__")) continue;
-    // Skip tool result messages
-    if (entry.role === "tool") continue;
+    // Keep tool calls as context markers — agent sees what tools were used
+    if (entry.role === "assistant" && entry.content.startsWith("__TOOL_CALLS__")) {
+      const toolName = entry.content.replace("__TOOL_CALLS__", "");
+      messages.push({ 
+        role: "assistant", 
+        content: `[Previously called tool: ${toolName}]` 
+      });
+      continue;
+    }
+    // Keep tool results as context — agent sees what was found
+    if (entry.role === "tool") {
+      const preview = entry.content.slice(0, 300);
+      messages.push({ 
+        role: "user", 
+        content: `[Tool result]: ${preview}${entry.content.length > 300 ? "..." : ""}` 
+      });
+      continue;
+    }
     messages.push({ role: entry.role as "user" | "assistant", content: entry.content });
   }
   messages.push({ role: "user", content: params.message });
@@ -210,6 +297,7 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
       // Cleanup sessionAgentMap on success
       if (params.agentId) {
         sessionAgentMap.delete(params.sessionId);
+        sessionAgentTimestamps.delete(params.sessionId);
       }
 
       return result;
@@ -228,24 +316,14 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
   // Cleanup sessionAgentMap AFTER all model candidates are exhausted
   if (params.agentId) {
     sessionAgentMap.delete(params.sessionId);
+    sessionAgentTimestamps.delete(params.sessionId);
   }
   throw new Error("All models failed");
 }
 
 // thisRole() removed — was dead code, all callers use direct object construction
 
-/**
- * Auto-create a skill from a complex task for self-learning.
- * This is a stub that can be replaced with actual skill generation logic.
- * Currently it logs the intent — no crash, no side effects.
- */
-async function maybeCreateSkill(_sessionId: string, _modelRef: string): Promise<void> {
-  // Stub: skill auto-creation is planned but not yet implemented.
-  // When implemented, this will analyze the session transcript and
-  // create a new skill file in skills/ for reusable patterns.
-  // For now, it's a no-op to prevent the ReferenceError crash.
-  return Promise.resolve();
-}
+
 
 /**
  * The tool execution loop — runs the LLM with tool definitions, handles
@@ -265,6 +343,7 @@ async function toolLoop(params: RunParams, ctx: {
 }): Promise<RunResult> {
   const taskId = params.runId ?? `${params.sessionId}-${Date.now()}`;
   const agentId = params.agentId ?? "anonymous";
+  const messageIsTask = isTaskMessage(params.message);
 
   // ─── Safety: Initialize tool circuit breaker ─────────────────
   toolBreaker.initTask(taskId);
@@ -327,6 +406,25 @@ async function toolLoop(params: RunParams, ctx: {
       };
     }
 
+    // ─── Wrap-up prompt v2: earlier nudge to prevent hitting iteration limit ──
+    if (iteration === 10) {
+      ctx.messages.push({
+        role: "user",
+        content: "⚠️ You are at iteration 10 of 50. Please produce your final answer/summary NOW based on what you have gathered so far. Do NOT call any more tools — just write your report directly.",
+      });
+    }
+
+    // ═══ FORCE EXIT v2 at iteration 15: remove all tools ═══
+    // If agent ignores the wrap-up prompt, force it to stop by removing
+    // tools entirely — the LLM can't call what isn't available.
+    if (iteration >= 15) {
+      ctx.tools = [];
+      ctx.messages.push({
+        role: "system",
+        content: "🔴 FINAL WARNING: All tools have been removed. You MUST produce your complete final answer NOW. No more investigation is possible. Write your report with whatever information you have.",
+      });
+    }
+
     // ─── Safety: Check circuit breaker before each LLM call ───
     const startTime = Date.now();
     try {
@@ -357,7 +455,7 @@ async function toolLoop(params: RunParams, ctx: {
     }
 
     // ─── Call the LLM ─────────────────────────────────────────
-    const piResult = await piHarness.call(ctx);
+    const piResult = await piHarness.send(ctx);
     inputTokens += piResult.usage?.inputTokens ?? 0;
     outputTokens += piResult.usage?.outputTokens ?? 0;
 
@@ -446,6 +544,20 @@ async function toolLoop(params: RunParams, ctx: {
           iteration,
         });
 
+        // ─── Emit tool_result event for real-time UI visibility ──
+        emitEvent({
+          type: "event",
+          kind: "tool_result",
+          sessionId: params.sessionId,
+          runId: params.runId,
+          data: {
+            toolName,
+            success,
+            durationMs: toolDuration,
+            resultPreview: resultStr.slice(0, 200),
+          },
+        });
+
         // ─── Usage tracking for tool call ──────────────────────
         usageTracker.log({
           agentId,
@@ -460,6 +572,20 @@ async function toolLoop(params: RunParams, ctx: {
 
         // ─── Safety: After-call hook ──────────────────────────
         toolBreaker.afterCall({ taskId, toolName });
+
+        // ─── Save tool activity to session ──────────────────────
+        try {
+          sessionManager.appendToolActivity(
+            params.sessionId,
+            agentId,
+            toolName,
+            argsStr,
+            resultStr,
+            success,
+            toolDuration,
+            iteration
+          );
+        } catch { /* best-effort: tool activity is non-critical */ }
 
         // ─── Append tool result to messages ───────────────────
         ctx.messages.push({
@@ -482,7 +608,51 @@ async function toolLoop(params: RunParams, ctx: {
       continue; // Go back to LLM call with tool results
     }
 
-    // ─── No tool calls — this is the final response ──────────
+    // ═══ Smart exit detection v2: don't let AGENTS quit early ═══
+    // CRITICAL: This only applies to agent INVESTIGATIONS (agentId set, not "default").
+    // Regular chat must exit immediately — users expect instant answers to simple questions.
+    // v2: Stricter min rounds, plan detection, completion recognition.
+    
+    const isAgentMode = agentId && agentId !== "default";
+    
+    if (isAgentMode && messageIsTask) {
+      // TASK MODE: require deeper investigation
+      const minRounds = 3;  // reduced from 6 — enough for most tasks
+      const isShortResponse = content.length < 200;  // reduced from 300
+      const looksIncomplete = /^(ok|rozumiem|zaraz|sprawdzam|let me|i'll|i will|checking|looking|starting|begin|first|sure|absolutely|of course)/i.test(content.trim());
+      const looksLikePlan = /^(plan|next steps|here's what|proposed|approach|strategy|roadmap|will do|going to|first i'll|start by|to do|todo|checklist)/i.test(content.trim());
+      const noRealOutput = content.trim().length < 80;  // reduced from 100
+      const hasDoneWork = iteration > 0;
+      const looksComplete = /^(completed|fixed|done|implemented|created|updated|changed|resolved|analyzed|found|here's what|summary|report|findings)/i.test(content.trim());
+      
+      if (iteration < minRounds || isShortResponse || looksIncomplete || looksLikePlan || noRealOutput) {
+        // ALLOW completion if agent looks done AND has done real work
+        if (looksComplete && hasDoneWork && !isShortResponse) {
+          // Fall through to success — agent finished properly
+        } else {
+          const reason = noRealOutput ? "empty response"
+            : looksLikePlan ? "plan instead of execution"
+            : looksIncomplete ? "placeholder reply"
+            : isShortResponse ? `too short (${content.length} chars, need 200+)`
+            : `need ${minRounds - iteration} more investigation rounds`;
+          
+          ctx.messages.push({
+            role: "user",
+            content: `⚠️ REJECTED: ${reason}. Continue working — use tools, gather evidence, produce a COMPREHENSIVE final report with concrete findings.`,
+          });
+          iteration++;
+          continue;
+        }
+      }
+    } else if (isAgentMode && !messageIsTask) {
+      // CHAT MODE: allow instant exit on first turn with any substantive response
+      if (iteration === 0 && content.length > 20) {
+        // Simple chat — exit immediately
+      } else if (iteration > 0 && content.length > 20) {
+        // Had tool calls but now responding — allow exit
+      }
+    }
+    
     fullResponse = content;
 
     // ─── Safety: Reset circuit breaker ─────────────────────────
@@ -521,259 +691,6 @@ async function toolLoop(params: RunParams, ctx: {
     modelRef: params.modelRef,
     usage: { input: inputTokens, output: outputTokens },
   };
-
-  const seenTools = new Set<string>();
-  const fileMutations: { action: string; path: string; detail: string }[] = [];
-
-  const FILE_TOOLS = new Set(["workspace_write_file", "workspace_edit_file", "workspace_delete_file", "write_file", "patch", "delete_file"]);
-
-  function trackFileMutation(toolName: string, args: Record<string, unknown>, result: string): void {
-    if (!FILE_TOOLS.has(toolName)) return;
-    const path = (args.path as string) || "";
-    if (toolName === "workspace_write_file" || toolName === "write_file") {
-      const content = (args.content as string) || "";
-      fileMutations.push({ action: "✏️ Written", path, detail: `${content.length} bytes` });
-    } else if (toolName === "workspace_edit_file" || toolName === "patch") {
-      fileMutations.push({ action: "🔧 Edited", path, detail: `find/replace` });
-    } else if (toolName === "workspace_delete_file" || toolName === "delete_file") {
-      fileMutations.push({ action: "🗑️ Deleted", path, detail: `` });
-    }
-  }
-
-  function buildMutationFooter(): string {
-    if (fileMutations.length === 0) return "";
-    const lines = fileMutations.map(m => `  ${m.action} \`${m.path}\`${m.detail ? ` — ${m.detail}` : ""}`);
-    return `\n\n📁 **File changes** (${fileMutations.length}):\n${lines.join("\n")}`;
-  }
-
-  for (let iteration = 0; iteration < 50; iteration++) {
-    let text = "";
-    let toolCalls: ToolCall[] = [];
-
-    try {
-      const result = await piHarness.send(ctx as Parameters<typeof piHarness.send>[0]);
-      text = result.text || "";
-      toolCalls = result.toolCalls || [];
-    } catch (e: unknown) {
-      console.error(`[toolLoop] piHarness.send error (iteration ${iteration}):`, safeMessage(e));
-      text = `Tool execution error: ${safeMessage(e)}`;
-      toolCalls = [];
-    }
-
-    // If no tool calls, return text (even if empty, we guard against that)
-    if (!toolCalls.length) {
-      const finalText = text || "(completed)";
-      sessionManager.append(params.sessionId, "assistant", finalText);
-      try { toolBreaker.resetTask(params.sessionId); } catch {}
-      return { sessionId: params.sessionId, text: finalText, modelRef: params.modelRef, usage: { input: 0, output: 0 } };
-    }
-
-    // Force a final summary after 10 iterations — model may keep calling tools without producing text
-    if (iteration >= 10 && !text.trim()) {
-      text = `[Analysis complete after ${iteration + 1} tool iterations]`;
-    }
-
-    // At iteration 20, inject a "wrap up" prompt to prevent hitting the limit
-    if (iteration === 20) {
-      const wrapUpMsg: AgentMessage = {
-        role: "user",
-        content: "You are approaching the iteration limit. Please provide your final answer/summary now based on what you've gathered so far. Do not call any more tools — just write the report directly."
-      };
-      ctx.messages.push(wrapUpMsg);
-      sessionManager.append(params.sessionId, "user", wrapUpMsg.content);
-      continue;
-    }
-
-    // Execute tools
-    const toolNames = toolCalls.map((tc) => tc.function.name);
-    const assistantMsg = { role: "assistant" as const, content: text, tool_calls: toolCalls };
-    ctx.messages.push(assistantMsg);
-
-    // Persist assistant message with tool_calls to transcript (marked with __TOOL_CALLS__ prefix)
-    // so we can skip it on replay — tool calls are ephemeral and should not be replayed
-    const toolCallsJson = JSON.stringify({ text, toolCalls: toolCalls.map(tc => ({
-      id: tc.id, type: tc.type, function: { name: tc.function.name, arguments: tc.function.arguments }
-    })) });
-    sessionManager.append(params.sessionId, "assistant", `__TOOL_CALLS__${toolCallsJson}`);
-
-    for (const tc of toolCalls) {
-      const tool = getTool(tc.function.name);
-      if (!tool) {
-        ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: `Unknown tool: ${tc.function.name}` }), name: tc.function.name });
-        sessionManager.append(params.sessionId, "tool", JSON.stringify({ error: `Unknown tool: ${tc.function.name}` }), tc.id, tc.function.name);
-        continue;
-      }
-
-      // Parse arguments safely
-      let parsedArgs: Record<string, unknown> = {};
-      try { parsedArgs = JSON.parse(tc.function.arguments || "{}"); } catch {}
-
-      // ─── Safety Middleware: Circuit Breaker check ─────────────
-      const callCtx: import("../safety/circuit-breaker-tools.ts").ToolCallContext = {
-        taskId: params.runId || params.sessionId,
-        agentId: sessionAgentMap.get(params.sessionId) || agentId || "unknown",
-        toolName: tc.function.name,
-        toolParams: parsedArgs,
-        paramsHash: toolAudit.hashParams(parsedArgs),
-        iteration,
-      };
-      toolBreaker.beforeCall(callCtx);
-
-      // Premium: Emit tool_call event BEFORE execution (shows what agent is doing)
-      emitEvent({ type: "event", kind: "tool_call", sessionId: params.sessionId, runId: params.runId, data: {
-        name: tc.function.name,
-        arguments: parsedArgs,
-        iteration,
-      } });
-
-      // Execute tool with timeout
-      const toolStartTime = Date.now();
-      try {
-        let toolTimeout: ReturnType<typeof setTimeout> | undefined;
-        const resultText = await Promise.race([
-          tool.execute(parsedArgs, { sessionId: params.sessionId, signal: params.signal }),
-          new Promise<string>((_, reject) => { toolTimeout = setTimeout(() => reject(new Error(`Tool ${tc.function.name} timed out after 60s`)), 60000); }),
-        ]);
-        if (toolTimeout) clearTimeout(toolTimeout);
-        const toolDurationMs = Date.now() - toolStartTime;
-        trackFileMutation(tc.function.name, parsedArgs, resultText);
-
-        // LSP diagnostics after file writes
-        if (FILE_TOOLS.has(tc.function.name) && resultText.includes("✅")) {
-          try {
-            const { runDiagnostics, formatDiagnostics } = await import("../lsp-diagnostics.ts");
-            const filePath = (parsedArgs.path as string) || "";
-            const wsRoot = workspaceManager?.getRoot?.();
-            if (filePath && wsRoot) {
-              const diags = runDiagnostics(filePath, wsRoot);
-              if (diags.length > 0) {
-                const diagMsg = formatDiagnostics(diags);
-                fileMutations.push({ action: "🔍 Lint", path: filePath, detail: diagMsg.replace(/\n/g, "; ") });
-              }
-            }
-          } catch {} // diagnostics are non-blocking
-        }
-
-        ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: resultText.slice(0, 10000), name: tc.function.name });
-        sessionManager.append(params.sessionId, "tool", resultText.slice(0, 10000), tc.id, tc.function.name);
-        // Premium: Emit rich tool_result event
-        emitEvent({ type: "event", kind: "tool_result", sessionId: params.sessionId, runId: params.runId, data: {
-          toolCallId: tc.id,
-          toolName: tc.function.name,
-          success: true,
-          durationMs: toolDurationMs,
-          resultPreview: resultText.slice(0, 200),
-        } });
-
-        // ─── Audit & Usage Logging ──────────────────────────────
-        const auditAgentId = sessionAgentMap.get(params.sessionId) || agentId;
-        toolAudit.record({
-          taskId: params.runId || params.sessionId,
-          agentId: auditAgentId || "unknown",
-          toolName: tc.function.name,
-          paramsHash: toolAudit.hashParams(parsedArgs as Record<string, unknown>),
-          resultPreview: resultText.slice(0, 200),
-          durationMs: toolDurationMs,
-          success: true,
-          iteration,
-        });
-        usageTracker.log({
-          agentId: agentId || undefined,
-          sessionId: params.sessionId,
-          modelRef: params.modelRef,
-          action: "tool_call",
-          durationMs: toolDurationMs,
-        });
-
-        // ─── Kernel Ledger — immutable audit trail ──────────────
-        try {
-          ledger.append({
-            agentId: auditAgentId || "unknown",
-            sessionId: params.sessionId,
-            runId: params.runId,
-            action: tc.function.name,
-            status: "success",
-            detail: resultText.slice(0, 500),
-            durationMs: toolDurationMs,
-          } as any);
-        } catch {}
-
-        // ─── Safety Middleware: afterCall unwind ──────────────
-        toolBreaker.afterCall({ taskId: params.runId || params.sessionId, toolName: tc.function.name });
-      } catch (e: unknown) {
-        const toolDurationMs = Date.now() - toolStartTime;
-        const errMsg = `Error executing ${tc.function.name}: ${safeMessage(e)}`;
-        console.error(`[toolLoop] Tool execution error: ${errMsg}`);
-        ctx.messages.push({ role: "tool", tool_call_id: tc.id, content: errMsg, name: tc.function.name });
-        sessionManager.append(params.sessionId, "tool", errMsg, tc.id, tc.function.name);
-        // Premium: Emit tool_result for failed tool
-        emitEvent({ type: "event", kind: "tool_result", sessionId: params.sessionId, runId: params.runId, data: {
-          toolCallId: tc.id, toolName: tc.function.name, success: false,
-          durationMs: toolDurationMs, error: safeMessage(e),
-        } });
-
-        // ─── Audit Failure ──────────────────────────────────────
-        const failAgentId = sessionAgentMap.get(params.sessionId);
-        toolAudit.record({
-          taskId: params.runId || params.sessionId,
-          agentId: failAgentId || "unknown",
-          toolName: tc.function.name,
-          paramsHash: toolAudit.hashParams(parsedArgs as Record<string, unknown>),
-          resultPreview: errMsg.slice(0, 200),
-          durationMs: toolDurationMs,
-          success: false,
-          iteration,
-        });
-
-        // ─── Safety Middleware: afterCall unwind (failure) ────
-        toolBreaker.afterCall({ taskId: params.runId || params.sessionId, toolName: tc.function.name });
-
-        // ─── Kernel Ledger — audit failure ────────────────────
-        try {
-          ledger.append({
-            agentId: failAgentId || "unknown",
-            sessionId: params.sessionId,
-            runId: params.runId,
-            action: tc.function.name,
-            status: "error",
-            detail: errMsg.slice(0, 500),
-            durationMs: toolDurationMs,
-          } as any);
-        } catch {}
-      }
-    }
-
-    // Track all tools seen across iterations
-    for (const name of toolNames) seenTools.add(name);
-
-    // Detect tool loops — if same exact tool called 8+ times in a single iteration, break
-    if (toolNames.length >= 8 && new Set(toolNames).size <= 1) {
-      const summary = `[Loop detected — same tool "${toolNames[0]}" called ${toolNames.length} times]`;
-      sessionManager.append(params.sessionId, "assistant", summary);
-      try { toolBreaker.resetTask(params.sessionId); } catch {}
-      return { sessionId: params.sessionId, text: summary + buildMutationFooter(), modelRef: params.modelRef, usage: { input: 0, output: 0 } };
-    }
-  }
-
-  // Max iterations reached — include last text if any
-  const lastText = ctx.messages.filter(m => m.role === "assistant" && !m.content.startsWith("__TOOL_CALLS__")).pop()?.content || "";
-  const allTools = [...seenTools];
-  const summary = allTools.length > 0
-    ? `${lastText || `[Completed after tool iterations]`}\n\n_Tools used: ${allTools.join(", ")}_`
-    : lastText || "Max attempts reached";
-  const fullText = summary + buildMutationFooter();
-  sessionManager.append(params.sessionId, "assistant", fullText);
-
-  // Fire-and-forget: compress long sessions in background
-  try {
-    const { maybeCompressSession } = await import("../trajectory-compression.ts");
-    maybeCompressSession(params.sessionId, params.modelRef).catch(() => {});
-  } catch {}
-
-  // ─── Cleanup: reset circuit breaker state ───────────────────
-  try { toolBreaker.resetTask(params.sessionId); } catch {}
-
-  return { sessionId: params.sessionId, text: fullText, modelRef: params.modelRef, usage: { input: 0, output: 0 } };
 }
 
 /**

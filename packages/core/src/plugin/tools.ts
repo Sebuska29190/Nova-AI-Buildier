@@ -510,6 +510,46 @@ registerTool({
 // Video editor and shopping tools removed in Nexus AI v2.0
 // Computer Use tools removed in Nexus AI v2.0 (computer-use.ts deleted)
 
+// ─── Agent Handoff Tool ────────────────────────────────────────
+registerTool({
+  name: "handoff_to_agent",
+  description: "Delegate a task to another named agent. The target agent runs with its own system prompt, skills, and session. Use when a different specialist should handle the work (e.g. handoff to 'code-reviewer', 'bug-hunter', 'security-auditor').",
+  parameters: {
+    type: "object",
+    properties: {
+      agentId: { type: "string", description: "ID of the target agent (e.g. 'code-reviewer', 'bug-hunter')" },
+      message: { type: "string", description: "Task message to send to the target agent" },
+      context: { type: "string", description: "Optional context from your current work to help the target agent" },
+    },
+    required: ["agentId", "message"],
+    additionalProperties: false,
+  },
+  async execute(args, ctx) {
+    const { agentId, message, context } = args as { agentId: string; message: string; context?: string };
+    const { agentStore } = await import("../agent/store.ts");
+    const { spawnSubAgent } = await import("../multi-agent/subagent.ts");
+
+    const agent = agentStore.get(agentId);
+    if (!agent) {
+      const available = agentStore.list().map(a => a.id).join(", ");
+      return `❌ Agent "${agentId}" not found. Available agents: ${available || "(none)"}`;
+    }
+
+    const fullMessage = context
+      ? `## Context from previous agent\n${context}\n\n## Task\n${message}`
+      : message;
+
+    const systemPrompt = agent.systemPrompt || `You are ${agent.name}. ${agent.description || ""}`;
+
+    const result = await spawnSubAgent(
+      { id: `${agentId}-${Date.now()}`, name: agent.name, systemPrompt, modelRef: agent.modelRef },
+      fullMessage,
+    );
+
+    return `### Handoff to ${agent.name} (${agentId})\n\n${result}`;
+  },
+});
+
 // ─── Kanban Orchestrator Tool ──────────────────────────────────
 registerTool({
   name: "orchestrate",

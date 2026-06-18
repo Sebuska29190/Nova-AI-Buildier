@@ -39,7 +39,7 @@ import { authManager } from "./auth/manager.ts";
 import { memoryStore } from "./memory/store.ts";
 import { loadProviderConfigs } from "./config/provider-config.ts";
 import "./search/web.ts"; // registers web_search tool
-import "./plugin/community-skills.ts"; // registers 20 community tools
+import { registerAllCommunitySkills } from "./plugin/community-skills.ts"; // 49 community tools (11 modules)
 import "./plugin/tools_session_search.ts"; // FTS5 session search tool
 import "./skill/self-improve.ts"; // Auto-skill creation tools
 import { cronManager } from "./cron/manager.ts"; // Cron scheduler (registers tools)
@@ -70,6 +70,9 @@ console.log("\n  ╔════════════════════
 console.log("  ║       Nexus AI v2.0 — Connected        ║");
 console.log("  ╚═══════════════════════════════════════╝\n");
 
+// Register community skills (49 tools across 11 modules)
+registerAllCommunitySkills();
+
 // Init stores
 sessionManager.init(process.env.NOVA_DB_PATH);
 agentStore.init(process.env.NOVA_DB_PATH);
@@ -85,6 +88,17 @@ import { workspaceManager } from "./workspace/manager.ts";
 if (!workspaceManager.getRoot()) {
   workspaceManager.setRoot(process.cwd());
   console.log(`  ✓ Default workspace set to: ${process.cwd()}`);
+}
+
+// ─── Environment Validation ───────────────────────────────────
+const warnings: string[] = [];
+if (!process.env.DEEPSEEK_API_KEY && !process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
+  warnings.push("No LLM provider API keys configured — add at least one to .env");
+}
+if (warnings.length > 0) {
+  console.log("\n  ⚠ Environment warnings:");
+  for (const w of warnings) console.log(`    - ${w}`);
+  console.log();
 }
 
 // ─── Auto-Loader: safety + monitored modules ───────────────────

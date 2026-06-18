@@ -60,6 +60,35 @@ class SessionManager {
         INSERT INTO transcripts_fts(rowid, content, role) VALUES (new.id, new.content, new.role);
       END;
     `.trim());
+
+    // ─── Tool Activity Log — tracks every tool call per session ─────
+    this.db.run(`CREATE TABLE IF NOT EXISTS tool_activity_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      agent_id TEXT NOT NULL DEFAULT 'anonymous',
+      tool_name TEXT NOT NULL,
+      tool_args TEXT DEFAULT '{}',
+      tool_result TEXT DEFAULT '',
+      success INTEGER NOT NULL DEFAULT 1,
+      duration_ms INTEGER DEFAULT 0,
+      iteration INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    )`);
+    this.db.run("CREATE INDEX IF NOT EXISTS idx_tool_activity_session ON tool_activity_log(session_id, id)");
+
+    // ─── Agent Session State — persistent agent state across turns ──
+    this.db.run(`CREATE TABLE IF NOT EXISTS agent_session_state (
+      session_id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'idle',
+      current_task TEXT DEFAULT '',
+      completed_steps TEXT DEFAULT '[]',
+      context TEXT DEFAULT '{}',
+      started_at TEXT NOT NULL,
+      last_activity_at TEXT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    )`);
   }
 
   createSession(modelRef: string, opts?: { agentId?: string; channelId?: string; systemPrompt?: string; thinkingLevel?: string }): SessionRow {
@@ -172,6 +201,90 @@ class SessionManager {
   }
 
   close(): void { this.db?.close(); }
+
+  // ─── Tool Activity Log methods ─────────────────────────────────
+
+  appendToolActivity(
+    sessionId: string,
+    agentId: string,
+    toolName: string,
+    toolArgs: string,
+    toolResult: string,
+    success: boolean,
+    durationMs: number,
+    iteration: number
+  ): void {
+    this.db.run(
+      `INSERT INTO tool_activity_log (session_id, agent_id, tool_name, tool_args, tool_result, success, duration_ms, iteration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [sessionId, agentId, toolName, toolArgs, toolResult.slice(0, 2000), success ? 1 : 0, durationMs, iteration]
+    );
+  }
+
+  getToolActivity(sessionId: string, limit = 20): Array<{
+    toolName: string;
+    toolArgs: string;
+    toolResult: string;
+    success: boolean;
+    durationMs: number;
+    iteration: number;
+  }> {
+    return this.db.query(
+      `SELECT tool_name as toolName, tool_args as toolArgs, tool_result as toolResult, success, duration_ms as durationMs, iteration FROM tool_activity_log WHERE session_id = ? ORDER BY id DESC LIMIT ?`
+    ).all(sessionId, limit) as any[];
+  }
+
+  // ─── Agent Session State methods ───────────────────────────────
+
+  saveSessionState(sessionId: string, state: {
+    agentId: string;
+    status: string;
+    currentTask?: string;
+    completedSteps?: any[];
+    context?: Record<string, any>;
+  }): void {
+    this.db.run(
+      `INSERT OR REPLACE INTO agent_session_state (session_id, agent_id, status, current_task, completed_steps, context, started_at, last_activity_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+      [sessionId, state.agentId, state.status, state.currentTask ?? "", JSON.stringify(state.completedSteps ?? []), JSON.stringify(state.context ?? {})]
+    );
+  }
+
+  getSessionState(sessionId: string): {
+    agentId: string;
+    status: string;
+    currentTask: string;
+    completedSteps: any[];
+    context: Record<string, any>;
+  } | null {
+    const row = this.db.query(`SELECT * FROM agent_session_state WHERE session_id = ?`).get(sessionId) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      agentId: row.agent_id as string,
+      status: row.status as string,
+      currentTask: row.current_task as string,
+      completedSteps: JSON.parse((row.completed_steps as string) ?? "[]"),
+      context: JSON.parse((row.context as string) ?? "{}"),
+    };
+  }
+
+  updateSessionState(sessionId: string, updates: {
+    status?: string;
+    currentTask?: string;
+    completedSteps?: any[];
+    context?: Record<string, any>;
+  }): void {
+    const existing = this.getSessionState(sessionId);
+    if (!existing) return;
+    this.db.run(
+      `UPDATE agent_session_state SET status = ?, current_task = ?, completed_steps = ?, context = ?, last_activity_at = datetime('now') WHERE session_id = ?`,
+      [
+        updates.status ?? existing.status,
+        updates.currentTask ?? existing.currentTask,
+        JSON.stringify(updates.completedSteps ?? existing.completedSteps),
+        JSON.stringify(updates.context ?? existing.context),
+        sessionId,
+      ]
+    );
+  }
 }
 
 export const sessionManager = new SessionManager();
