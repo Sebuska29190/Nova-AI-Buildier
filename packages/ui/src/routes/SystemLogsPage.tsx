@@ -3,7 +3,6 @@
  */
 import { useState, useRef, useEffect } from "react";
 import { ScrollText, Search, XCircle, AlertTriangle, Info, Bug, Download, Trash2, Pause, Play } from "lucide-react";
-import { nexus, nx } from "../lib/design-tokens";
 
 type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG';
 interface LogEntry { id: string; time: string; level: LogLevel; module: string; message: string; detail?: string; }
@@ -27,7 +26,7 @@ const MOCK_LOGS: LogEntry[] = [
 
 const MODULES = ["all", "api", "agent", "session", "tool", "plugin", "auth", "cron", "quota", "git"];
 
-export default function SystemLogsPage() {
+function SystemLogsPage() {
   const [logs] = useState<LogEntry[]>(MOCK_LOGS);
   const [filter, setFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<Set<string>>(new Set());
@@ -66,11 +65,11 @@ export default function SystemLogsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setPaused(!paused)} className={`${nx.button.ghost} px-3 py-2 text-sm flex items-center gap-2`}>
+            <button onClick={() => setPaused(!paused)} className="btn-glass px-3 py-2 text-sm flex items-center gap-2">
               {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
               {paused ? "Resume" : "Pause"}
             </button>
-            <button className={`${nx.button.ghost} px-3 py-2 text-sm flex items-center gap-2`}>
+            <button className="btn-glass px-3 py-2 text-sm flex items-center gap-2">
               <Download className="w-3.5 h-3.5" /> Export
             </button>
             <button className="p-2 rounded-xl bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.2)] transition-all">
@@ -87,10 +86,10 @@ export default function SystemLogsPage() {
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search logs..."
-            className={nexus.glass.input + " pl-9 pr-3 py-1.5 text-xs w-full"}
+            className="glass-input pl-9 pr-3 py-1.5 text-xs w-full"
           />
         </div>
-        <select value={filter} onChange={e => setFilter(e.target.value)} className={nexus.glass.input + " px-3 py-1.5 text-xs"}>
+        <select value={filter} onChange={e => setFilter(e.target.value)} className="glass-input px-3 py-1.5 text-xs">
           {MODULES.map(m => <option key={m} value={m}>{m === 'all' ? 'All Modules' : m}</option>)}
         </select>
         <div className="flex gap-1.5">
@@ -136,3 +135,6 @@ export default function SystemLogsPage() {
     </div>
   );
 }
+
+export { SystemLogsPage };
+export default SystemLogsPage;

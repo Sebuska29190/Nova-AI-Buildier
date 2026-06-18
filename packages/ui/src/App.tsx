@@ -33,6 +33,10 @@ import { PromptPlaygroundPage } from "./routes/PromptPlaygroundPage";
 import { GitAutomationPage } from "./routes/GitAutomationPage";
 import { CodeEditorPage } from "./routes/CodeEditorPage";
 import { KnowledgeGraphPage } from "./routes/KnowledgeGraphPage";
+import { AgentWorkPage } from "./routes/AgentWorkPage";
+import { SettingsPage } from "./routes/SettingsPage";
+import { ApiKeysPage } from "./routes/ApiKeysPage";
+import { SystemLogsPage } from "./routes/SystemLogsPage";
 
 // Page component map
 const pages: Record<string, React.ComponentType<any>> = {
@@ -44,10 +48,10 @@ const pages: Record<string, React.ComponentType<any>> = {
   channels: ChannelsPage,
   memory: MemoryPage,
   config: ConfigPage,
-  settings: ConfigPage,
+  settings: SettingsPage,
   env: EnvPage,
-  apikeys: EnvPage,
-  logs: LogsPage,
+  apikeys: ApiKeysPage,
+  logs: SystemLogsPage,
   analytics: AnalyticsPage,
   aimodels: ModelsPage,
   schedule: CronPage,
@@ -65,6 +69,7 @@ const pages: Record<string, React.ComponentType<any>> = {
   playground: PromptPlaygroundPage,
   "code-editor": CodeEditorPage,
   knowledge: KnowledgeGraphPage,
+  "agent-work": AgentWorkPage,
 };
 
 function AppContent() {

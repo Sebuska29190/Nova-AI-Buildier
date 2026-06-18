@@ -56,3 +56,12 @@
 - [File Created: packages/core/src/agent/runner.ts](2026-06-17-File Created_ packages_core_src_agent_runner.ts.md) — 2026-06-17 `[workspace, file-created, ts]`
 - [File Created: packages/core/src/memory/store.ts](2026-06-17-File Created_ packages_core_src_memory_store.ts.md) — 2026-06-17 `[workspace, file-created, ts]`
 - [File Created: packages/core/src/memory/store.ts](2026-06-17-File Created_ packages_core_src_memory_store.ts.md) — 2026-06-17 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/signal.ts](2026-06-18-File Created_ packages_core_src_channel_signal.ts.md) — 2026-06-18 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/signal.ts](2026-06-18-File Created_ packages_core_src_channel_signal.ts.md) — 2026-06-18 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/signal.ts](2026-06-18-File Created_ packages_core_src_channel_signal.ts.md) — 2026-06-18 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/signal.ts](2026-06-18-File Created_ packages_core_src_channel_signal.ts.md) — 2026-06-18 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/signal.ts](2026-06-18-File Created_ packages_core_src_channel_signal.ts.md) — 2026-06-18 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/signal.ts](2026-06-18-File Created_ packages_core_src_channel_signal.ts.md) — 2026-06-18 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/signal.ts](2026-06-18-File Created_ packages_core_src_channel_signal.ts.md) — 2026-06-18 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/signal.ts](2026-06-18-File Created_ packages_core_src_channel_signal.ts.md) — 2026-06-18 `[workspace, file-created, ts]`
+- [File Created: packages/core/src/channel/email.ts](2026-06-18-File Created_ packages_core_src_channel_email.ts.md) — 2026-06-18 `[workspace, file-created, ts]`

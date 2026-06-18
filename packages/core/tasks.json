@@ -1,0 +1,12 @@
+[
+  {
+    "id": "fb3dfd5e",
+    "title": "Test task",
+    "description": "Description",
+    "status": "todo",
+    "priority": "high",
+    "tags": [],
+    "createdAt": "2026-06-18T02:05:52.309Z",
+    "updatedAt": "2026-06-18T02:05:52.309Z"
+  }
+]

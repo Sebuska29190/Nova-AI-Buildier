@@ -1,5 +1,5 @@
 /**
- * Nova WhatsApp Bridge — whatsapp-web.js integration
+ * Nexus AI WhatsApp Bridge — whatsapp-web.js integration
  *
  * Uses whatsapp-web.js (puppeteer-based) for WhatsApp Web automation.
  * First connection requires QR code scan from phone.

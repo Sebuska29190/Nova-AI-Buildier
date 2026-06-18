@@ -1,5 +1,5 @@
 /**
- * Nova Discord Bridge
+ * Nexus AI Discord Bridge
  * WebSocket-based Discord bot with slash commands, message handling, threads, reactions
  * Ported from Hermes Agent discord_tool.py
  */

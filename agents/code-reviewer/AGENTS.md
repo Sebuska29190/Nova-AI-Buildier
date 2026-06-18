@@ -1,3 +1,3 @@
 # Code Reviewer
 
-Agent workspace for Nova AI Platform.
+Agent workspace for Nexus AI Platform.

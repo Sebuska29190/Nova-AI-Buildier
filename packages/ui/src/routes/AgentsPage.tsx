@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { Activity, Hexagon, Network } from "lucide-react";
 import { api } from "../lib/api";
+import { AgentWorkPanel } from "../lib/components/agent/AgentWorkPanel";
 
 export function AgentsPage() {
   const [agents, setAgents] = useState<any[]>([]);
@@ -27,12 +29,15 @@ export function AgentsPage() {
   const [agentFiles, setAgentFiles] = useState<any[]>([]);
   const [editingFile, setEditingFile] = useState<{ name: string; content: string } | null>(null);
   const [allSkills, setAllSkills] = useState<any[]>([]);
+  const [meshTopology, setMeshTopology] = useState<any>(null);
   const [agentTab, setAgentTab] = useState<"info" | "files" | "skills" | "memory">("info");
   const [agentMemories, setAgentMemories] = useState<any[]>([]);
   const [agentMemoryTotal, setAgentMemoryTotal] = useState(0);
   const [newMemory, setNewMemory] = useState("");
   const [memoryType, setMemoryType] = useState("observation");
   const [memoryImportance, setMemoryImportance] = useState(3);
+  const [activeRunId, setActiveRunId] = useState("");
+  const [activeRunAgent, setActiveRunAgent] = useState("");
 
   // Memory functions
   async function loadAgentMemory(agentId: string) {
@@ -64,6 +69,7 @@ export function AgentsPage() {
     loadAgents();
     api.models().then((m: any[]) => setAvailableModels(m)).catch(() => {});
     fetch("/api/skills").then(r => r.json()).then(d => setAllSkills(d.skills || [])).catch(() => {});
+    fetch("/api/mesh/topology").then(r => r.json()).then(d => setMeshTopology(d)).catch(() => {});
     connectSSE();
     return () => { /* cleanup handled in connectSSE */ };
   }, []);
@@ -148,8 +154,14 @@ export function AgentsPage() {
         throw new Error(res.status + ": " + errText);
       }
       const data = await res.json();
-      setTaskResult(`✅ Agent started in background (runId: ${data.runId || "n/a"})`);
-      setTimeout(() => setShowAgentModal(false), 1500);
+      const runId = data.runId || "";
+      setTaskResult(`✅ Agent started (runId: ${runId.slice(0, 12)})`);
+      if (runId) {
+        setActiveRunId(runId);
+        setActiveRunAgent(agent.name || agentId);
+      } else {
+        setTimeout(() => setShowAgentModal(false), 1500);
+      }
     } catch (e: any) {
       setTaskResult("Error: " + (e.message || e));
     } finally {
@@ -252,6 +264,56 @@ export function AgentsPage() {
           + Create Agent
         </button>
       </div>
+
+      {/* Agent Mesh Topology — Nexus v2.0 */}
+      {meshTopology && meshTopology.agents && (
+        <div className="glass-card rounded-2xl p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#00d4ff] to-[#8b5cf6] flex items-center justify-center">
+              <Network size={12} className="text-white" />
+            </div>
+            <h3 className="text-sm font-semibold text-white">Agent Mesh</h3>
+            <span className="text-[10px] text-[#4a5068] font-mono ml-auto">
+              {meshTopology.agents.filter((a: any) => a.status === "online").length}/{meshTopology.agents.length} online
+            </span>
+          </div>
+          <svg viewBox="0 0 600 160" className="w-full" style={{ maxHeight: "180px" }}>
+            {/* Connection lines */}
+            {meshTopology.routes?.map((r: any, i: number) => {
+              const src = meshTopology.agents.find((a: any) => a.id === r.sourceId);
+              const tgt = meshTopology.agents.find((a: any) => a.id === r.targetId);
+              if (!src || !tgt) return null;
+              const srcIdx = meshTopology.agents.indexOf(src);
+              const tgtIdx = meshTopology.agents.indexOf(tgt);
+              const spacing = 560 / (meshTopology.agents.length - 1);
+              const x1 = 20 + srcIdx * spacing;
+              const x2 = 20 + tgtIdx * spacing;
+              return (
+                <line key={i} x1={x1} y1={50} x2={x2} y2={50}
+                  stroke="rgba(0,212,255,0.12)" strokeWidth={1}
+                  strokeDasharray="4 3" />
+              );
+            })}
+            {/* Agent nodes */}
+            {meshTopology.agents.map((a: any, i: number) => {
+              const spacing = 560 / (meshTopology.agents.length - 1);
+              const x = 20 + i * spacing;
+              const color = a.status === "online" ? "#10b981" : a.status === "idle" ? "#f59e0b" : "#4a5068";
+              return (
+                <g key={a.id}>
+                  <circle cx={x} cy={50} r={14} fill="rgba(13,15,32,0.95)" stroke={color} strokeWidth={1.5} />
+                  <text x={x} y={54} textAnchor="middle" fill="#e8ecf2" fontSize="10" fontFamily="system-ui">
+                    {a.name?.split(" ")[0] || a.id}
+                  </text>
+                  <text x={x} y={85} textAnchor="middle" fill="#4a5068" fontSize="8" fontFamily="system-ui">
+                    {a.connections?.length || 0} links
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="glass-panel rounded-xl p-3 mb-4 border border-red-500/30">
@@ -497,6 +559,24 @@ export function AgentsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Agent Work Viewer — live execution */}
+      {activeRunId && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-xs font-bold text-white">Agent Work</h4>
+            <button
+              className="text-[9px] text-[#4a5068] hover:text-white"
+              onClick={() => setActiveRunId("")}
+            >Close</button>
+          </div>
+          <AgentWorkPanel
+            runId={activeRunId}
+            agentName={activeRunAgent}
+            onComplete={() => {}} // user can close manually
+          />
         </div>
       )}
 

@@ -4,9 +4,9 @@
   "type": "module",
   "workspaces": ["packages/*"],
   "scripts": {
-    "dev": "bun run build:ui && bun run packages/core/src/main.ts",
-    "start": "bun run build:ui && bun run packages/core/src/main.ts",
-    "build:ui": "cd packages/ui && bun run build",
+    "dev": "bun run build:ui ; bun run packages/core/src/main.ts",
+    "start": "bun run build:ui ; bun run packages/core/src/main.ts",
+    "build:ui": "cd packages/ui ; bun run build",
     "build": "bun run build:ui",
     "test": "bun test packages/core/src/**/*.test.ts"
   },

@@ -120,8 +120,8 @@ export function Sidebar({ route, onRoute, version, sessions = [] }: SidebarProps
               <Orbit size={18} className="text-white" />
             </div>
             <div className="flex-1">
-              <h1 className="font-extrabold text-sm tracking-wide text-white font-mono">NOVA AI</h1>
-              <span className="text-[9px] text-[#818cf8] tracking-widest uppercase font-mono font-semibold">BUILDER SUITE</span>
+              <h1 className="font-extrabold text-sm tracking-wide text-white font-mono">NEXUS AI</h1>
+              <span className="text-[9px] text-[#818cf8] tracking-widest uppercase font-mono font-semibold">AGENT MESH</span>
             </div>
             <button
               onClick={() => setCollapsed(true)}
@@ -230,7 +230,7 @@ export function Sidebar({ route, onRoute, version, sessions = [] }: SidebarProps
             </div>
             <div>
               <div className="text-[11px] font-semibold text-white">System Operator</div>
-              <div className="text-[9px] text-[#475569]">core@nova-ai-builder</div>
+              <div className="text-[9px] text-[#475569]">core@nexus-ai</div>
             </div>
           </div>
           <Sliders size={14} className="text-[#475569] hover:text-[#6366f1] transition-colors duration-200" />

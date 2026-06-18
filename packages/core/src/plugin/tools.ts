@@ -494,53 +494,7 @@ registerTool({
 });
 
 // Video editor and shopping tools removed in Nexus AI v2.0
-
-// ─── Computer Use Tools ─────────────────────────────────────────
-// NOTE: computer_screenshot, computer_mouse_move, computer_mouse_click
-// are registered in community-skills.ts (better implementations with
-// await, error handling, and more features). Do NOT re-add here.
-
-registerTool({
-  name: "computer_type",
-  description: "Type text at the current cursor position (sends keystrokes to active window).",
-  parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"], additionalProperties: false },
-  async execute(args) { const cu = await import("../computer-use.ts"); return cu.typeText((args as any).text); },
-});
-
-registerTool({
-  name: "computer_key_press",
-  description: "Press a key: enter, tab, escape, backspace, delete, arrows, home, end, ctrl_c/v/x/a/z/s, alt_tab, etc.",
-  parameters: { type: "object", properties: { key: { type: "string" } }, required: ["key"], additionalProperties: false },
-  async execute(args) { const cu = await import("../computer-use.ts"); return cu.keyPress((args as any).key); },
-});
-
-registerTool({
-  name: "computer_screen_size",
-  description: "Get primary screen resolution (width x height).",
-  parameters: { type: "object", properties: {}, additionalProperties: false },
-  async execute() { const cu = await import("../computer-use.ts"); const s = cu.getScreenSize(); return `📺 Screen: ${s.width}x${s.height}`; },
-});
-
-registerTool({
-  name: "computer_cursor_pos",
-  description: "Get current mouse cursor position.",
-  parameters: { type: "object", properties: {}, additionalProperties: false },
-  async execute() { const cu = await import("../computer-use.ts"); const p = cu.getCursorPos(); return `📍 Cursor: (${p.x}, ${p.y})`; },
-});
-
-registerTool({
-  name: "computer_scroll",
-  description: "Scroll mouse wheel. Positive=up, negative=down.",
-  parameters: { type: "object", properties: { amount: { type: "number" } }, required: ["amount"], additionalProperties: false },
-  async execute(args) { const cu = await import("../computer-use.ts"); return cu.scroll((args as any).amount); },
-});
-
-registerTool({
-  name: "computer_drag",
-  description: "Drag mouse from (x1,y1) to (x2,y2) with smooth movement.",
-  parameters: { type: "object", properties: { x1: { type: "number" }, y1: { type: "number" }, x2: { type: "number" }, y2: { type: "number" }, steps: { type: "number", default: 10 } }, required: ["x1", "y1", "x2", "y2"], additionalProperties: false },
-  async execute(args) { const a = args as any; const cu = await import("../computer-use.ts"); return cu.mouseDrag(a.x1, a.y1, a.x2, a.y2, a.steps || 10); },
-});
+// Computer Use tools removed in Nexus AI v2.0 (computer-use.ts deleted)
 
 // ─── Kanban Orchestrator Tool ──────────────────────────────────
 registerTool({
@@ -594,15 +548,7 @@ registerTool({
   },
 });
 
-// ── Bluesky Tools ──────────────────────────────────────────
-for (const key of Object.keys(bskyTools)) {
-  registerTool(bskyTools[key]);
-}
-
-// ── Social Media Tools ────────────────────────────────────
-console.log(`[social] registering ${Object.keys(socialTools).length} tool(s)`);
-for (const key of Object.keys(socialTools)) {
-  registerTool(socialTools[key]);
-  console.log(`[social] registered: ${key}`);
-}
+// Bluesky and social tools removed in Nexus AI v2.0
+// for (const key of Object.keys(bskyTools)) { registerTool(bskyTools[key]); }
+// for (const key of Object.keys(socialTools)) { registerTool(socialTools[key]); }
 

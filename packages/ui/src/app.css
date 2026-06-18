@@ -2,6 +2,46 @@
 /* Nova AI Builder — Dark Glassmorphism Theme 2026              */
 /* ────────────────────────────────────────────────────────────── */
 
+/* ═══════════════════════════════════════════════════════════════ */
+/* NEXUS AI v2.0 — Premium Design Tokens (additive, non-breaking) */
+/* ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Premium background depth layers */
+  --nx-bg-deepest: #050510;
+  --nx-bg-primary: #0a0b1e;
+  --nx-bg-secondary: #11132b;
+  --nx-bg-tertiary: #1a1d3a;
+  --nx-bg-glass: rgba(255, 255, 255, 0.025);
+  --nx-bg-glass-hover: rgba(255, 255, 255, 0.05);
+  --nx-bg-glass-active: rgba(0, 212, 255, 0.06);
+
+  /* Premium accent spectrum */
+  --nx-cyan: #00d4ff;
+  --nx-blue: #3b82f6;
+  --nx-indigo: #6366f1;
+  --nx-violet: #8b5cf6;
+  --nx-purple: #a78bfa;
+
+  /* Premium text hierarchy */
+  --nx-text-primary: #e8ecf2;
+  --nx-text-secondary: #8892a8;
+  --nx-text-muted: #4a5068;
+  --nx-text-accent: #00d4ff;
+
+  /* Premium borders */
+  --nx-border-subtle: rgba(255, 255, 255, 0.04);
+  --nx-border-default: rgba(255, 255, 255, 0.08);
+  --nx-border-active: rgba(0, 212, 255, 0.25);
+  --nx-border-glow: rgba(99, 102, 241, 0.3);
+
+  /* Status */
+  --nx-success: #10b981;
+  --nx-warning: #f59e0b;
+  --nx-error: #ef4444;
+  --nx-info: #3b82f6;
+}
+
 @import "tailwindcss";
 
 @theme {
@@ -498,3 +538,140 @@ select.glass-input,
 [data-theme="light"] .glass-separator {
   background: linear-gradient(90deg, transparent, rgba(0,0,0,0.08), transparent);
 }
+
+/* ═════════════════════════════════════════════════════════════════ */
+/* NEXUS AI v2.0 — Premium Component Classes                        */
+/* ═════════════════════════════════════════════════════════════════ */
+
+/* Premium card — deeper glass, cyan glow on hover */
+.nx-card {
+  background: var(--nx-bg-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--nx-border-default);
+  border-radius: 1rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  transition: border-color 0.25s cubic-bezier(0.16,1,0.3,1),
+              box-shadow 0.25s cubic-bezier(0.16,1,0.3,1);
+}
+.nx-card:hover {
+  border-color: rgba(0, 212, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,212,255,0.08);
+}
+
+/* Premium input */
+.nx-input {
+  background: var(--nx-bg-glass);
+  border: 1px solid var(--nx-border-default);
+  border-radius: 0.75rem;
+  color: var(--nx-text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.nx-input::placeholder { color: var(--nx-text-muted); }
+.nx-input:focus {
+  outline: none;
+  border-color: var(--nx-border-active);
+  box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+}
+
+/* Premium panel */
+.nx-panel {
+  background: rgba(255,255,255,0.02);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--nx-border-subtle);
+  border-radius: 0.75rem;
+}
+
+/* Gradient text */
+.nx-gradient-text {
+  background: linear-gradient(135deg, var(--nx-cyan), var(--nx-violet));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Premium gradient button */
+.nx-btn-primary {
+  background: linear-gradient(135deg, var(--nx-cyan), var(--nx-indigo), var(--nx-violet));
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+  box-shadow: 0 2px 12px rgba(0,212,255,0.15);
+}
+.nx-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 24px rgba(0,212,255,0.3);
+  filter: brightness(1.1);
+}
+.nx-btn-primary:active { transform: translateY(0); }
+
+/* Premium ghost button */
+.nx-btn-ghost {
+  background: var(--nx-bg-glass);
+  border: 1px solid var(--nx-border-default);
+  color: var(--nx-text-secondary);
+  font-weight: 500;
+  border-radius: 0.75rem;
+  transition: all 0.2s;
+}
+.nx-btn-ghost:hover {
+  background: var(--nx-bg-glass-hover);
+  color: var(--nx-text-primary);
+  border-color: rgba(255,255,255,0.12);
+}
+
+/* Agent mesh dot pulse */
+.nx-agent-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.nx-agent-dot.online { background: var(--nx-success); box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+.nx-agent-dot.idle { background: var(--nx-warning); }
+.nx-agent-dot.offline { background: var(--nx-text-muted); }
+
+/* Context progress bar */
+.nx-progress-bar {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--nx-cyan), var(--nx-indigo));
+  transition: width 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* Premium separator */
+.nx-separator {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--nx-border-default), transparent);
+}
+
+/* Thinking dots animation */
+@keyframes nx-pulse-dot {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.nx-thinking-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--nx-cyan);
+  animation: nx-pulse-dot 1.2s ease-in-out infinite;
+}
+.nx-thinking-dot:nth-child(2) { animation-delay: 0.2s; background: var(--nx-indigo); }
+.nx-thinking-dot:nth-child(3) { animation-delay: 0.4s; background: var(--nx-violet); }
+
+/* Smooth fade-in for streaming content */
+@keyframes nx-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.nx-fade-up { animation: nx-fade-up 0.3s cubic-bezier(0.16,1,0.3,1); }
+
+/* Scrollbar premium styling */
+.nx-scroll::-webkit-scrollbar { width: 5px; }
+.nx-scroll::-webkit-scrollbar-track { background: transparent; }
+.nx-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.06);
+  border-radius: 999px;
+}
+.nx-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.1); }

@@ -335,7 +335,7 @@ class ChannelManager {
           await fetch(`${ntfyServer}/${target || topic}`, {
             method: "POST",
             body: text,
-            headers: { Title: "Nova AI Notification" },
+            headers: { Title: "Nexus AI Notification" },
           });
         } catch (e) {
           console.warn(`[Ntfy] Error sending:`, safeMessage(e));
@@ -447,26 +447,26 @@ class ChannelManager {
         const { chatId } = inst.config;
         await fetch(`https://api.telegram.org/bot${inst.config.token}/sendMessage`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: Number(chatId), text: "✅ Nova channel test — connection OK", parse_mode: "Markdown" }),
+          body: JSON.stringify({ chat_id: Number(chatId), text: "✅ Nexus AI channel test — connection OK", parse_mode: "Markdown" }),
         });
         return { ok: true, message: "Test message sent to Telegram" };
       } else if (id === "discord") {
         const { channelId } = inst.config;
         await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
           method: "POST", headers: { Authorization: `Bot ${inst.config.token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ content: "✅ Nova channel test — connection OK" }),
+          body: JSON.stringify({ content: "✅ Nexus AI channel test — connection OK" }),
         });
         return { ok: true, message: "Test message sent to Discord" };
       } else if (id === "slack") {
         const { channel } = inst.config;
         await fetch(`https://slack.com/api/chat.postMessage`, {
           method: "POST", headers: { Authorization: `Bearer ${inst.config.token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ channel, text: "✅ Nova channel test — connection OK" }),
+          body: JSON.stringify({ channel, text: "✅ Nexus AI channel test — connection OK" }),
         });
         return { ok: true, message: "Test message sent to Slack" };
       } else if (id === "websocket") {
         if (inst.wsServer && inst.wsServer.readyState === WebSocket.OPEN) {
-          inst.wsServer.send("✅ Nova channel test — connection OK");
+          inst.wsServer.send("✅ Nexus AI channel test — connection OK");
           return { ok: true, message: "Test message sent via WebSocket" };
         }
         return { ok: false, message: "WebSocket not connected" };

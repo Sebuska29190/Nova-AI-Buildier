@@ -29,6 +29,7 @@ async function post(path: string, body?: unknown, timeoutMs = 15000) {
 }
 
 export const api = {
+  get: (path: string): Promise<any> => get(path),
   health: () => get("/healthz"),
   models: () => get("/v1/models").then((r) => r.data || []),
   sessions: () => get("/api/sessions").then((r) => r.sessions || []),

@@ -104,6 +104,18 @@ class AgentMemoryManager {
     return r?.c ?? 0;
   }
 
+  // ─── Extended API for Agent Work Viewer ──────────────────────
+
+  /** Get all entries for an agent (run history) */
+  getEntries(agentId: string, limit = 50): AgentMemory[] {
+    return this.search(agentId, undefined, undefined, 1, limit);
+  }
+
+  /** Record a manual insight/learning */
+  recordInsight(agentId: string, content: string, category = "manual"): AgentMemory {
+    return this.add(agentId, "semantic", content, 4, [category]);
+  }
+
   // ─── Prompt Injection ─────────────────────────────────────────
 
   /** Get top memories for injection into agent's system prompt */

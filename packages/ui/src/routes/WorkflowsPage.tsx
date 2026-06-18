@@ -55,7 +55,7 @@ function EndNode({ data }: any) {
 const nodeTypes = { start: StartNode, agent: AgentNode, tool: ToolNode, condition: ConditionNode, end: EndNode };
 let nodeId = 0;
 
-export default function WorkflowsPage() {
+export function WorkflowsPage() {
   const [nodes, setNodes, onNodesChange] = useNodesState([
     { id: 'start-1', type: 'start', position: { x: 250, y: 0 }, data: { label: 'Start' } },
   ]);

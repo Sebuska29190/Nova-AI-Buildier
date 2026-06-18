@@ -1,13 +1,14 @@
 <!doctype html>
-<html lang="pl" class="dark">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nova AI Builder</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232dd4bf'><circle cx='12' cy='12' r='10'/></svg>">
+    <title>Nexus AI — Connect. Create. Automate.</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%2300d4ff'/><stop offset='50%' stop-color='%236366f1'/><stop offset='100%' stop-color='%238b5cf6'/></linearGradient></defs><polygon points='12,2 22,7 22,17 12,22 2,17 2,7' fill='url(%23g)'/></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-      body { margin: 0; background: #020408; color: #f1f5f9; font-family: system-ui, sans-serif; overflow: hidden; }
+      body { margin: 0; background: #0a0b1e; color: #e8ecf2; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; }
     </style>
   </head>
   <body>
@@ -17,7 +18,7 @@
       setTimeout(() => {
         var root = document.getElementById('root');
         if (root && root.children.length === 0) {
-          root.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:1rem;color:#475569;background:#020408"><div style="width:40px;height:40px;border:3px solid #1e293b;border-top-color:#00f2fe;border-radius:50%;animation:spin 0.8s linear infinite"></div><h2 style="color:#00f2fe;font-size:1.1rem">Nova AI Builder loading…</h2><button onclick="location.reload()" style="padding:0.5rem 1rem;border-radius:6px;border:1px solid #00f2fe;background:rgba(0,242,254,0.1);color:#f0e6d2;cursor:pointer;font-size:0.85rem">Refresh</button><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
+          root.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:1.25rem;color:#4a5068;background:#0a0b1e"><div style="width:44px;height:44px;border:3px solid rgba(255,255,255,0.06);border-top-color:#00d4ff;border-radius:50%;animation:spin 0.8s linear infinite;box-shadow:0 0 20px rgba(0,212,255,0.15)"></div><h2 style="background:linear-gradient(135deg,#00d4ff,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:1.15rem;font-weight:600;letter-spacing:-0.02em">Nexus AI</h2><p style="font-size:0.8rem;margin-top:-0.5rem;color:#4a5068">Connect. Create. Automate.</p><button onclick="location.reload()" style="margin-top:0.5rem;padding:0.55rem 1.2rem;border-radius:0.75rem;border:1px solid rgba(0,212,255,0.2);background:rgba(0,212,255,0.06);color:#e8ecf2;cursor:pointer;font-size:0.85rem;font-family:inherit;transition:all 0.2s;hover:bg:rgba(0,212,255,0.1)">Refresh</button><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
         }
       }, 3000);
     </script>

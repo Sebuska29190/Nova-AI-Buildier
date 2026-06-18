@@ -170,8 +170,11 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
         agentMemory.consolidateRun(params.agentId, result.text, params.runId || result.sessionId).catch(() => {});
       }
 
-      // ─── Auto-create skill from complex tasks ────────────────
-      // maybeCreateSkill(params.sessionId, params.modelRef).catch(() => {});
+      // ─── Self-learning: Auto-create skill from complex tasks ───
+      maybeCreateSkill(params.sessionId, params.modelRef).catch(() => {});
+
+      // Emit done event for Agent Work Viewer
+      emitEvent({ type: "done", sessionId: params.sessionId, runId: params.runId });
 
       // Cleanup sessionAgentMap on success
       if (params.agentId) {
@@ -182,7 +185,8 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
     } catch (e: unknown) {
       const classified = classifyError(e, providerId);
       breaker.recordFailure();
-      emitEvent({ type: "event", kind: "message", sessionId: params.sessionId, data: { text: `⚠ ${classified.category}: ${classified.recoveryHint}` } });
+      emitEvent({ type: "event", kind: "message", sessionId: params.sessionId, data: { text: `â ${classified.category}: ${classified.recoveryHint}` } });
+      emitEvent({ type: "error", sessionId: params.sessionId, runId: params.runId, message: safeMessage(e) });
       if (candidates.length === 1) {
         return { sessionId: params.sessionId, text: `Error: ${safeMessage(e)}`, modelRef, usage: { input: 0, output: 0 } };
       }

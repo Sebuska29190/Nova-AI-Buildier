@@ -1,4 +1,4 @@
-﻿import { Hono } from "hono";
+import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { safeMessage } from "../errors.ts";
 import { cors } from "hono/cors";
@@ -11,8 +11,9 @@ import { runAgent } from "../agent/runner.ts";
 import { listTools } from "../plugin/tools.ts";
 import { channelManager } from "../channel/manager.ts";
 import { memoryStore } from "../memory/store.ts";
-import { onEvent } from "../event-bus/index.ts";
+import { onEvent, emitEvent } from "../event-bus/index.ts";
 import { getWorkJobs, getWorkJob, createWorkJob, cancelWorkJob, deleteWorkJob, subscribeSSE } from "../worker/manager.ts";
+import { meshRouter, meshBus } from "../agent-mesh/index.ts";
 import { createTask, listTasks, updateTask, deleteTask } from "../task/store.ts";
 import { loadSkills } from "../skill/loader.ts";
 import { spawnSubAgent } from "../multi-agent/subagent.ts";
@@ -39,7 +40,7 @@ import { getAllProviderConfigs, saveProviderConfig, deleteProviderConfig, testPr
 import { logStore } from "../log/capture.ts";
 import { cronManager } from "../cron/manager.ts";
 
-  // Auth middleware — bypass for /health, /api/auth, /v1, and /api/sessions
+  // Auth middleware � bypass for /health, /api/auth, /v1, and /api/sessions
 const PUBLIC_PATHS = ["/health", "/api/auth", "/", "/assets"];
 
 function authMiddleware(c: any, next: any) {
@@ -90,7 +91,7 @@ export function createRouter(): Hono {
     c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
     const path = c.req.path;
     if (!path.startsWith("/v1/") && !path.includes("/stream") && !path.includes("/events")) {
-      c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:; frame-src https://www.tradingview.com");
+      c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:;");
     }
   });
 
@@ -126,7 +127,7 @@ export function createRouter(): Hono {
   // Models
   app.get("/v1/models", (c) => c.json({ object: "list", data: registry.listModels().map((m) => ({ id: m.ref, object: "model", owned_by: m.providerId })) }));
 
-  // Grouped models — filtered by configured providers only
+  // Grouped models � filtered by configured providers only
   app.get("/api/models/grouped", (c) => {
     const providerConfigsList = getAllProviderConfigs();
     const configuredMap = new Map<string, any>();
@@ -215,7 +216,7 @@ export function createRouter(): Hono {
     return c.json({ id: `chatcmpl-${session.id}`, model: body.model, choices: [{ index: 0, message: { role: "assistant", content: result.text }, finish_reason: "stop" }] });
   });
 
-  // Agent API — supports agentId to use agent's model+prompt
+  // Agent API � supports agentId to use agent's model+prompt
   app.post("/api/agent/send", async (c) => {
     const body = await c.req.json<{ message: string; model?: string; sessionId?: string; thinkingLevel?: string; systemPrompt?: string; agentId?: string; workspace?: string; }>();
     let sessionId = body.sessionId;
@@ -343,7 +344,7 @@ Return valid JSON only (no markdown, no code fences):
         description: agentData.description || "AI-generated agent",
         modelRef: agentData.modelRef || "deepseek/deepseek-chat",
         systemPrompt: agentData.systemPrompt || "",
-        emoji: agentData.emoji || "🤖",
+        emoji: agentData.emoji || "??",
         skills: agentData.skills || [],
       });
       return c.json({ agent, generated: agentData }, 201);
@@ -370,7 +371,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
   });
 
-  // ─── Agent Memory ──────────────────────────────────────────
+  // --- Agent Memory ------------------------------------------
   app.get("/api/agents/:id/memory", async (c) => {
     try {
       const { agentMemory } = await import("../agent/memory.ts");
@@ -412,6 +413,122 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ status: "deleted" });
   });
 
+  // ─── Agent Work Viewer SSE — live agent execution events ──────
+  app.get("/api/agents/runs/:runId/events", (c) => {
+    const runId = c.req.param("runId");
+    const controller = new AbortController();
+
+    const stream = new ReadableStream({
+      start(ctrl) {
+        const unsubEvent = onEvent("event", (e) => {
+          if ((e as any).runId !== runId) return;
+          try {
+            const data = JSON.stringify({ type: (e as any).kind, data: (e as any).data, ts: Date.now() });
+            ctrl.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+          } catch {}
+        });
+        const unsubDone = onEvent("done", (e: any) => {
+          if (e.runId !== runId) return;
+          try {
+            ctrl.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "done", ts: Date.now() })}\n\n`));
+            ctrl.close();
+          } catch {}
+        });
+        const unsubErr = onEvent("error", (e: any) => {
+          if (e.runId !== runId) return;
+          try {
+            ctrl.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: "error", error: e.message, ts: Date.now() })}\n\n`));
+            ctrl.close();
+          } catch {}
+        });
+        controller.signal.addEventListener("abort", () => {
+          unsubEvent(); unsubDone(); unsubErr();
+          try { ctrl.close(); } catch {}
+        }, { once: true });
+      },
+      cancel() { controller.abort(); },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  });
+
+  // ─── Agent Run Status ─────────────────────────────────────────
+  app.get("/api/agents/runs/:runId/status", (c) => {
+    const runId = c.req.param("runId");
+    const job = agentScheduler.getJob(runId);
+    return c.json({
+      runId,
+      status: job?.status || "unknown",
+      startTime: job?.startedAt || null,
+      toolCount: job?.toolCount || 0,
+      iteration: job?.iteration || 0,
+    });
+  });
+
+  // ─── Agent Memory — persistent run history & learning ─────────
+  app.get("/api/agents/:id/runs/history", (c) => {
+    try {
+      const agentId = c.req.param("id");
+      const entries = agentMemory.getEntries(agentId);
+      return c.json({ runs: entries });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  app.post("/api/agents/:id/learn", async (c) => {
+    try {
+      const agentId = c.req.param("id");
+      const body = await c.req.json<{ insight: string; category?: string }>();
+      agentMemory.recordInsight(agentId, body.insight, body.category || "manual");
+      return c.json({ status: "recorded" });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // ─── Agent Steer — mid-execution intervention ─────────────────
+  app.post("/api/agents/runs/:runId/steer", async (c) => {
+    try {
+      const runId = c.req.param("runId");
+      const body = await c.req.json<{ message: string }>();
+      if (!body.message?.trim()) return c.json({ error: "message required" }, 400);
+
+      const job = agentScheduler.getJob(runId);
+      if (!job) return c.json({ error: "Run not found" }, 404);
+      if (job.status !== "running") return c.json({ error: `Run is ${job.status}, not running` }, 400);
+
+      // Inject message into session — agent picks it up on next iteration
+      sessionManager.append(job.sessionId, "user", `[STEER from operator] ${body.message.trim()}`);
+      emitEvent({ type: "event", kind: "message", sessionId: job.sessionId, runId, data: { text: `Steer injected: ${body.message}` } });
+
+      return c.json({ status: "steered", runId });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // ─── Agent Stop (force) ───────────────────────────────────────
+  app.post("/api/agents/runs/:runId/stop", async (c) => {
+    try {
+      const runId = c.req.param("runId");
+      const job = agentScheduler.getJob(runId);
+      if (!job) return c.json({ error: "Run not found" }, 404);
+
+      const ok = await agentScheduler.stopRun(runId);
+      return c.json({ status: ok ? "stopped" : "already_stopped", runId });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
+  // ─── Agent Runs List (all background runs) ────────────────────
+  app.get("/api/agents/runs", (c) => {
+    try {
+      const jobs = agentScheduler.listJobs();
+      return c.json({ runs: jobs });
+    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
+  });
+
   // Agent background jobs
   app.post("/api/agents/:id/start", async (c) => {
     try {
@@ -427,7 +544,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
   });
 
-  // ─── Agent Chambers ──────────────────────────────────────────
+  // --- Agent Chambers ------------------------------------------
   app.get("/api/chambers", (c) => {
     try {
       const chambers = chamberManager.list();
@@ -496,7 +613,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 400); }
   });
 
-  // ─── Chambers SSE (real-time updates) ─────────────────
+  // --- Chambers SSE (real-time updates) -----------------
   app.get("/api/chambers/:id/events", (c) => {
     const chamberId = c.req.param("id");
     const stream = new TransformStream();
@@ -533,7 +650,7 @@ Return valid JSON only (no markdown, no code fences):
     return new Response(stream.readable, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
   });
 
-  // ─── Workflows ──────────────────────────────────────────────
+  // --- Workflows ----------------------------------------------
   app.get("/api/workflows", (c) => {
     try { return c.json({ workflows: workflowEngine.list() }); }
     catch (e) { return c.json({ error: safeMessage(e) }, 400); }
@@ -561,7 +678,7 @@ Return valid JSON only (no markdown, no code fences):
     catch (e) { return c.json({ error: safeMessage(e) }, 400); }
   });
 
-  // ─── Monitoring ──────────────────────────────────────────────
+  // --- Monitoring ----------------------------------------------
   app.get("/api/usage", (c) => {
     try {
       const since = c.req.query("since");
@@ -652,7 +769,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ status: "saved" });
   });
 
-  // Agent task endpoint — wysyła zadanie do konkretnego agenta
+  // Agent task endpoint � wysyla zadanie do konkretnego agenta
   app.post("/api/agents/:id/task", async (c) => {
     try {
       const agentId = c.req.param("id");
@@ -682,7 +799,7 @@ Return valid JSON only (no markdown, no code fences):
           for (const [k, v] of Object.entries(cfg as Record<string, string>)) {
             const sensitiveKeys = ["token", "botToken", "apiKey", "accessToken", "secret", "password", "authToken"];
             masked[chId][k] = sensitiveKeys.some(sk => k.toLowerCase().includes(sk))
-              ? v.slice(0, 8) + "•••" + v.slice(-4)
+              ? v.slice(0, 8) + "���" + v.slice(-4)
               : v;
           }
         }
@@ -716,7 +833,7 @@ Return valid JSON only (no markdown, no code fences):
     try {
       const channels = channelManager.getChannels();
       const now = new Date().toISOString();
-      let report = `Channel Report — ${now}\n${"=".repeat(50)}\n\n`;
+      let report = `Channel Report � ${now}\n${"=".repeat(50)}\n\n`;
       report += `Total channels configured: ${channels.length}\n\n`;
       for (const ch of channels) {
         const configKeys = Object.keys(ch.config || {}).join(", ");
@@ -734,7 +851,7 @@ Return valid JSON only (no markdown, no code fences):
     }
   });
 
-  // ─── File Upload ────────────────────────────────────────────────────────────
+  // --- File Upload ------------------------------------------------------------
   const UPLOAD_DIR = join(process.cwd(), "data", "uploads");
 
   app.post("/api/upload", async (c) => {
@@ -922,7 +1039,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ result });
   });
 
-  // ─── Workspace ──────────────────────────────────────────────────────────
+  // --- Workspace ----------------------------------------------------------
   app.get("/api/workspace", (c) => {
     const state = workspaceManager.getState();
     if (!state) return c.json({ active: false });
@@ -971,7 +1088,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ status: "cleared" });
   });
 
-  // ─── Kernel ─────────────────────────────────────────────────────────────
+  // --- Kernel -------------------------------------------------------------
   app.get("/api/kernel/status", (c) => c.json({ initialized: kernel.isInitialized() }));
   app.get("/api/kernel/agentfs/:agentId", (c) => {
     const files = agentFS.listAgentFiles(c.req.param("agentId"));
@@ -1002,10 +1119,10 @@ Return valid JSON only (no markdown, no code fences):
   });
   app.get("/api/kernel/ledger/stats", (c) => c.json({ stats: ledger.getStats() }));
 
-  // ─── Research Sources ───────────────────────────────────────────────────
+  // --- Research Sources ---------------------------------------------------
   app.get("/api/research/sources", (c) => c.json({ sources: listSources() }));
 
-  // ─── Tmux ───────────────────────────────────────────────────────────────
+  // --- Tmux ---------------------------------------------------------------
   app.get("/api/tmux/status", (c) => c.json({ available: tmuxAvailable(), status: tmuxGetStatus() }));
   app.get("/api/tmux/sessions", (c) => c.json({ sessions: tmuxListSessions() }));
   app.post("/api/tmux/sessions", async (c) => {
@@ -1034,7 +1151,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ output });
   });
 
-  // ─── Plugins ──────────────────────────────────────────────────────────────
+  // --- Plugins --------------------------------------------------------------
   app.get("/api/plugins", (c) => c.json({ plugins: listCommunityPlugins() }));
   app.get("/api/plugins/:id", (c) => {
     const plugin = getCommunityPlugin(c.req.param("id"));
@@ -1063,7 +1180,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
-  // ─── Config / Provider API Keys ────────────────────────────────────────────
+  // --- Config / Provider API Keys --------------------------------------------
   app.get("/api/config/providers", (c) => {
     const providers = getAllProviderConfigs();
     return c.json({ providers });
@@ -1108,7 +1225,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ status: "ok", count: models.length, models });
   });
 
-  // ─── Workspace API ────────────────────────────────────────────────────────
+  // --- Workspace API --------------------------------------------------------
   app.post("/api/workspace/add-folder", async (c) => {
     try {
       const body = await c.req.json<{ path: string }>();
@@ -1130,16 +1247,16 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ folders });
   });
 
-  // Native folder picker — opens Windows folder dialog via PowerShell
+  // Native folder picker � opens Windows folder dialog via PowerShell
   app.post("/api/workspace/browse", async (c) => {
     try {
       const { execSync } = await import("node:child_process");
       // PowerShell script that opens native FolderBrowserDialog
-      // Use semicolons between statements so newline→space replacement doesn't break it
+      // Use semicolons between statements so newline?space replacement doesn't break it
       const psScript = [
         'Add-Type -AssemblyName System.Windows.Forms',
         '$folder = New-Object System.Windows.Forms.FolderBrowserDialog',
-        '$folder.Description = "Select workspace folder for Nova AI"',
+        '$folder.Description = "Select workspace folder for Nexus AI"',
         '$folder.ShowNewFolderButton = $true',
         '$result = $folder.ShowDialog()',
         'if ($result -eq [System.Windows.Forms.DialogResult]::OK) {',
@@ -1161,7 +1278,7 @@ Return valid JSON only (no markdown, no code fences):
     }
   });
 
-  // ─── Config / Global Rules ─────────────────────────────────────────────────
+  // --- Config / Global Rules -------------------------------------------------
   const RULES_PATH = join(process.cwd(), "config", "rules.txt");
 
   app.get("/api/config/rules", (c) => {
@@ -1208,7 +1325,7 @@ Return valid JSON only (no markdown, no code fences):
     }
   });
 
-  // ─── Config Export/Import ──────────────────────────────────────────────────────
+  // --- Config Export/Import ------------------------------------------------------
   const CFG_DIR = join(process.cwd(), "data");
   const APPEARANCE_PATH = join(process.cwd(), "data", "appearance.json");
   const RULES_PATH_ = RULES_PATH; // already defined above
@@ -1297,7 +1414,7 @@ Return valid JSON only (no markdown, no code fences):
     }
   });
 
-  // ─── MCP Management ───────────────────────────────────────────────────────────
+  // --- MCP Management -----------------------------------------------------------
   app.get("/api/mcp/servers", async (c) => {
     try {
       const { listServers } = await import("../mcp/client.ts");
@@ -1314,7 +1431,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
-  // ─── Crypto News Agent ────────────────────────────────────────────────────────
+  // --- Crypto News Agent --------------------------------------------------------
   app.post("/api/crypto/start", async (c) => {
     return c.json({ status: "running", interval: 45, message: "Crypto news scheduler started" });
   });
@@ -1350,17 +1467,17 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ ok: true, positions: [] });
   });
 
-  // ─── Crypto — Base Ecosystem ──────────────────────────────────────────
+  // --- Crypto � Base Ecosystem ------------------------------------------
   app.get("/api/crypto/base/status", async (c) => {
     return c.json({ ecosystem: { tvl: 0, protocols: 0 }, onchain: { txCount: 0, activeAddresses: 0 } });
   });
 
-  // ─── Crypto — Wallet Scanner ─────────────────────────────────────────
+  // --- Crypto � Wallet Scanner -----------------------------------------
   app.post("/api/crypto/wallet/check", async (c) => {
     return c.json({ results: [] });
   });
 
-  // ─── Crypto — Token Analyzer ─────────────────────────────────────────
+  // --- Crypto � Token Analyzer -----------------------------------------
   app.post("/api/crypto/analyze", async (c) => {
     try {
       const body = await c.req.json<{ symbol: string }>();
@@ -1374,7 +1491,7 @@ Return valid JSON only (no markdown, no code fences):
 
   // Shopping routes removed in Nexus AI v2.0
 
-  // ─── Analytics ───────────────────────────────────────────────────
+  // --- Analytics ---------------------------------------------------
   app.get("/api/analytics/stats", async (c) => {
     try {
       const allAgents = agentStore.list();
@@ -1390,7 +1507,7 @@ Return valid JSON only (no markdown, no code fences):
         sessionsByModel[model] = (sessionsByModel[model] || 0) + 1;
       }
 
-      // Recent activity — last 10 sessions
+      // Recent activity � last 10 sessions
       const recentActivity = allSessions.slice(0, 10).map((s: any) => ({
         action: `Session with ${s.modelRef || "unknown"} (${s.id?.slice(0, 8) || "?"}...)`,
         timestamp: s.updatedAt || s.createdAt || "",
@@ -1428,7 +1545,7 @@ Return valid JSON only (no markdown, no code fences):
     }
   });
 
-  // ─── Logs ─────────────────────────────────────────────────────────
+  // --- Logs ---------------------------------------------------------
   app.get("/api/logs", (c) => {
     const limit = parseInt(c.req.query("limit") || "500", 10);
     return c.json({ logs: logStore.list(limit) });
@@ -1449,7 +1566,7 @@ Return valid JSON only (no markdown, no code fences):
     });
   });
 
-  // ─── Stock Media Search ────────────────────────────────────────
+  // --- Stock Media Search ----------------------------------------
   app.get("/api/stock/search", async (c) => {
     try {
       const q = c.req.query("q");
@@ -1469,7 +1586,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
-  // ─── Stock Video Search ─────────────────────────────────────────
+  // --- Stock Video Search -----------------------------------------
   app.get("/api/stock/video-search", async (c) => {
     try {
       const q = c.req.query("q");
@@ -1499,24 +1616,24 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
-  // ─── Music Library ─────────────────────────────────────────────
+  // --- Music Library ---------------------------------------------
   app.get("/api/music/library", (c) => {
     const tracks = [
-      { id: "chill-1", title: "Sunset Chill", artist: "Nova Audio", duration: 180, genre: "chill", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-      { id: "upbeat-1", title: "Morning Energy", artist: "Nova Audio", duration: 210, genre: "upbeat", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-      { id: "cinematic-1", title: "Epic Journey", artist: "Nova Audio", duration: 240, genre: "cinematic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
-      { id: "lofi-1", title: "Night Study", artist: "Nova Audio", duration: 195, genre: "lofi", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-      { id: "corporate-1", title: "Tech Forward", artist: "Nova Audio", duration: 165, genre: "corporate", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
-      { id: "ambient-1", title: "Deep Space", artist: "Nova Audio", duration: 300, genre: "ambient", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
-      { id: "pop-1", title: "Summer Vibes", artist: "Nova Audio", duration: 200, genre: "pop", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
-      { id: "jazz-1", title: "Late Night Jazz", artist: "Nova Audio", duration: 280, genre: "jazz", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
-      { id: "electronic-1", title: "Neon Pulse", artist: "Nova Audio", duration: 220, genre: "electronic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
-      { id: "acoustic-1", title: "Acoustic Dreams", artist: "Nova Audio", duration: 190, genre: "acoustic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
+      { id: "chill-1", title: "Sunset Chill", artist: "Nexus Audio", duration: 180, genre: "chill", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+      { id: "upbeat-1", title: "Morning Energy", artist: "Nexus Audio", duration: 210, genre: "upbeat", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+      { id: "cinematic-1", title: "Epic Journey", artist: "Nexus Audio", duration: 240, genre: "cinematic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+      { id: "lofi-1", title: "Night Study", artist: "Nexus Audio", duration: 195, genre: "lofi", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+      { id: "corporate-1", title: "Tech Forward", artist: "Nexus Audio", duration: 165, genre: "corporate", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
+      { id: "ambient-1", title: "Deep Space", artist: "Nexus Audio", duration: 300, genre: "ambient", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
+      { id: "pop-1", title: "Summer Vibes", artist: "Nexus Audio", duration: 200, genre: "pop", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
+      { id: "jazz-1", title: "Late Night Jazz", artist: "Nexus Audio", duration: 280, genre: "jazz", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
+      { id: "electronic-1", title: "Neon Pulse", artist: "Nexus Audio", duration: 220, genre: "electronic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
+      { id: "acoustic-1", title: "Acoustic Dreams", artist: "Nexus Audio", duration: 190, genre: "acoustic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3" },
     ];
     return c.json({ tracks });
   });
 
-  // ─── Integrations ─────────────────────────────────────────────
+  // --- Integrations ---------------------------------------------
   app.get("/api/integrations/services", async (c) => {
     try {
       const { integrationManager } = await import("../integrations/manager.ts");
@@ -1576,7 +1693,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
-  // ─── RAG Pipeline ────────────────────────────────────────────
+  // --- RAG Pipeline --------------------------------------------
   app.get("/api/rag/documents", async (c) => {
     try {
       const { ragManager } = await import("../rag/manager.ts");
@@ -1603,7 +1720,7 @@ Return valid JSON only (no markdown, no code fences):
         const buffer = Buffer.from(await file.arrayBuffer());
         console.log(`[rag] Uploading: ${file.name} (${buffer.length} bytes)`);
         const doc = await ragManager.uploadDocument(file.name, buffer);
-        console.log(`[rag] Result: ${file.name} → status=${doc.status}`);
+        console.log(`[rag] Result: ${file.name} ? status=${doc.status}`);
         return c.json({ document: doc }, 201);
       }
       const body = await c.req.json<{ filename: string; content: string }>();
@@ -1650,7 +1767,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
-  // ─── Cron ─────────────────────────────────────────────────────────
+  // --- Cron ---------------------------------------------------------
   app.get("/api/cron", (c) => {
     try {
       const jobs = cronManager.listJobs(true); // include disabled
@@ -1756,7 +1873,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ error: err instanceof Error ? err.message : "Internal error" }, 500);
   });
 
-  // ─── Crypto & Trading Hub V2 ────────────────────────────────────────
+  // --- Crypto & Trading Hub V2 ----------------------------------------
   app.get("/api/crypto-hub/dashboard", async (c) => {
     try { const { getDashboard } = await import("../crypto-hub/v2.ts"); return c.json(await getDashboard()); }
     catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
@@ -1807,7 +1924,7 @@ Return valid JSON only (no markdown, no code fences):
     try { const { checkAlerts } = await import("../crypto-hub/v2.ts"); return c.json({ triggered: await checkAlerts() }); }
     catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
-  // ── Social Media Accounts API ────────────────────────────
+  // -- Social Media Accounts API ----------------------------
   app.get("/api/social/accounts", async (c) => {
     const { listAccounts } = await import("../social/manager.ts");
     return c.json({ accounts: listAccounts() });
@@ -1909,7 +2026,7 @@ Return valid JSON only (no markdown, no code fences):
 
       return c.json({
         ok: true,
-        message: `🌐 Browser opened for **${account.name}**.\nLog in, then click "Verify Login" to confirm.`,
+        message: `?? Browser opened for **${account.name}**.\nLog in, then click "Verify Login" to confirm.`,
       });
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
@@ -1924,7 +2041,7 @@ Return valid JSON only (no markdown, no code fences):
 
 
 
-  // ─── Playground ────────────────────────────────────────────────
+  // --- Playground ------------------------------------------------
   const playgroundHistory: any[] = [];
 
   app.post("/api/playground/run", async (c) => {
@@ -1978,7 +2095,7 @@ Return valid JSON only (no markdown, no code fences):
     }
   });
 
-  // ─── OAuth Endpoints ──────────────────────────────────────
+  // --- OAuth Endpoints --------------------------------------
   app.get("/api/integrations/oauth/authorize/:service", async (c) => {
     try {
       const { oauthManager } = await import("../integrations/oauth");
@@ -2009,7 +2126,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json(configs);
   });
 
-  // ─── Git Automation Endpoints ─────────────────────────────
+  // --- Git Automation Endpoints -----------------------------
   app.post("/api/git/status", async (c) => {
     try {
       const { gitManager } = await import("../git/manager");
@@ -2098,7 +2215,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: any) { return c.json({ error: e.message }, 500); }
   });
 
-  // ─── RAG Embedding Endpoints ──────────────────────────────
+  // --- RAG Embedding Endpoints ------------------------------
   app.get("/api/rag/config", (c) => {
     const { embeddingManager } = require("../rag/manager");
     return c.json(embeddingManager.getConfig());
@@ -2130,7 +2247,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ results });
   });
 
-  // ─── DEX Trading Endpoints ───────────────────────────────
+  // --- DEX Trading Endpoints -------------------------------
   app.post("/api/dex/quote", async (c) => {
     try {
       const { jupiterClient } = await import("../crypto-hub/dex/jupiter");
@@ -2197,7 +2314,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json(SOLANA_TOKENS);
   });
 
-  // ─── Polymarket Endpoints ────────────────────────────────
+  // --- Polymarket Endpoints --------------------------------
   app.get("/api/polymarket/markets", async (c) => {
     try {
       const { polymarketClient } = await import("../crypto-hub/polymarket/client");
@@ -2259,7 +2376,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: any) { return c.json({ error: e.message }, 500); }
   });
 
-  // ─── Strategy Endpoints ──────────────────────────────────
+  // --- Strategy Endpoints ----------------------------------
   app.get("/api/strategies", (c) => {
     const { strategyEngine } = require("../crypto-hub/strategies/engine");
     return c.json(strategyEngine.listStrategies());
@@ -2303,7 +2420,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json(strategyEngine.getTradeHistory(c.req.param("id")));
   });
 
-  // ─── Risk Endpoints ──────────────────────────────────────
+  // --- Risk Endpoints --------------------------------------
   app.post("/api/risk/score", async (c) => {
     try {
       const { riskScorer } = await import("../crypto-hub/risk/scorer");
@@ -2313,7 +2430,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: any) { return c.json({ error: e.message }, 500); }
   });
 
-  // ─── TradingView Widget Config ──────────────────────────
+  // --- TradingView Widget Config --------------------------
   app.get("/api/tradingview/url", (c) => {
     const { TradingViewConfig } = require("../crypto-hub/charts/tradingview");
     const symbol = c.req.query("symbol") || "BINANCE:BTCUSDT";
@@ -2322,7 +2439,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ url: TradingViewConfig.getWidgetUrl(config) });
   });
 
-  // ─── 1inch DEX (Multi-Chain EVM) ───────────────────────
+  // --- 1inch DEX (Multi-Chain EVM) -----------------------
   app.post("/api/oneinch/quote", async (c) => {
     try {
       const { oneInchClient } = await import("../crypto-hub/dex/oneinch");
@@ -2386,7 +2503,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: any) { return c.json({ error: e.message }, 500); }
   });
 
-  // ─── Relay Bridge (Cross-Chain) ─────────────────────────
+  // --- Relay Bridge (Cross-Chain) -------------------------
   app.post("/api/bridge/quote", async (c) => {
     try {
       const { relayBridge } = await import("../crypto-hub/bridge/relay");
@@ -2418,6 +2535,45 @@ Return valid JSON only (no markdown, no code fences):
       return c.json(tokens);
     } catch (e: any) { return c.json({ error: e.message }, 500); }
   });
+
+  // --- Agent Mesh API ------------------------------------------
+  app.get("/api/mesh/topology", (c) => c.json(meshRouter.getTopology()));
+  
+  app.get("/api/mesh/agents", (c) => c.json(meshRouter.getAllAgents()));
+  
+  app.get("/api/mesh/agents/:id", (c) => {
+    const agent = meshRouter.getAgent(c.req.param("id"));
+    if (!agent) return c.json({ error: "Agent not found" }, 404);
+    return c.json(agent);
+  });
+
+  app.post("/api/mesh/send", async (c) => {
+    try {
+      const body = await c.req.json<{ from: string; to: string; payload: unknown }>();
+      const result = await meshRouter.send({
+        id: crypto.randomUUID(),
+        from: body.from,
+        to: body.to,
+        type: "request",
+        payload: body.payload,
+        timestamp: Date.now(),
+      });
+      return c.json({ success: true, result });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 400);
+    }
+  });
+
+  app.get("/api/mesh/events", (c) => {
+    const limit = parseInt(c.req.query("limit") || "50");
+    return c.json(meshBus.getHistory(limit));
+  });
+
+  app.get("/api/mesh/stats", (c) => c.json({
+    totalAgents: meshRouter.getAllAgents().length,
+    onlineAgents: meshRouter.getOnlineCount(),
+    topology: meshRouter.getTopology().routes.length,
+  }));
 
   return app;
 }

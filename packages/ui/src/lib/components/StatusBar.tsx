@@ -24,7 +24,11 @@ export function StatusBar({
       <div className="flex items-center gap-3">
         <div className={`w-2 h-2 rounded-full ${connected ? "bg-[#22c55e] active-dot" : "bg-[#475569]"}`} />
         <span className="text-xs font-mono text-[#475569]">
-          Agent Status: <strong className="text-[#f1f5f9]">{modelLabel(selectedModel)} {connected ? "(active)" : "(offline)"}</strong>
+          {connected ? (
+            <><span className="text-[#00d4ff]">Nexus AI</span> v{version} · {modelLabel(selectedModel)}</>
+          ) : (
+            <span className="text-[#ef4444]">Disconnected</span>
+          )}
         </span>
       </div>
 

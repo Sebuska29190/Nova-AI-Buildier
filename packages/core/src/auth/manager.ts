@@ -1,5 +1,5 @@
 /**
- * Simple API key authentication for Nova
+ * Simple API key authentication for Nexus AI
  */
 import { safeMessage } from "../errors.ts";
 

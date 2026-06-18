@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js";
-import { Bot, Sparkles, Settings, Copy, ThumbsUp, ThumbsDown, RefreshCw, ChevronDown, Upload, Trash2, X, Edit3, Plus, MessageSquare, FileCode, Search, BookOpen, Zap, Brain, Cpu, FolderGit2 } from "lucide-react";
+import { Bot, Sparkles, Settings, Copy, ThumbsUp, ThumbsDown, RefreshCw, ChevronDown, Upload, Trash2, X, Edit3, Plus, MessageSquare, FileCode, Search, BookOpen, Zap, Brain, Cpu, FolderGit2, GitBranch, Users, Hexagon, Check, History } from "lucide-react";
 import { api } from "../lib/api";
 import { CodeBlock } from "../lib/components/chat/CodeBlock";
 import { ToolCallCard } from "../lib/components/chat/ToolCallCard";
@@ -41,6 +41,18 @@ interface Message {
 
 interface Settings { agent: string; autoApprove: boolean; autoAllowance: boolean; }
 
+// ─── Agent List ──────────────────────────────────────
+const AGENT_LIST = [
+  { id: "main", name: "Main Assistant", icon: "🤖" },
+  { id: "research", name: "Research Agent", icon: "🧠" },
+  { id: "coder", name: "Coder Agent", icon: "💻" },
+  { id: "data", name: "Data Analyst", icon: "📊" },
+  { id: "security", name: "Security Auditor", icon: "🔒" },
+  { id: "devops", name: "DevOps Engineer", icon: "🚀" },
+  { id: "pm", name: "Project Manager", icon: "📋" },
+  { id: "tester", name: "Tester", icon: "🧪" },
+];
+
 // ─── Slash Commands ─────────────────────────────────────
 const SLASH_COMMANDS = [
   { cmd: "/help", desc: "Show available commands" },
@@ -67,9 +79,9 @@ interface ChatPageProps {
   onSessionKeyChange?: (key: string) => void;
 }
 
-export function ChatPage({ models = [], skills = [], agents = [], sessionKey: initialSessionId = "", onSessionKeyChange }: ChatPageProps) {
+export function ChatPage({ models = [], skills = [], agents = [], sessions = [], onRefresh, sessionKey: initialSessionId = "", onSessionKeyChange }: ChatPageProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { id: "welcome", role: "assistant", content: "Hello! I'm Nova AI Agent. I can help you with coding, debugging, documentation, analysis, and more. Type `/` for commands or ask me anything.", timestamp: Date.now() },
+    { id: "welcome", role: "assistant", content: "## Welcome to Nexus AI v2.0\n\nI'm your connected AI assistant — powered by the Agent Mesh Protocol. I can orchestrate specialized agents, search knowledge bases, write code, manage your workspace, and more.\n\n**Try these:**\n- `/agents` — see available agents\n- `/models` — browse AI models\n- `/help` — all slash commands\n- Just ask me anything!", timestamp: Date.now() },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -84,6 +96,7 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
   const [files, setFiles] = useState<File[]>([]);
   const [groupedModels, setGroupedModels] = useState<Record<string, { name: string; hasApiKey: boolean; models: { id: string; name: string }[] }>>({});
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -210,6 +223,16 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
     setIsThinking(false);
   }
 
+  function forkConversation(msgId: string) {
+    const idx = messages.findIndex(m => m.id === msgId);
+    if (idx >= 0) {
+      const forked = messages.slice(0, idx + 1);
+      setMessages(forked);
+      setResumeSessionId("");
+      onSessionKeyChange?.("");
+    }
+  }
+
   async function handleSlashCommand(text: string): Promise<string | null> {
     const [cmd, ...args] = text.split(" ");
     const arg = args.join(" ").trim();
@@ -248,57 +271,88 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
 
   return (
     <div className="flex flex-col h-full max-h-[calc(100dvh-3.5rem)]">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[rgba(255,255,255,0.06)] bg-[rgba(18,18,26,0.7)] backdrop-blur-xl shrink-0">
+      {/* Header — premium Nexus */}
+      <div className="flex items-center justify-between px-5 py-2.5 border-b border-[rgba(255,255,255,0.06)] bg-[#0a0b1e]/90 backdrop-blur-xl shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] flex items-center justify-center shadow-[0_0_12px_rgba(99,102,241,0.3)]">
-            <Bot size={14} className="text-white" />
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#00d4ff] via-[#6366f1] to-[#8b5cf6] flex items-center justify-center shadow-[0_0_14px_rgba(0,212,255,0.25)]">
+            <Hexagon size={14} className="text-white" />
           </div>
-          <div>
-            <span className="text-xs font-semibold text-white">Nova Agent</span>
-            {resumeSessionId && <span className="ml-2 text-[9px] text-[#475569] font-mono">{resumeSessionId.slice(0, 8)}</span>}
-          </div>
+          <span className="text-xs font-semibold text-white tracking-tight">Nexus AI</span>
+          {resumeSessionId && <span className="text-[9px] text-[#475569] font-mono">{resumeSessionId.slice(0, 8)}</span>}
+
+          {/* Agent Switcher */}
           <div className="relative">
-            <button onClick={() => setShowModelDropdown(!showModelDropdown)}
-              className="glass-badge text-[9px] px-2 py-0.5 rounded-lg bg-[rgba(255,255,255,0.04)] text-[#94a3b8] border border-[rgba(255,255,255,0.06)] font-mono hover:border-[rgba(99,102,241,0.2)] transition-colors flex items-center gap-1 cursor-pointer">
-              {settings.agent.split("/").pop()}
+            <button onClick={() => { setShowAgentDropdown(!showAgentDropdown); setShowModelDropdown(false); }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] text-[11px] text-[#94a3b8] hover:border-[rgba(0,212,255,0.15)] transition-all">
+              <Users size={12} />
+              <span>Agent</span>
+              <ChevronDown size={10} />
+            </button>
+            {showAgentDropdown && (
+              <div className="absolute top-full left-0 mt-1 w-52 bg-[#0d0f20] border border-[rgba(255,255,255,0.1)] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden z-50" onClick={() => setShowAgentDropdown(false)}>
+                {AGENT_LIST.map(a => (
+                  <button key={a.id} onClick={() => setShowAgentDropdown(false)}
+                    className="w-full px-3 py-2 flex items-center gap-2.5 text-xs transition-colors text-[#8892a8] hover:bg-[rgba(255,255,255,0.04)] hover:text-[#e8ecf2]">
+                    <span>{a.icon}</span><span>{a.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Model Switcher */}
+          <div className="relative">
+            <button onClick={() => { setShowModelDropdown(!showModelDropdown); setShowAgentDropdown(false); }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] text-[11px] text-[#94a3b8] font-mono hover:border-[rgba(0,212,255,0.15)] transition-all">
+              <Cpu size={12} />
+              <span>{settings.agent.split("/").pop()}</span>
               <ChevronDown size={10} />
             </button>
             {showModelDropdown && (
-              <div className="absolute top-full left-0 mt-1 w-80 bg-[#12121a] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden z-50">
+              <div className="absolute top-full left-0 mt-1 w-72 bg-[#0d0f20] border border-[rgba(255,255,255,0.1)] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden z-50">
                 {Object.entries(groupedModels).map(([providerId, provider]) => (
                   <div key={providerId}>
                     <button onClick={() => setExpandedProvider(expandedProvider === providerId ? null : providerId)}
                       className="w-full px-3 py-2 flex items-center justify-between hover:bg-[rgba(255,255,255,0.04)] transition-colors border-b border-[rgba(255,255,255,0.04)]">
                       <div className="flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
-                        <span className="text-xs text-white font-medium">{provider.name}</span>
-                        <span className="text-[9px] text-[#475569]">{provider.models.length} models</span>
+                        <span className="text-xs text-[#e8ecf2] font-medium">{provider.name}</span>
+                        <span className="text-[9px] text-[#4a5068]">{provider.models.length}m</span>
                       </div>
-                      <ChevronDown size={12} className={`text-[#475569] transition-transform ${expandedProvider === providerId ? "rotate-180" : ""}`} />
+                      <ChevronDown size={12} className={`text-[#4a5068] transition-transform ${expandedProvider === providerId ? "rotate-180" : ""}`} />
                     </button>
                     {expandedProvider === providerId && (
                       <div className="bg-[rgba(0,0,0,0.2)]">
                         {provider.models.map(model => (
                           <button key={model.id} onClick={() => { setSettings(s => ({ ...s, agent: model.id })); setShowModelDropdown(false); setExpandedProvider(null); }}
                             className={`w-full px-4 py-1.5 text-left text-[11px] flex items-center gap-2 transition-colors ${
-                              settings.agent === model.id ? "bg-[rgba(99,102,241,0.1)] text-[#818cf8]" : "text-[#94a3b8] hover:bg-[rgba(255,255,255,0.04)] hover:text-white"
+                              settings.agent === model.id ? "bg-[rgba(0,212,255,0.08)] text-[#00d4ff]" : "text-[#8892a8] hover:bg-[rgba(255,255,255,0.04)] hover:text-[#e8ecf2]"
                             }`}>
                             <span className="font-mono">{model.id.split("/").pop()}</span>
-                            {settings.agent === model.id && <Check size={12} className="ml-auto text-[#6366f1]" />}
+                            {settings.agent === model.id && <Check size={12} className="ml-auto text-[#00d4ff]" />}
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
                 ))}
+                {Object.keys(groupedModels).length === 0 && (
+                  <div className="px-3 py-4 text-[11px] text-[#4a5068] text-center">Loading models…</div>
+                )}
               </div>
             )}
           </div>
         </div>
-        <button onClick={() => setShowSettings(!showSettings)} className="p-1.5 text-[#475569] hover:text-[#94a3b8] transition-colors rounded-lg hover:bg-[rgba(255,255,255,0.04)]">
-          <Settings size={16} />
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setMessages([{ id: "welcome", role: "assistant", content: "## New Session\n\nReady for a fresh start. How can I help?", timestamp: Date.now() }]); setResumeSessionId(""); onSessionKeyChange?.(""); }}
+            className="px-3 py-1 rounded-lg text-[10px] text-[#8892a8] hover:text-[#e8ecf2] hover:bg-[rgba(255,255,255,0.04)] transition-all flex items-center gap-1">
+            <Plus size={12} /> New
+          </button>
+          <button onClick={() => setShowSettings(!showSettings)} className="p-1.5 text-[#4a5068] hover:text-[#8892a8] transition-colors rounded-lg hover:bg-[rgba(255,255,255,0.04)]">
+            <Settings size={15} />
+          </button>
+        </div>
       </div>
 
       {/* Main area */}
@@ -307,7 +361,30 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6">
           <div className="max-w-4xl mx-auto">
             {messages.length <= 1 ? (
-              <WelcomeScreen onSelectPrompt={(text) => { setInput(text); }} />
+              <>
+                <WelcomeScreen onSelectPrompt={(text) => { setInput(text); }} />
+                {sessions && sessions.length > 0 && (
+                  <div className="mt-8 glass-card rounded-2xl p-5 max-w-lg mx-auto">
+                    <h3 className="text-xs font-semibold text-[#8892a8] mb-3 flex items-center gap-2">
+                      <History size={14} className="text-[#00d4ff]" /> Recent Conversations
+                    </h3>
+                    <div className="space-y-1">
+                      {sessions.sort((a: any, b: any) => new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime()).slice(0, 8).map((s: any) => (
+                        <button key={s.id} onClick={() => { setResumeSessionId(s.id); onSessionKeyChange?.(s.id); loadSession(s.id); }}
+                          className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-[rgba(0,212,255,0.06)] transition-colors flex items-center justify-between group">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1] shrink-0" />
+                            <span className="text-[#e8ecf2] truncate font-medium">{s.modelRef || s.model || 'Chat'}</span>
+                          </div>
+                          <span className="text-[10px] text-[#4a5068] font-mono shrink-0 ml-2 group-hover:text-[#8892a8]">
+                            {s.messageCount || s.messages?.length || 0} msg
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="space-y-6">
                 {messages.filter(m => m.role !== "system").map((msg) => (
@@ -318,13 +395,9 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
                         {/* Thinking (collapsible, shown in ThinkingPanel) */}
                         {msg.thinking && <ThinkingPanel content={msg.thinking} />}
 
-                        {/* Tool calls (persisted) */}
+                        {/* Tool calls — collapsible summary */}
                         {msg.toolCalls && msg.toolCalls.length > 0 && (
-                          <div className="mb-3 space-y-1">
-                            {msg.toolCalls.map((tc, i) => (
-                              <ToolCallCard key={i} tool={tc.tool} args={tc.args} success={tc.success} duration={tc.duration} status="done" />
-                            ))}
-                          </div>
+                          <CollapsibleTools tools={msg.toolCalls} />
                         )}
 
                         {/* Content */}
@@ -336,17 +409,18 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
                             {msg.duration && `${(msg.duration / 1000).toFixed(1)}s`}
                             {msg.tokens && ` · ${msg.tokens.input + msg.tokens.output} tok`}
                           </span>
-                          <div className="flex items-center gap-1 ml-auto">
-                            <button onClick={() => navigator.clipboard.writeText(msg.content)} className="p-1 text-[#475569] hover:text-[#94a3b8] rounded transition-colors"><Copy size={12} /></button>
-                            <button className="p-1 text-[#475569] hover:text-[#22c55e] rounded transition-colors"><ThumbsUp size={12} /></button>
-                            <button className="p-1 text-[#475569] hover:text-[#ef4444] rounded transition-colors"><ThumbsDown size={12} /></button>
-                            <button onClick={() => { setInput(msg.content); }} className="p-1 text-[#475569] hover:text-[#94a3b8] rounded transition-colors"><Edit3 size={12} /></button>
+                          <div className="flex items-center gap-0.5 ml-auto">
+                            <button onClick={() => navigator.clipboard.writeText(msg.content)} className="p-1.5 text-[#475569] hover:text-[#00d4ff] hover:bg-[rgba(0,212,255,0.08)] rounded-lg transition-all" title="Copy"><Copy size={13} /></button>
+                            <button className="p-1.5 text-[#475569] hover:text-[#22c55e] hover:bg-[rgba(34,197,94,0.08)] rounded-lg transition-all" title="Good"><ThumbsUp size={13} /></button>
+                            <button className="p-1.5 text-[#475569] hover:text-[#ef4444] hover:bg-[rgba(239,68,68,0.08)] rounded-lg transition-all" title="Bad"><ThumbsDown size={13} /></button>
+                            <button onClick={() => { setInput(msg.content); }} className="p-1.5 text-[#475569] hover:text-[#f59e0b] hover:bg-[rgba(245,158,11,0.08)] rounded-lg transition-all" title="Edit"><Edit3 size={13} /></button>
+                            <button onClick={() => forkConversation(msg.id)} className="p-1.5 text-[#475569] hover:text-[#8b5cf6] hover:bg-[rgba(139,92,246,0.08)] rounded-lg transition-all" title="Fork"><GitBranch size={13} /></button>
                           </div>
                         </div>
                       </div>
                     ) : (
                       /* User message */
-                      <div className="bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] rounded-2xl px-4 py-3 max-w-[75%] ml-auto">
+                      <div className="bg-gradient-to-r from-[#00d4ff] via-[#6366f1] to-[#8b5cf6] rounded-2xl px-4 py-3 max-w-[75%] ml-auto shadow-[0_4px_16px_rgba(0,212,255,0.12)]">
                         <p className="text-sm text-white whitespace-pre-wrap">{msg.content}</p>
                         {msg.files && msg.files.length > 0 && (
                           <div className="flex gap-1.5 mt-2 flex-wrap">
@@ -369,10 +443,13 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
                     {/* Thinking */}
                     <ThinkingPanel content={currentThinking} isStreaming={isThinking} />
 
-                    {/* Tool calls (live) */}
-                    {agentActivity.map((a, i) => (
-                      <ToolCallCard key={i} tool={a.tool || ""} args={a.args} success={a.success} duration={a.duration} status={a.type === "tool_call" ? "done" : "done"} />
-                    ))}
+                    {/* Tool calls — live collapsible summary */}
+                    {agentActivity.length > 0 && (
+                      <CollapsibleTools
+                        tools={agentActivity.map(a => ({ tool: a.tool || "", args: a.args, success: a.success, duration: a.duration }))}
+                        isLive
+                      />
+                    )}
 
                     {/* Streaming text */}
                     {streaming && streamContent && (
@@ -386,7 +463,7 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
                     {loading && !streaming && !streamContent && (
                       <div className="flex items-center gap-2 text-xs text-[#475569]">
                         <span className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" />
-                        <span>Nova is thinking...</span>
+                        <span>Nexus is thinking...</span>
                         <button onClick={cancelStream} className="text-[10px] text-[#ef4444] hover:text-[#f87171] ml-2 px-2 py-0.5 rounded bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)]">Cancel</button>
                       </div>
                     )}
@@ -463,6 +540,40 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
         )}
       </div>
 
+      {/* Context Window Bar — dynamic per model */}
+      {(() => {
+        const MODEL_CONTEXT: Record<string, number> = {
+          'deepseek/deepseek-chat': 64000, 'deepseek/deepseek-coder': 128000,
+          'openai/gpt-5': 128000, 'openai/gpt-4o': 128000, 'openai/gpt-4': 8192,
+          'anthropic/claude-opus-4': 200000, 'anthropic/claude-sonnet-4': 200000,
+          'google/gemini-2.5-pro': 1000000, 'google/gemini-2.0-flash': 1000000,
+          'mimo-v2.5': 1000000, 'custom/mimo-v2.5': 1000000,
+          'qwen/qwen-max': 32768, 'zhipu/glm-4': 128000, 'kimi/kimi-latest': 128000,
+        };
+        const modelId = settings.agent;
+        const contextLimit = MODEL_CONTEXT[modelId] || MODEL_CONTEXT[modelId.toLowerCase()] || 128000;
+        const totalChars = messages.reduce((acc, m) => acc + (m.content?.length || 0), 0);
+        const estimatedTokens = Math.round(totalChars / 3.5); // rough: ~3.5 chars per token
+        const pct = Math.min(100, Math.round((estimatedTokens / contextLimit) * 100));
+        const usedLabel = contextLimit >= 1000000 ? `${(estimatedTokens / 1000000).toFixed(1)}M` : `${(estimatedTokens / 1000).toFixed(0)}K`;
+        const maxLabel = contextLimit >= 1000000 ? `${(contextLimit / 1000000).toFixed(0)}M` : `${(contextLimit / 1000).toFixed(0)}K`;
+        const barColor = pct > 90 ? 'bg-[#ef4444]' : pct > 70 ? 'bg-[#f59e0b]' : 'bg-gradient-to-r from-[#00d4ff] to-[#6366f1]';
+
+        return (
+          <div className="shrink-0 px-6 py-1.5 border-t border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.01)]">
+            <div className="max-w-4xl mx-auto flex items-center gap-3">
+              <div className="flex-1 h-1 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+              </div>
+              <span className="text-[9px] text-[#4a5068] font-mono shrink-0">
+                ~{usedLabel} / {maxLabel} tokens
+              </span>
+              <span className="text-[8px] text-[#4a5068] shrink-0">{modelId.split('/').pop()}</span>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Input */}
       <ChatInput
         value={input}
@@ -478,6 +589,49 @@ export function ChatPage({ models = [], skills = [], agents = [], sessionKey: in
         onSlashSelect={(cmd) => { setInput(cmd); }}
         model={settings.agent}
       />
+    </div>
+  );
+}
+
+// ─── Collapsible Tool Summary (Claude/ZCode-style) ────────
+function CollapsibleTools({ tools, isLive }: { tools: Array<{ tool: string; args?: any; success?: boolean; duration?: number }>; isLive?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const readCount = tools.filter(t => t.tool.includes("read") || t.tool.includes("Read") || t.tool.includes("list")).length;
+  const editCount = tools.filter(t => t.tool.includes("edit") || t.tool.includes("write") || t.tool.includes("Edit") || t.tool.includes("Write")).length;
+  const runCount = tools.filter(t => t.tool.includes("run") || t.tool.includes("exec") || t.tool.includes("Run") || t.tool.includes("Exec")).length;
+  const otherCount = tools.length - readCount - editCount - runCount;
+  const totalDuration = tools.reduce((acc, t) => acc + (t.duration || 0), 0);
+  const successCount = tools.filter(t => t.success !== false).length;
+
+  const parts: string[] = [];
+  if (readCount > 0) parts.push(`${readCount} reads`);
+  if (editCount > 0) parts.push(`${editCount} edits`);
+  if (runCount > 0) parts.push(`${runCount} runs`);
+  if (otherCount > 0) parts.push(`${otherCount} other`);
+
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 text-[10px] text-[#4a5068] hover:text-[#8892a8] transition-colors w-full group"
+      >
+        <span className={`transition-transform ${expanded ? 'rotate-90' : ''}`}>▶</span>
+        <span className="font-mono">
+          🔧 {tools.length} tool{tools.length !== 1 ? 's' : ''} used
+          {parts.length > 0 && ` · ${parts.join(', ')}`}
+          {totalDuration > 0 && ` · ${(totalDuration / 1000).toFixed(1)}s`}
+        </span>
+        {successCount < tools.length && (
+          <span className="text-[#ef4444]">{tools.length - successCount} failed</span>
+        )}
+      </button>
+      {expanded && (
+        <div className="mt-2 ml-4 space-y-1 border-l border-[rgba(255,255,255,0.06)] pl-3">
+          {tools.map((tc, i) => (
+            <ToolCallCard key={i} tool={tc.tool} args={tc.args} success={tc.success} duration={tc.duration} status={isLive ? "running" : "done"} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

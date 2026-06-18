@@ -139,7 +139,7 @@ export function ChannelsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-bold text-white">External Communication Pipelines</h2>
-          <p className="text-xs text-slate-400">Establish pathways between Nova Agent actions and third-party networks.</p>
+          <p className="text-xs text-slate-400">Establish pathways between Nexus AI agents and third-party networks.</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[10px] text-slate-500">

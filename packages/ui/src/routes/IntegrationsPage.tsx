@@ -111,7 +111,7 @@ export function IntegrationsPage() {
           </div>
           <div>
             <h2 className="text-lg font-bold text-white">Integrations Hub</h2>
-            <p className="text-[10px] text-slate-500">Connect Nova to 30+ services — Slack, GitHub, Notion, Google, Discord & more</p>
+            <p className="text-[10px] text-slate-500">Connect Nexus AI to 30+ services — Slack, GitHub, Notion, Google, Discord & more</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

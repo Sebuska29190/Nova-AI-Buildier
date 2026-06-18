@@ -51,6 +51,7 @@ import "./git/tools.ts"; // registers 11 git tools
 import "./memory/knowledge-graph.ts"; // registers 6 knowledge graph tools
 import "./agent/goal-decomposition.ts"; // registers 4 goal decomposition tools
 import "./analytics/dashboard.ts"; // registers 4 analytics tools
+import { initializeMesh } from "./agent-mesh/index.ts"; // Agent Mesh Protocol
 // Crypto modules removed in Nexus AI v2.0
 import deepseekPlugin from "../../provider-deepseek/src/index.ts";
 import anthropicProvider from "../../provider-anthropic/src/index.ts";
@@ -66,7 +67,7 @@ import grokProvider from "../../provider-grok/src/index.ts";
 import customProvider from "../../provider-custom/src/index.ts";
 
 console.log("\n  ╔═══════════════════════════════════════╗");
-console.log("  ║       Nova Agent Platform v0.6.1        ║");
+console.log("  ║       Nexus AI v2.0 — Connected        ║");
 console.log("  ╚═══════════════════════════════════════╝\n");
 
 // Init stores
@@ -155,6 +156,9 @@ mcpManager.loadConfigs();
 
 const agentCount = agentStore.list().length;
 console.log(`  ${agentCount} agent(s) configured\n`);
+
+// Initialize Agent Mesh Protocol
+initializeMesh().then(() => {}).catch((e) => console.warn(`  Mesh: init warning - ${e}`));
 
 // ─── Auto-build UI ──────────────────────────────────────────────────────────
 // Build the Svelte UI (packages/ui) on startup so the latest components are served
@@ -295,5 +299,5 @@ async function tryStart(port: number): Promise<import("node:http").Server | null
     console.warn("  MCP:          Not configured (optional)");
   }
 
-  console.log("\n  ✅ Nova is ready!\n");
+  console.log("\n  ✅ Nexus AI is ready!\n");
 })();
