@@ -42,8 +42,8 @@ Built on **Bun + Hono + React 19 + SQLite**. Every agent has persistent memory, 
 
 ```bash
 # 1. Clone
-git clone <repo-url>
-cd nexus-ai
+git clone https://github.com/Sebuska29190/Nexus-AI-Buildier.git
+cd Nexus-AI-Buildier
 
 # 2. Install
 bun install

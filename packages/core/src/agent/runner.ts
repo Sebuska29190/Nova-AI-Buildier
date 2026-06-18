@@ -234,8 +234,294 @@ export async function runAgent(params: RunParams): Promise<RunResult> {
 
 // thisRole() removed — was dead code, all callers use direct object construction
 
-async function toolLoop(params: RunParams, ctx: { modelRef: string; messages: AgentMessage[]; signal?: AbortSignal; thinkingLevel?: string; tools: { type: "function"; function: { name: string; description?: string; parameters: Record<string, unknown> } }[] }): Promise<RunResult> {
-  // ─── Safety Middleware initialization ──────────────────────────
+/**
+ * Auto-create a skill from a complex task for self-learning.
+ * This is a stub that can be replaced with actual skill generation logic.
+ * Currently it logs the intent — no crash, no side effects.
+ */
+async function maybeCreateSkill(_sessionId: string, _modelRef: string): Promise<void> {
+  // Stub: skill auto-creation is planned but not yet implemented.
+  // When implemented, this will analyze the session transcript and
+  // create a new skill file in skills/ for reusable patterns.
+  // For now, it's a no-op to prevent the ReferenceError crash.
+  return Promise.resolve();
+}
+
+/**
+ * The tool execution loop — runs the LLM with tool definitions, handles
+ * tool calls, and enforces safety limits via the ToolCircuitBreaker.
+ *
+ * Safety layers integrated:
+ * - toolBreaker.initTask / beforeCall / afterCall / resetTask (infinite loop, depth, timeout protection)
+ * - toolAudit.record() (hash-based loop detection, call logging)
+ * - usageTracker.log() (API cost monitoring)
+ */
+async function toolLoop(params: RunParams, ctx: {
+  modelRef: string;
+  messages: AgentMessage[];
+  signal?: AbortSignal;
+  thinkingLevel?: string;
+  tools: { type: "function"; function: { name: string; description?: string; parameters: Record<string, unknown> } }[];
+}): Promise<RunResult> {
+  const taskId = params.runId ?? `${params.sessionId}-${Date.now()}`;
+  const agentId = params.agentId ?? "anonymous";
+
+  // ─── Safety: Initialize tool circuit breaker ─────────────────
+  toolBreaker.initTask(taskId);
+
+  // ─── Ledger: Record agent run start ───────────────────────────
+  ledger.append({
+    agentId,
+    action: "agent_run",
+    target: params.modelRef,
+    status: "started",
+    detail: params.message.slice(0, 200),
+  });
+
+  // ─── Usage tracker: log the start of this run ─────────────────
+  try { usageTracker.init(); } catch { /* best-effort */ }
+  usageTracker.log({
+    agentId,
+    sessionId: params.sessionId,
+    modelRef: params.modelRef,
+    action: "agent_run",
+    tokensInput: 0,
+    tokensOutput: 0,
+    cost: 0,
+    durationMs: 0,
+  });
+
+  // ─── Workspace Manager: auto-init if not yet active ──────────
+  try {
+    if (!workspaceManager.isActive()) {
+      const cwd = process.cwd();
+      workspaceManager.setRoot(cwd);
+    }
+  } catch { /* best-effort: workspace is optional */ }
+
+  // ─── Tool Execution State ────────────────────────────────────
+  const maxIterations = 50; // matches toolBreaker maxToolCallsPerTask
+  let iteration = 0;
+  let fullResponse = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  // Resolve the LLM provider
+  const resolved = registry.resolveModel(params.modelRef);
+  if (!resolved) {
+    toolBreaker.resetTask(taskId);
+    throw new Error(`Model ${params.modelRef} not found in registry`);
+  }
+  const providerId = resolved.providerId;
+
+  // ─── Main Tool Loop ─────────────────────────────────────────
+  while (iteration < maxIterations) {
+    // Check abort signal
+    if (params.signal?.aborted) {
+      toolBreaker.resetTask(taskId);
+      return {
+        sessionId: params.sessionId,
+        text: fullResponse || "⚠️ Agent run was aborted.",
+        modelRef: params.modelRef,
+        usage: { input: inputTokens, output: outputTokens },
+      };
+    }
+
+    // ─── Safety: Check circuit breaker before each LLM call ───
+    const startTime = Date.now();
+    try {
+      toolBreaker.beforeCall({
+        taskId,
+        agentId,
+        toolName: "__llm_call__",
+        toolParams: {},
+        paramsHash: `iter_${iteration}`,
+        iteration,
+      });
+    } catch (breakerError: unknown) {
+      // Circuit breaker tripped — stop gracefully
+      toolBreaker.resetTask(taskId);
+      const msg = safeMessage(breakerError);
+      emitEvent({
+        type: "event",
+        kind: "message",
+        sessionId: params.sessionId,
+        data: { text: `⚠ Circuit breaker: ${msg}` },
+      });
+      return {
+        sessionId: params.sessionId,
+        text: fullResponse || `⚠️ ${msg}`,
+        modelRef: params.modelRef,
+        usage: { input: inputTokens, output: outputTokens },
+      };
+    }
+
+    // ─── Call the LLM ─────────────────────────────────────────
+    const piResult = await piHarness.call(ctx);
+    inputTokens += piResult.usage?.inputTokens ?? 0;
+    outputTokens += piResult.usage?.outputTokens ?? 0;
+
+    // ─── Usage tracking ───────────────────────────────────────
+    usageTracker.log({
+      agentId,
+      sessionId: params.sessionId,
+      modelRef: params.modelRef,
+      action: "api_call",
+      tokensInput: piResult.usage?.inputTokens ?? 0,
+      tokensOutput: piResult.usage?.outputTokens ?? 0,
+      cost: (piResult.usage?.inputTokens ?? 0) * 0.000002 + (piResult.usage?.outputTokens ?? 0) * 0.00001,
+      durationMs: Date.now() - startTime,
+    });
+
+    const content = piResult.content ?? "";
+
+    // ─── Check for tool calls ─────────────────────────────────
+    if (piResult.toolCalls && piResult.toolCalls.length > 0) {
+      for (const tc of piResult.toolCalls) {
+        const toolStart = Date.now();
+        const toolName = tc.function?.name ?? tc.name ?? "unknown";
+        const toolArgs = tc.function?.arguments ?? tc.arguments ?? {};
+        const argsStr = typeof toolArgs === "string" ? toolArgs : JSON.stringify(toolArgs);
+        let parsedArgs: Record<string, unknown>;
+        try {
+          parsedArgs = typeof toolArgs === "string" ? JSON.parse(toolArgs) : toolArgs;
+        } catch {
+          parsedArgs = {};
+        }
+
+        // ─── Safety: Check circuit breaker for this tool call ──
+        const paramsHash = toolAudit.hashParams(parsedArgs);
+        try {
+          toolBreaker.beforeCall({
+            taskId,
+            agentId,
+            toolName,
+            toolParams: parsedArgs,
+            paramsHash,
+            iteration,
+          });
+        } catch (toolBreakerError: unknown) {
+          // Log the breach and break out
+          toolAudit.record({
+            taskId,
+            agentId,
+            toolName,
+            paramsHash,
+            resultPreview: `❌ Circuit breaker: ${safeMessage(toolBreakerError)}`,
+            durationMs: Date.now() - toolStart,
+            success: false,
+            iteration,
+          });
+          toolBreaker.afterCall({ taskId, toolName });
+          throw toolBreakerError; // Let outer catch handle it
+        }
+
+        // ─── Execute the tool ─────────────────────────────────
+        let resultStr: string;
+        let success = false;
+        try {
+          const toolFn = getTool(toolName);
+          if (!toolFn) {
+            resultStr = `❌ Tool "${toolName}" not found. Available tools: ${listTools().map(t => t.name).join(", ")}`;
+          } else {
+            resultStr = await toolFn.execute(parsedArgs, { sessionId: params.sessionId });
+          }
+          success = true;
+        } catch (toolError: unknown) {
+          resultStr = `❌ Error executing ${toolName}: ${safeMessage(toolError)}`;
+          success = false;
+        }
+
+        const toolDuration = Date.now() - toolStart;
+
+        // ─── Audit logging ────────────────────────────────────
+        toolAudit.record({
+          taskId,
+          agentId,
+          toolName,
+          paramsHash,
+          resultPreview: resultStr.slice(0, 200),
+          durationMs: toolDuration,
+          success,
+          iteration,
+        });
+
+        // ─── Usage tracking for tool call ──────────────────────
+        usageTracker.log({
+          agentId,
+          sessionId: params.sessionId,
+          modelRef: params.modelRef,
+          action: "tool_call",
+          tokensInput: 0,
+          tokensOutput: 0,
+          cost: 0,
+          durationMs: toolDuration,
+        });
+
+        // ─── Safety: After-call hook ──────────────────────────
+        toolBreaker.afterCall({ taskId, toolName });
+
+        // ─── Append tool result to messages ───────────────────
+        ctx.messages.push({
+          role: "assistant",
+          content: `__TOOL_CALLS__${tc.id ?? toolName}`,
+          tool_calls: [{
+            id: tc.id ?? `call_${iteration}`,
+            type: "function",
+            function: { name: toolName, arguments: argsStr },
+          }],
+        });
+        ctx.messages.push({
+          role: "tool",
+          content: resultStr,
+          tool_call_id: tc.id ?? `call_${iteration}`,
+        });
+      }
+
+      iteration++;
+      continue; // Go back to LLM call with tool results
+    }
+
+    // ─── No tool calls — this is the final response ──────────
+    fullResponse = content;
+
+    // ─── Safety: Reset circuit breaker ─────────────────────────
+    toolBreaker.resetTask(taskId);
+
+    // ─── Ledger: Record completion ────────────────────────────
+    ledger.append({
+      agentId,
+      action: "agent_run",
+      target: params.modelRef,
+      status: "completed",
+      detail: fullResponse.slice(0, 200),
+    });
+
+    return {
+      sessionId: params.sessionId,
+      text: fullResponse,
+      modelRef: params.modelRef,
+      usage: { input: inputTokens, output: outputTokens },
+    };
+  }
+
+  // ─── Max iterations reached without final response ─────────
+  toolBreaker.resetTask(taskId);
+  ledger.append({
+    agentId,
+    action: "agent_run",
+    target: params.modelRef,
+    status: "failed",
+    detail: "Max tool call iterations reached without final response",
+  });
+
+  return {
+    sessionId: params.sessionId,
+    text: fullResponse || "⚠️ Agent reached maximum tool call limit without a final response.",
+    modelRef: params.modelRef,
+    usage: { input: inputTokens, output: outputTokens },
+  };
+}ety Middleware initialization ──────────────────────────
   const taskId = params.sessionId;
   const agentId = params.agentId || "default";
   toolBreaker.initTask(taskId);

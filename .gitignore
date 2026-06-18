@@ -21,6 +21,13 @@ data/uploads/
 *.sqlite3
 data/
 
+# ─── Kernel Ledger (audit trail — runtime only) ──────────────
+kernel/
+
+# ─── Agent Runtime Memory (not source) ───────────────────────
+agents/*/MEMORY.md
+packages/core/agents/*/MEMORY.md
+
 # ─── Knowledge Base (personal/private) ──────────────────────
 knowledge/
 
