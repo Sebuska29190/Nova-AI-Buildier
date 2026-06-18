@@ -51,10 +51,7 @@ import "./git/tools.ts"; // registers 11 git tools
 import "./memory/knowledge-graph.ts"; // registers 6 knowledge graph tools
 import "./agent/goal-decomposition.ts"; // registers 4 goal decomposition tools
 import "./analytics/dashboard.ts"; // registers 4 analytics tools
-import "./crypto-hub/dex/tools.ts"; // registers 5 DEX trading tools
-import "./crypto-hub/polymarket/tools.ts"; // registers 3 prediction tools
-import "./crypto-hub/strategies/engine.ts"; // registers 5 strategy tools
-import "./crypto-hub/risk/scorer.ts"; // registers 2 risk tools
+// Crypto modules removed in Nexus AI v2.0
 import deepseekPlugin from "../../provider-deepseek/src/index.ts";
 import anthropicProvider from "../../provider-anthropic/src/index.ts";
 import openaiProvider from "../../provider-openai/src/index.ts";
@@ -284,22 +281,19 @@ async function tryStart(port: number): Promise<import("node:http").Server | null
     console.log(`  Channels:     ${channelManager.getChannels().length} restored from config`);
   });
 
-  // Initialize MCP servers
-  import("./mcp/client.ts").then(async (mcp) => {
-    await mcp.initMCPServers();
-    const servers = mcp.listServers();
-    if (servers.length > 0) {
-      console.log(`  MCP:          ${servers.length} server(s), ${servers.reduce((s, x) => s + x.toolCount, 0)} tools`);
-      const { registerTool } = await import("./plugin/tools.ts");
-      for (const reg of mcp.getMCPToolRegistrations()) {
-        registerTool({
-          name: reg.name, description: reg.description,
-          parameters: reg.parameters,
-          async execute(args: any) { return reg.execute(args); },
-        });
+  // Initialize MCP servers (optional — don't crash if not configured)
+  try {
+    const mcp = await import("./mcp/client.ts");
+    if (mcp.mcpManager?.loadConfigs) {
+      mcp.mcpManager.loadConfigs();
+      const servers = mcp.mcpManager.getServers?.() || [];
+      if (servers.length > 0) {
+        console.log(`  MCP:          ${servers.length} server(s) configured`);
       }
-    } else {
-      console.log(`  MCP:          no servers configured (edit config/mcp-servers.json)`);
     }
-  });
+  } catch (e) {
+    console.warn("  MCP:          Not configured (optional)");
+  }
+
+  console.log("\n  ✅ Nova is ready!\n");
 })();

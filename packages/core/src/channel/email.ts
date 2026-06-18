@@ -1,5 +1,5 @@
 /**
- * Nova Email Bridge — IMAP polling + SMTP send
+ * Nexus AI Email Bridge — IMAP polling + SMTP send
  * Ported from Hermes Agent email_tool.py + send_message_tool.py
  *
  * Supports: send, list, read (full), reply, search, list_folders
@@ -138,7 +138,7 @@ export async function emailSend(to: string, subject: string, body: string, optio
   const transport = await getSmtpTransport();
   try {
     const info = await transport.sendMail({
-      from: `"Nova" <${getConfig().smtp.user}>`,
+      from: `"Nexus AI" <${getConfig().smtp.user}>`,
       to,
       cc: options?.cc,
       bcc: options?.bcc,
@@ -161,10 +161,6 @@ export async function emailSend(to: string, subject: string, body: string, optio
 export async function emailList(folder = "INBOX", limit = 20): Promise<EmailMessage[]> {
   const client = await getImapConnection();
   try {
-    await client.mailboxOpen(folder);
-    const messages: EmailMessage[] = [];
-    const range = `1:${limit}`; // Use last N messages
-
     // Get total count
     const mailbox = await client.mailboxOpen(folder);
     const total = mailbox.exists;

@@ -87,6 +87,7 @@ class MemoryStore {
 
   private writeEntry(entry: MemoryEntry): void {
     const frontmatter = `---
+id: ${entry.id}
 tags: [${entry.tags.join(", ")}]
 scope: ${entry.scope}
 created_at: ${entry.createdAt}
@@ -100,6 +101,7 @@ importance: ${entry.importance}
     let importance: "low" | "medium" | "high" = "medium";
     let body = content;
     let createdAt = new Date().toISOString();
+    let entryId = name; // use filename as the stable ID
 
     if (content.startsWith("---")) {
       const end = content.indexOf("---", 3);
@@ -109,6 +111,7 @@ importance: ${entry.importance}
         for (const line of fm.split("\n")) {
           const [k, ...v] = line.split(":");
           const val = v.join(":").trim();
+          if (k.trim() === "id") entryId = val;
           if (k.trim() === "tags") {
             try { const parsed: string[] = JSON.parse(val.replace(/'/g, '"')); if (Array.isArray(parsed)) tags.push(...parsed); } catch { tags.push(...val.replace(/[[\]"']/g, "").split(",").map((t: string) => t.trim())); }
           }
@@ -119,7 +122,7 @@ importance: ${entry.importance}
     }
 
     if (!body) return null;
-    return { id: randomUUID().slice(0, 8), name, content: body, tags, scope, createdAt, updatedAt: createdAt, lastUsedAt: createdAt, importance };
+    return { id: entryId, name, content: body, tags, scope, createdAt, updatedAt: createdAt, lastUsedAt: createdAt, importance };
   }
 }
 

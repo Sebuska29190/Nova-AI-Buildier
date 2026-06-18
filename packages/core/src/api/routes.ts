@@ -20,7 +20,8 @@ import { makeSnapshot, listSnapshots, rewindFiles } from "../checkpoint/store.ts
 import { uploadSession, listSessions as listGistSessions } from "../cloud-save/gist.ts";
 import { research, listSources } from "../research/engine.ts";
 import { subscribe as monSubscribe, listSubscriptions, unsubscribe as monUnsubscribe } from "../monitor/scheduler.ts";
-import * as cryptoHub from "../crypto-hub/hub.ts";
+// Crypto hub removed in Nexus AI v2.0
+// import * as cryptoHub from "../crypto-hub/hub.ts";
 import { brainstorm } from "../brainstorm/engine.ts";
 import { verifyToken, registerUser, loginUser } from "../auth/jwt.ts";
 import { runTerminal } from "../gateway/routes-terminal.ts";
@@ -182,7 +183,11 @@ export function createRouter(): Hono {
               sendSSE(JSON.stringify({ type: "thinking", content: e.data.text }));
             }
             else if (e.kind === "tool_call" && e.data) {
-              sendSSE(JSON.stringify({ type: "tool_call", tool: e.data.name || e.data.toolName || "unknown", args: e.data.arguments || e.data.args }));
+              const toolName = e.data.name || e.data.toolName || "";
+              // Only forward tool_call events that have a real tool name (skip empty/partial deltas)
+              if (toolName && toolName.length > 2 && toolName !== "unknown") {
+                sendSSE(JSON.stringify({ type: "tool_call", tool: toolName, args: e.data.arguments || e.data.args }));
+              }
             }
             else if (e.kind === "tool_result" && e.data) {
               sendSSE(JSON.stringify({ type: "tool_result", tool: e.data.toolName || e.data.name || "unknown", success: e.data.success !== false, duration: e.data.durationMs }));
@@ -876,29 +881,7 @@ Return valid JSON only (no markdown, no code fences):
     return c.json({ status: "deleted" });
   });
 
-  // Trading
-  app.get("/api/trading/:symbol", async (c) => {
-    const result = await cryptoHub.analyzeSymbol(c.req.param("symbol"));
-    return c.json({ analysis: result });
-  });
-  app.get("/api/trading/:symbol/history", async (c) => {
-    const range = c.req.query("range") as any || "7";
-    const data = await cryptoHub.getPriceHistory(c.req.param("symbol"), range);
-    return c.json({ symbol: c.req.param("symbol"), data });
-  });
-  app.get("/api/trading/watchlist", async (c) => {
-    return c.json({ watchlist: await cryptoHub.getWatchlist() });
-  });
-  app.post("/api/trading/watchlist", async (c) => {
-    const body = await c.req.json<{ symbol: string; note?: string }>();
-    if (!body.symbol) return c.json({ error: "symbol required" }, 400);
-    const entry = await cryptoHub.addToWatchlist(body.symbol);
-    return c.json({ entry }, 201);
-  });
-  app.delete("/api/trading/watchlist/:symbol", async (c) => {
-    const result = await cryptoHub.removeFromWatchlist(c.req.param("symbol"));
-    return c.json({ status: "removed", result });
-  });
+  // Trading routes removed in Nexus AI v2.0
 
   // Brainstorm
   app.post("/api/brainstorm", async (c) => {
@@ -1389,47 +1372,7 @@ Return valid JSON only (no markdown, no code fences):
     } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
   });
 
-  // ─── Shopping Agent ──────────────────────────────────────────────────────────
-  app.get("/api/shopping/products", async (c) => {
-    try {
-      const query = c.req.query("q");
-      const minPrice = c.req.query("minPrice") ? parseFloat(c.req.query("minPrice")!) : undefined;
-      const maxPrice = c.req.query("maxPrice") ? parseFloat(c.req.query("maxPrice")!) : undefined;
-      const site = c.req.query("site") || "all";
-      const limit = c.req.query("limit") ? parseInt(c.req.query("limit")!) : 20;
-      const sort = c.req.query("sort") || "relevance";
-      const offset = c.req.query("offset") ? parseInt(c.req.query("offset")!) : 0;
-
-      if (!query) return c.json({ error: "Query required (q parameter)" }, 400);
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 25000);
-      const { searchProducts } = await import("../shopping/scraper.ts");
-      const result = await searchProducts({ query, minPrice, maxPrice, site, limit: limit + offset });
-      clearTimeout(timeout);
-      const products = result.products.slice(offset, offset + limit);
-
-      // Sort on client-request
-      if (sort === "price_asc") products.sort((a: any, b: any) => (a.price ?? Infinity) - (b.price ?? Infinity));
-      else if (sort === "price_desc") products.sort((a: any, b: any) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
-      else if (sort === "newest") products.sort((a: any, b: any) => (b.title || "").localeCompare(a.title || ""));
-
-      return c.json({ products, total: result.products.length });
-    } catch (e: unknown) { return c.json({ error: safeMessage(e) }, 500); }
-  });
-
-  app.get("/api/shopping/sites", async (c) => {
-    return c.json({
-      sites: [
-        "amazon.fr", "fnac.com", "darty.com", "cdiscount.com", "boulanger.com",
-        "zalando.fr", "adidas.fr", "nike.com/fr", "decathlon.fr", "intersport.fr",
-        "leroymerlin.fr", "manomano.fr", "auchan.fr", "carrefour.fr",
-        "sephora.fr", "galerieslafayette.com", "showroomprive.com", "veepee.fr",
-        "la-redoute.fr", "but.fr", "electrodepot.fr",
-        "celio.com", "petit-bateau.fr", "go-sport.com",
-      ],
-    });
-  });
+  // Shopping routes removed in Nexus AI v2.0
 
   // ─── Analytics ───────────────────────────────────────────────────
   app.get("/api/analytics/stats", async (c) => {

@@ -70,7 +70,7 @@ export const piHarness: HarnessV2 = {
                 function: { name: chunk.name || "", arguments: chunk.args || "" },
               });
             }
-            emitEvent({ type: "event", kind: "tool_call", sessionId, runId, data: { toolCallId: finalId, toolName: chunk.name || "", args: chunk.args || "" } });
+            // tool_call events are emitted by runner.ts (more reliable name)
             break;
           }
           case "error": throw new Error(chunk.message);

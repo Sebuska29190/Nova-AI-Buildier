@@ -1,8 +1,23 @@
 ﻿import type { ToolPlugin, ToolContext } from "@nova/sdk";
-import { bskyTools } from "../bsky/tools.ts";
-import { socialTools } from "../social/tools.ts";
+// Bluesky and social tools removed in Nexus AI v2.0
+// import { bskyTools } from "../bsky/tools.ts";
+// import { socialTools } from "../social/tools.ts";
 
 const tools = new Map<string, ToolPlugin>();
+
+// Safety: block dangerous commands
+function checkDangerousCommand(cmd: string): string | null {
+  const patterns: [RegExp, string][] = [
+    [/\brm\s+-rf\s+\//i, "Recursive delete of root is blocked"],
+    [/\bformat\s+[cde]:/i, "Format of drives is blocked"],
+    [/\bdd\s+if=\/dev\/sd/i, "Direct disk write is blocked"],
+    [/\bkill\s+-9\s+1\b/i, "Killing PID 1 is blocked"],
+  ];
+  for (const [pat, reason] of patterns) {
+    if (pat.test(cmd)) return reason;
+  }
+  return null;
+}
 
 export function registerTool(t: ToolPlugin): void {
   tools.set(t.name, t);
@@ -478,83 +493,7 @@ registerTool({
   },
 });
 
-// ─── Video Editor Tools ─────────────────────────────────────────
-registerTool({
-  name: "analyze_video_clips",
-  description: "Analyze video clips: get duration, resolution, file size. Returns formatted info for each file. Use before generating an edit plan.",
-  parameters: { type: "object", properties: { files: { type: "array", items: { type: "string" }, description: "Array of file paths to analyze" } }, required: ["files"], additionalProperties: false },
-  async execute(args: { files: string[] }) {
-    const { analyzeClips } = await import("../video/editor-tools.ts");
-    return analyzeClips(args.files);
-  },
-});
-
-registerTool({
-  name: "execute_video_plan",
-  description: "Execute a video editing plan using FFmpeg. The plan must specify scenes (clips with trim, speed, effects), captions, music, resolution, and output filename. Returns the output path of the rendered video.",
-  parameters: {
-    type: "object",
-    properties: {
-      plan: { type: "object", description: "JSON editing plan with scenes, captions, music, resolution, fps, output" },
-      workspaceDir: { type: "string", description: "Workspace directory where clips are located" },
-    },
-    required: ["plan", "workspaceDir"],
-    additionalProperties: false,
-  },
-  async execute(args: { plan: any; workspaceDir: string }) {
-    const { executeEditPlan } = await import("../video/editor-tools.ts");
-    const path = await executeEditPlan(args.plan, args.workspaceDir);
-    return `Video rendered: ${path}`;
-  },
-});
-
-// ─── Shopping Agent Tool ─────────────────────────────────────────
-registerTool({
-  name: "search_products",
-  description: "Search for products on French e-commerce websites. Returns product name, price, availability, and link. Works with adidas.fr, zalando.fr, amazon.fr, etc.",
-  parameters: {
-    type: "object",
-    properties: {
-      query: { type: "string", description: "Product search query (in French or English). E.g. 'sac à main adidas femme'" },
-      minPrice: { type: "number", description: "Minimum price in EUR (optional)" },
-      maxPrice: { type: "number", description: "Maximum price in EUR (optional)" },
-      site: { type: "string", description: "Specific site to search: 'adidas.fr', 'zalando.fr', 'amazon.fr', or 'all' (default)" },
-      limit: { type: "number", description: "Max results (default: 10)" },
-    },
-    required: ["query"],
-    additionalProperties: false,
-  },
-  async execute(args: { query: string; minPrice?: number; maxPrice?: number; site?: string; limit?: number }) {
-    const { searchProducts } = await import("../shopping/scraper.ts");
-    const result = await searchProducts({
-      query: args.query,
-      minPrice: args.minPrice,
-      maxPrice: args.maxPrice,
-      site: args.site,
-      limit: args.limit || 10,
-    });
-
-    if (result.error) return `No products found: ${result.error}`;
-    if (result.products.length === 0) return "No products found. Try a different query or site.";
-
-    const lines = [`🔍 Results for "${args.query}" in France (${args.site || "all sites"})`];
-    if (args.minPrice !== undefined || args.maxPrice !== undefined) {
-      lines.push(`💰 Price range: ${args.minPrice ?? 0}€ — ${args.maxPrice ?? "∞"}€`);
-    }
-    lines.push("");
-
-    result.products.forEach((p, i) => {
-      lines.push(`${i + 1}. **${p.title}**`);
-      if (p.price !== "See site") lines.push(`   💰 Price: ${p.price}`);
-      if (p.availability) lines.push(`   ${p.availability}`);
-      lines.push(`   🔗 ${p.url}`);
-      lines.push(`   📍 ${p.site}`);
-      lines.push("");
-    });
-
-    return lines.join("\n");
-  },
-});
+// Video editor and shopping tools removed in Nexus AI v2.0
 
 // ─── Computer Use Tools ─────────────────────────────────────────
 // NOTE: computer_screenshot, computer_mouse_move, computer_mouse_click

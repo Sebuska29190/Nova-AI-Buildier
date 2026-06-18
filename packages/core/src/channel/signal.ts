@@ -1,5 +1,5 @@
 /**
- * Nova Signal Bridge — signal-cli integration
+ * Nexus AI Signal Bridge — signal-cli integration
  *
  * Uses signal-cli (Java CLI daemon) for Signal messaging.
  * First-time setup requires phone number verification via SMS/call.
@@ -14,7 +14,7 @@
  *   SIGNAL_CLI_PATH — path to signal-cli binary (default: "signal-cli")
  */
 
-import { execSync, exec } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 interface SignalMessage {
   source: string;
@@ -34,17 +34,23 @@ function getCliPath(): string {
   return process.env.SIGNAL_CLI_PATH || "signal-cli";
 }
 
-function execSignal(args: string, timeout = 15000): string {
+function execSignal(args: string[], timeout = 15000): string {
   const cli = getCliPath();
   const phone = getPhone();
   try {
-    return execSync(`"${cli}" -u "${phone}" ${args}`, {
+    const result = spawnSync(cli, ["-u", phone, ...args], {
       encoding: "utf-8",
       timeout,
       maxBuffer: 5 * 1024 * 1024,
-    }).trim();
+      windowsHide: true,
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+      throw new Error(`Signal CLI exited with code ${result.status}: ${result.stderr?.trim() || result.stdout?.trim() || "unknown error"}`);
+    }
+    return (result.stdout || "").trim();
   } catch (e: any) {
-    throw new Error(`Signal CLI error:\nstdout: ${e.stdout?.toString().trim() || ""}\nstderr: ${e.stderr?.toString().trim() || e.message}`);
+    throw new Error(`Signal CLI error:\n${e.message || e.stderr || e.stdout || String(e)}`);
   }
 }
 
@@ -53,7 +59,13 @@ function execSignal(args: string, timeout = 15000): string {
  */
 export async function signalStatus(): Promise<string> {
   try {
-    const version = execSync(`"${getCliPath()}" --version`, { encoding: "utf-8", timeout: 5000 }).trim();
+    const result = spawnSync(getCliPath(), ["--version"], {
+      encoding: "utf-8",
+      timeout: 5000,
+      windowsHide: true,
+    });
+    if (result.error) throw result.error;
+    const version = (result.stdout || "").trim();
     const user = getPhone();
     return `Signal CLI ${version}\nRegistered user: ${user}`;
   } catch {
@@ -65,27 +77,40 @@ export async function signalStatus(): Promise<string> {
  * Send a Signal message
  */
 export async function signalSend(recipient: string, message: string): Promise<string> {
-  // recipient can be phone number or group ID
   const isGroup = recipient.startsWith("group.");
-  const arg = isGroup ? `-g "${recipient.replace("group.", "")}"` : `"${recipient}"`;
 
   try {
-    execSignal(`send ${arg} -m "${message.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`);
+    const args = ["send"];
+    if (isGroup) {
+      args.push("-g", recipient.replace("group.", ""));
+    } else {
+      args.push(recipient);
+    }
+    args.push("-m", message);
+
+    execSignal(args);
     return `Signal message sent to ${recipient}`;
   } catch (e: any) {
-    // Try with stdin for longer messages
+    // Retry with stdin for longer messages
     try {
       const cli = getCliPath();
       const phone = getPhone();
-      const escaped = message.replace(/"/g, '\\"');
+      const args = ["-u", phone, "send"];
       if (isGroup) {
-        execSync(`echo "${escaped}" | "${cli}" -u "${phone}" send ${arg}`, {
-          encoding: "utf-8", timeout: 15000, shell: "cmd",
-        });
+        args.push("-g", recipient.replace("group.", ""));
       } else {
-        execSync(`echo "${escaped}" | "${cli}" -u "${phone}" send ${arg}`, {
-          encoding: "utf-8", timeout: 15000, shell: "cmd",
-        });
+        args.push(recipient);
+      }
+
+      const result = spawnSync(cli, args, {
+        input: message,
+        encoding: "utf-8",
+        timeout: 15000,
+        windowsHide: true,
+      });
+      if (result.error) throw result.error;
+      if (result.status !== 0) {
+        throw new Error(`Exit code ${result.status}: ${result.stderr?.trim() || result.stdout?.trim() || "unknown"}`);
       }
       return `Signal message sent to ${recipient}`;
     } catch (e2: any) {
@@ -99,7 +124,7 @@ export async function signalSend(recipient: string, message: string): Promise<st
  */
 export async function signalReceive(limit = 10): Promise<SignalMessage[]> {
   try {
-    const output = execSignal(`receive --timeout 5`, 15000);
+    const output = execSignal(["receive", "--timeout", "5"], 15000);
 
     // Parse signal-cli JSON output
     const messages: SignalMessage[] = [];
@@ -136,7 +161,7 @@ export async function signalReceive(limit = 10): Promise<SignalMessage[]> {
  */
 export async function signalListGroups(): Promise<{ id: string; name: string; memberCount: number }[]> {
   try {
-    const output = execSignal("listGroups", 10000);
+    const output = execSignal(["listGroups"], 10000);
     const groups: { id: string; name: string; memberCount: number }[] = [];
     const lines = output.split("\n");
 
@@ -160,7 +185,7 @@ export async function signalListGroups(): Promise<{ id: string; name: string; me
 export async function signalRegister(phone?: string): Promise<string> {
   const number = phone || getPhone();
   try {
-    execSignal(`register`, 30000);
+    execSignal(["register"], 30000);
     return `Registration SMS sent to ${number}. Check your phone for the verification code.`;
   } catch (e: any) {
     throw new Error(`Signal registration failed: ${e.message}`);
@@ -173,7 +198,7 @@ export async function signalRegister(phone?: string): Promise<string> {
 export async function signalVerify(code: string, phone?: string): Promise<string> {
   const number = phone || getPhone();
   try {
-    execSignal(`verify "${code}"`, 30000);
+    execSignal(["verify", code], 30000);
     return `Signal account ${number} verified successfully!`;
   } catch (e: any) {
     throw new Error(`Signal verification failed: ${e.message}`);
